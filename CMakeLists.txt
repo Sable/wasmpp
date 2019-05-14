@@ -11,7 +11,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt)
 include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt/src)
 include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
-file(GLOB_RECURSE SRC_FILES src/*/*.cpp)
+file(GLOB_RECURSE SRC_FILES src/*/*.cc)
 add_executable(${PROJECT_NAME} ${SRC_FILES} src/main.cc)
 target_link_libraries(${PROJECT_NAME} wabt)
 
