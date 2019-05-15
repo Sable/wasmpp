@@ -21,7 +21,8 @@ public:
   const wabt::Module& GetModule() const;
 
   // Create a new function in a module
-  void CreateFunction(std::string name, wabt::ExprList* exprList);
+  void CreateFunction(std::string name, wabt::FuncSignature sig, std::function<void(wabt::ExprList*,
+                                                                                    std::vector<wabt::Var>)> content);
 
   // Create block expressions
   wabt::ExprList CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content);
@@ -90,18 +91,18 @@ STORE_INSTRUCTIONS_LIST(DECLARE_STORE)
   wabt::ExprList CreateCall(wabt::Var var, std::vector<wabt::ExprList*> args);
 
   // Generate increment
-  wabt::ExprList GenerateI32Increment(wabt::Var var, uint32_t val, bool tee);
+  wabt::ExprList GenerateIncrement(wabt::Var var, wabt::ExprList* inc, bool tee);
   
   // Generate
-  //   get_local {lhs}
-  //   i32.const {inc}
+  //   get_local {comp_lhs}
+  //   {lhs_inc_amount}
   //   i32.add
-  //   tee_local {lhs}
-  //   {rhs}
-  //   {opcode}
+  //   tee_local {comp_lhs}
+  //   {comp_rhs}
+  //   {comp_op}
   //   br_if
-  wabt::ExprList GenerateBranchIfCompInc(wabt::Var var, wabt::Opcode opcode, wabt::Var lhs, uint32_t inc, 
-      wabt::ExprList* rhs);
+  wabt::ExprList GenerateBranchIfCompInc(wabt::Var label, wabt::Opcode comp_op, wabt::Var comp_lhs,
+                                         wabt::ExprList* lhs_inc_amount, wabt::ExprList* comp_rhs);
 };
 
 } // namespace wasm

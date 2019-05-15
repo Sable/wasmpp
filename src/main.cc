@@ -11,12 +11,17 @@ int main() {
   auto& module = mb.GetModule();
 
   // Create function
-  auto loop = mb.CreateLoop([&](wabt::ExprList* e, wabt::Var label) {
-    auto rhs = mb.CreateI32Const(1);
-    auto a = mb.GenerateBranchIfCompInc(label, wabt::Opcode::I32Ne, wabt::Var("$k"), 1, &rhs);
-    wasm::ModuleBuilder::Merge(e, &a);
+  mb.CreateFunction("sigmoid", {{wabt::Type::I32, wabt::Type::I32}, {wabt::Type::I32}},
+                    [&](wabt::ExprList* e, std::vector<wabt::Var> params) {
+    auto loop = mb.CreateLoop([&](wabt::ExprList* e, wabt::Var label) {
+      auto inc = mb.CreateI32Const(1);
+      auto rhs = mb.CreateI32Const(1);
+      auto a = mb.GenerateBranchIfCompInc(label, wabt::Opcode::I32Ne, params[1], &inc, &rhs);
+      wasm::ModuleBuilder::Merge(e, &a);
+    });
+    wasm::ModuleBuilder::Merge(e, &loop);
   });
-  mb.CreateFunction("sigmoid", &loop);
+
 
   // Write module to output stream
   wabt::WriteWatOptions watOptions;
