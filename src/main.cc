@@ -16,7 +16,7 @@ int main() {
     auto loop = mb.CreateLoop([&](wabt::ExprList* e, wabt::Var label) {
       auto inc = mb.CreateI32Const(1);
       auto rhs = mb.CreateI32Const(1);
-      auto a = mb.GenerateBranchIfCompInc(label, wabt::Opcode::I32Ne, params[1], &inc, &rhs);
+      auto a = mb.GenerateBranchIfCompInc(label, wabt::Type::I32, wabt::Opcode::I32Ne, params[1], &inc, &rhs);
       wasm::ModuleBuilder::Merge(e, &a);
     });
     wasm::ModuleBuilder::Merge(e, &loop);

@@ -24,7 +24,7 @@ public:
   const wabt::Module& GetModule() const;
 
   // Create a new function in a module
-  void CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+  wabt::Var CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
                       std::function<void(wabt::ExprList*, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
 
   // Create block expressions
@@ -93,18 +93,22 @@ STORE_INSTRUCTIONS_LIST(DECLARE_STORE)
   // Create calls
   wabt::ExprList CreateCall(wabt::Var var, std::vector<wabt::ExprList*> args);
 
-  // Generate increment
-  wabt::ExprList GenerateIncrement(wabt::Var var, wabt::ExprList* inc, bool tee);
-  
+  // Generate
+  //   get_local {var}
+  //   {inc}
+  //   [i32,i64,f32,f64].add
+  //   set_local {var} | tee_local {var}
+  wabt::ExprList GenerateIncrement(wabt::Type type, wabt::Var var, wabt::ExprList* inc, bool tee);
+
   // Generate
   //   get_local {comp_lhs}
   //   {lhs_inc_amount}
-  //   i32.add
+  //   [i32,i64,f32,f64].add
   //   tee_local {comp_lhs}
   //   {comp_rhs}
   //   {comp_op}
   //   br_if
-  wabt::ExprList GenerateBranchIfCompInc(wabt::Var label, wabt::Opcode comp_op, wabt::Var comp_lhs,
+  wabt::ExprList GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op, wabt::Var comp_lhs,
                                          wabt::ExprList* lhs_inc_amount, wabt::ExprList* comp_rhs);
 };
 

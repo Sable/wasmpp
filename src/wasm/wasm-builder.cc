@@ -25,11 +25,12 @@ wabt::ExprList ModuleBuilder::ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
   return e;
 }
 
-void ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+wabt::Var ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
                                    std::function<void(wabt::ExprList *, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
-  module_.AppendField(std::move(wabt::MakeUnique<wabt::FuncModuleField>()));
+  wabt::Var func_name = wabt::Var(GenerateUid());
+  module_.AppendField(std::move(wabt::MakeUnique<wabt::FuncModuleField>(wabt::Location(), func_name.name())));
   auto func = module_.funcs.back();
   func->decl.sig = sig;
 
@@ -63,6 +64,7 @@ void ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig, wa
 
   // Populate content
   content(&func->exprs, param_vars, local_vars);
+  return func_name;
 }
 
 wabt::ExprList ModuleBuilder::CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content) {
@@ -179,15 +181,32 @@ wabt::ExprList ModuleBuilder::Create##opcode(wabt::ExprList *index, wabt::ExprLi
 STORE_INSTRUCTIONS_LIST(DEFINE_STORE)
 #undef DEFINE_STORE
 
-wabt::ExprList ModuleBuilder::GenerateIncrement(wabt::Var var, wabt::ExprList *inc, bool tee) {
+wabt::ExprList ModuleBuilder::GenerateIncrement(wabt::Type type, wabt::Var var, wabt::ExprList *inc, bool tee) {
   auto lhs = CreateLocalGet(var);
-  auto add = CreateBinary(wabt::Opcode::I32Add, &lhs, inc);
+  wabt::ExprList add;
+  switch(type) {
+    case wabt::Type::I32:
+      add = CreateBinary(wabt::Opcode::I32Add, &lhs, inc);
+      break;
+    case wabt::Type::I64:
+      add = CreateBinary(wabt::Opcode::I64Add, &lhs, inc);
+      break;
+    case wabt::Type::F32:
+      add = CreateBinary(wabt::Opcode::F32Add, &lhs, inc);
+      break;
+    case wabt::Type::F64:
+      add = CreateBinary(wabt::Opcode::F64Add, &lhs, inc);
+      break;
+    default:
+      assert(!"Type not supported");
+  }
   return tee ? CreateLocalTree(var, &add) : CreateLocalSet(var, &add);
 }
 
-wabt::ExprList ModuleBuilder::GenerateBranchIfCompInc(wabt::Var label, wabt::Opcode comp_op, wabt::Var comp_lhs,
-                                                      wabt::ExprList *lhs_inc_amount, wabt::ExprList *comp_rhs) {
-  auto tee = GenerateIncrement(std::move(comp_lhs), lhs_inc_amount, true);
+wabt::ExprList ModuleBuilder::GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op,
+                                                      wabt::Var comp_lhs, wabt::ExprList *lhs_inc_amount,
+                                                      wabt::ExprList *comp_rhs) {
+  auto tee = GenerateIncrement(type, std::move(comp_lhs), lhs_inc_amount, true);
   auto comp = CreateBinary(comp_op, &tee, comp_rhs);
   return CreateBrIf(std::move(label), &comp);
 }
