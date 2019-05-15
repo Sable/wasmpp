@@ -18,11 +18,14 @@ public:
   // Append e2 to the end of e1
   static void Merge(wabt::ExprList* e1, wabt::ExprList* e2);
 
+  // To ExprList
+  static wabt::ExprList ExprToExprList(std::unique_ptr<wabt::Expr> expr);
+
   const wabt::Module& GetModule() const;
 
   // Create a new function in a module
-  void CreateFunction(std::string name, wabt::FuncSignature sig, std::function<void(wabt::ExprList*,
-                                                                                    std::vector<wabt::Var>)> content);
+  void CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+                      std::function<void(wabt::ExprList*, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
 
   // Create block expressions
   wabt::ExprList CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content);

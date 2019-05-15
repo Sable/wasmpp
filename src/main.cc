@@ -11,8 +11,8 @@ int main() {
   auto& module = mb.GetModule();
 
   // Create function
-  mb.CreateFunction("sigmoid", {{wabt::Type::I32, wabt::Type::I32}, {wabt::Type::I32}},
-                    [&](wabt::ExprList* e, std::vector<wabt::Var> params) {
+  mb.CreateFunction("sigmoid", {{wabt::Type::I32, wabt::Type::I32}, {wabt::Type::I32}}, {wabt::Type::I32},
+                    [&](wabt::ExprList* e, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
     auto loop = mb.CreateLoop([&](wabt::ExprList* e, wabt::Var label) {
       auto inc = mb.CreateI32Const(1);
       auto rhs = mb.CreateI32Const(1);

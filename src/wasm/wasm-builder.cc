@@ -19,20 +19,38 @@ void ModuleBuilder::Merge(wabt::ExprList* e1, wabt::ExprList* e2) {
   }
 }
 
-void ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig,
-                                   std::function<void(wabt::ExprList *, std::vector<wabt::Var>)> content) {
+wabt::ExprList ModuleBuilder::ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
+  wabt::ExprList e;
+  e.push_back(std::move(expr));
+  return e;
+}
+
+void ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+                                   std::function<void(wabt::ExprList *, std::vector<wabt::Var>,
+                                                      std::vector<wabt::Var>)> content) {
   // Create a function field
   module_.AppendField(std::move(wabt::MakeUnique<wabt::FuncModuleField>()));
   auto func = module_.funcs.back();
   func->decl.sig = sig;
 
   // Create params
-  std::vector<wabt::Var> params;
-  for(wabt::Index i=0; i < func->decl.sig.param_types.size(); i++) {
+  std::vector<wabt::Var> param_vars;
+  for(wabt::Index i=0; i < func->GetNumParams(); i++) {
     std::string uid = GenerateUid();
     func->bindings.emplace(uid, wabt::Binding(wabt::Location(), i));
-    params.emplace_back(wabt::Var(uid));
+    param_vars.emplace_back(wabt::Var(uid));
   }
+
+  // Create locals
+  std::vector<wabt::Var> local_vars;
+  std::vector<wabt::Type> local_types;
+  for(wabt::Index i=0; i < locals.size(); i++) {
+    std::string uid = GenerateUid();
+    func->bindings.emplace(uid, wabt::Binding(wabt::Location(), func->GetNumParams() + i));
+    local_vars.emplace_back(wabt::Var(uid));
+    local_types.emplace_back(locals[i]);
+  }
+  func->local_types.Set(local_types);
 
   // Create an export field
   wabt::ModuleFieldList export_fields;
@@ -44,7 +62,7 @@ void ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig,
   module_.AppendFields(&export_fields);
 
   // Populate content
-  content(&func->exprs, params);
+  content(&func->exprs, param_vars, local_vars);
 }
 
 wabt::ExprList ModuleBuilder::CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content) {
@@ -82,37 +100,27 @@ wabt::ExprList ModuleBuilder::CreateBinary(wabt::Opcode opcode, wabt::ExprList* 
 }
 
 wabt::ExprList ModuleBuilder::CreateI32Const(uint32_t val) {
-  wabt::ExprList e;
-  e.push_back(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I32(val)));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I32(val)));
 }
 
 wabt::ExprList ModuleBuilder::CreateI64Const(uint64_t val) {
-  wabt::ExprList e;
-  e.push_back(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I64(val)));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I64(val)));
 }
 
 wabt::ExprList ModuleBuilder::CreateF32Const(float val) {
-  wabt::ExprList e;
   uint32_t value;
   memcpy(&val, &value, sizeof(val));
-  e.push_back(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F32(value)));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F32(value)));
 }
 
 wabt::ExprList ModuleBuilder::CreateF64Const(double val) {
-  wabt::ExprList e;
   uint64_t value;
   memcpy(&val, &value, sizeof(val));
-  e.push_back(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value)));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value)));
 }
 
 wabt::ExprList ModuleBuilder::CreateBr(wabt::Var label) {
-  wabt::ExprList e;
-  e.push_back(wabt::MakeUnique<wabt::BrExpr>(label));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::BrExpr>(label));
 }
 
 wabt::ExprList ModuleBuilder::CreateBrIf(wabt::Var label, wabt::ExprList* cond) {
@@ -123,9 +131,7 @@ wabt::ExprList ModuleBuilder::CreateBrIf(wabt::Var label, wabt::ExprList* cond) 
 }
 
 wabt::ExprList ModuleBuilder::CreateLocalGet(wabt::Var var) {
-  wabt::ExprList e;
-  e.push_back(wabt::MakeUnique<wabt::LocalGetExpr>(var));
-  return e;
+  return ExprToExprList(wabt::MakeUnique<wabt::LocalGetExpr>(var));
 }
 
 wabt::ExprList ModuleBuilder::CreateLocalSet(wabt::Var var, wabt::ExprList* val) {
