@@ -26,10 +26,10 @@ public:
   const wabt::Module& GetModule() const;
 
   // Generate wat code
-  std::string ToWat(bool folded, bool inline_import_export);
+  std::string ToWat(bool folded, bool inline_import_export) const;
 
   // Generate wasm code
-  wabt::OutputBuffer ToWasm();
+  wabt::OutputBuffer ToWasm() const;
 
   // Create a new function in a module
   wabt::Var CreateFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,

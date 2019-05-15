@@ -10,7 +10,7 @@ const wabt::Module& ModuleBuilder::GetModule() const {
   return module_;
 }
 
-std::string ModuleBuilder::ToWat(bool folded, bool inline_import_export) {
+std::string ModuleBuilder::ToWat(bool folded, bool inline_import_export) const {
   wabt::WriteWatOptions wat_options;
   wat_options.fold_exprs = folded;
   wat_options.inline_import = inline_import_export;
@@ -20,7 +20,7 @@ std::string ModuleBuilder::ToWat(bool folded, bool inline_import_export) {
   return std::string(stream.output_buffer().data.begin(), stream.output_buffer().data.end());
 }
 
-wabt::OutputBuffer ModuleBuilder::ToWasm() {
+wabt::OutputBuffer ModuleBuilder::ToWasm() const {
   wabt::WriteBinaryOptions binaryOptions;
   wabt::MemoryStream stream;
   WriteBinaryModule(&stream, &module_, binaryOptions);
