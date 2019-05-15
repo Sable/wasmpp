@@ -1,10 +1,30 @@
-#include <src/wasm/wasm-builder.h>
+#include <src/wasmpp/wasm-builder.h>
+#include <src/wat-writer.h>
+#include <src/binary-writer.h>
+#include <src/stream.h>
 #include <sstream>
 
-namespace wasm {
+namespace wasmpp {
 
 const wabt::Module& ModuleBuilder::GetModule() const {
   return module_;
+}
+
+std::string ModuleBuilder::ToWat(bool folded, bool inline_import_export) {
+  wabt::WriteWatOptions wat_options;
+  wat_options.fold_exprs = folded;
+  wat_options.inline_import = inline_import_export;
+  wat_options.inline_export = inline_import_export;
+  wabt::MemoryStream stream;
+  wabt::WriteWat(&stream, &module_, wat_options);
+  return std::string(stream.output_buffer().data.begin(), stream.output_buffer().data.end());
+}
+
+wabt::OutputBuffer ModuleBuilder::ToWasm() {
+  wabt::WriteBinaryOptions binaryOptions;
+  wabt::MemoryStream stream;
+  WriteBinaryModule(&stream, &module_, binaryOptions);
+  return stream.output_buffer();
 }
 
 std::string ModuleBuilder::GenerateUid() {
@@ -25,7 +45,7 @@ wabt::ExprList ModuleBuilder::ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
   return e;
 }
 
-wabt::Var ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+wabt::Var ModuleBuilder::CreateFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                                    std::function<void(wabt::ExprList *, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
@@ -54,17 +74,45 @@ wabt::Var ModuleBuilder::CreateFunction(std::string name, wabt::FuncSignature si
   func->local_types.Set(local_types);
 
   // Create an export field
-  wabt::ModuleFieldList export_fields;
-  auto export_field = wabt::MakeUnique<wabt::ExportModuleField>();
-  export_field->export_.kind = wabt::ExternalKind::Func;
-  export_field->export_.name = std::move(name);
-  export_field->export_.var = wabt::Var(module_.funcs.size() - 1);
-  export_fields.push_back(std::move(export_field));
-  module_.AppendFields(&export_fields);
+  if(name) {
+    wabt::ModuleFieldList export_fields;
+    auto export_field = wabt::MakeUnique<wabt::ExportModuleField>();
+    export_field->export_.kind = wabt::ExternalKind::Func;
+    export_field->export_.name = std::move(name);
+    export_field->export_.var = wabt::Var(module_.funcs.size() - 1);
+    export_fields.push_back(std::move(export_field));
+    module_.AppendFields(&export_fields);
+  }
 
   // Populate content
   content(&func->exprs, param_vars, local_vars);
   return func_name;
+}
+
+wabt::Var ModuleBuilder::CreateFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
+  wabt::Var import_name(GenerateUid());
+  auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
+  import->func.decl.sig = sig;
+  auto field = wabt::MakeUnique<wabt::ImportModuleField>(std::move(import));
+  field->import->module_name = module;
+  field->import->field_name = function;
+  module_.AppendField(std::move(field));
+  return import_name;
+}
+
+wabt::Var ModuleBuilder::CreateMemory(uint64_t init_page, uint64_t max, bool shared) {
+  wabt::Var memory_name(GenerateUid());
+  auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());
+  field->memory.page_limits.initial = init_page;
+  field->memory.page_limits.is_shared = shared;
+  field->memory.page_limits.max = max;
+  if(shared || max != 0) {
+    field->memory.page_limits.has_max = true;
+  } else {
+    field->memory.page_limits.has_max = false;
+  }
+  module_.AppendField(std::move(field));
+  return memory_name;
 }
 
 wabt::ExprList ModuleBuilder::CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content) {

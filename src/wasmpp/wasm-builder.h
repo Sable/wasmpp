@@ -2,8 +2,9 @@
 #define WASM_WASM_BUILDER_H_
 
 #include <src/ir.h>
+#include <third_party/wabt/src/stream.h>
 
-namespace wasm {
+namespace wasmpp {
 
 class ModuleBuilder {
 private:
@@ -21,11 +22,24 @@ public:
   // To ExprList
   static wabt::ExprList ExprToExprList(std::unique_ptr<wabt::Expr> expr);
 
+  // Get module
   const wabt::Module& GetModule() const;
 
+  // Generate wat code
+  std::string ToWat(bool folded, bool inline_import_export);
+
+  // Generate wasm code
+  wabt::OutputBuffer ToWasm();
+
   // Create a new function in a module
-  wabt::Var CreateFunction(std::string name, wabt::FuncSignature sig, wabt::TypeVector locals,
+  wabt::Var CreateFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                       std::function<void(wabt::ExprList*, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
+
+  // Create import
+  wabt::Var CreateFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
+
+  // Create memory
+  wabt::Var CreateMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
 
   // Create block expressions
   wabt::ExprList CreateLoop(std::function<void(wabt::ExprList*, wabt::Var)> content);
