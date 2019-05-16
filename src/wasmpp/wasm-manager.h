@@ -37,15 +37,15 @@ public:
   // Generate wasm code
   wabt::OutputBuffer ToWasm() const;
 
-  // Create a new function in a module
-  wabt::Var CreateFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
+  // Make a new function in a module
+  wabt::Var MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                            std::function<void(FuncBody, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
 
-  // Create import
-  wabt::Var CreateFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
+  // Make import
+  wabt::Var MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
 
-  // Create memory
-  wabt::Var CreateMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
+  // Make memory
+  wabt::Var MakeMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
 };
 
 } // namespace wasm

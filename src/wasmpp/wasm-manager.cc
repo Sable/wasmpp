@@ -40,7 +40,7 @@ std::string ModuleManager::GenerateUid() {
   return ss.str();
 }
 
-wabt::Var ModuleManager::CreateFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
+wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                                    std::function<void(FuncBody, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
@@ -73,7 +73,7 @@ wabt::Var ModuleManager::CreateFunction(const char* name, wabt::FuncSignature si
     wabt::ModuleFieldList export_fields;
     auto export_field = wabt::MakeUnique<wabt::ExportModuleField>();
     export_field->export_.kind = wabt::ExternalKind::Func;
-    export_field->export_.name = std::move(name);
+    export_field->export_.name = name;
     export_field->export_.var = wabt::Var(module_.funcs.size() - 1);
     export_fields.push_back(std::move(export_field));
     module_.AppendFields(&export_fields);
@@ -86,28 +86,24 @@ wabt::Var ModuleManager::CreateFunction(const char* name, wabt::FuncSignature si
   return func_name;
 }
 
-wabt::Var ModuleManager::CreateFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
+wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
   wabt::Var import_name(GenerateUid());
   auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
-  import->func.decl.sig = sig;
+  import->func.decl.sig = std::move(sig);
   auto field = wabt::MakeUnique<wabt::ImportModuleField>(std::move(import));
-  field->import->module_name = module;
-  field->import->field_name = function;
+  field->import->module_name = std::move(module);
+  field->import->field_name = std::move(function);
   module_.AppendField(std::move(field));
   return import_name;
 }
 
-wabt::Var ModuleManager::CreateMemory(uint64_t init_page, uint64_t max, bool shared) {
+wabt::Var ModuleManager::MakeMemory(uint64_t init_page, uint64_t max, bool shared) {
   wabt::Var memory_name(GenerateUid());
   auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());
   field->memory.page_limits.initial = init_page;
   field->memory.page_limits.is_shared = shared;
   field->memory.page_limits.max = max;
-  if(shared || max != 0) {
-    field->memory.page_limits.has_max = true;
-  } else {
-    field->memory.page_limits.has_max = false;
-  }
+  field->memory.page_limits.has_max = shared || max != 0;
   module_.AppendField(std::move(field));
   return memory_name;
 }
