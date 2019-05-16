@@ -24,7 +24,7 @@ target_link_libraries(${PROJECT_NAME} wabt)
 
 # Create learn-or application
 set(NN_APP "nn")
-file(GLOB_RECURSE NN_SRC_FILES src/apps/nn-builder/*.cc)
+file(GLOB_RECURSE NN_SRC_FILES src/apps/nn-builder/*.cc src/apps/nn-builder/*/*.cc)
 add_executable(${NN_APP} ${NN_SRC_FILES})
 target_link_libraries(${NN_APP} wabt wasmpp)
 

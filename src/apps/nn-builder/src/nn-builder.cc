@@ -1,5 +1,6 @@
 #include <src/wasmpp/wasm-manager.h>
 #include <src/wasmpp/wasm-instructions.h>
+#include <src/wasmpp/data_structure/ndarray.h>
 #include <iostream>
 
 using namespace wasmpp;
