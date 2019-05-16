@@ -18,6 +18,25 @@ struct ContentManager {
 typedef ContentManager FuncBody;
 typedef ContentManager BlockBody;
 
+struct Memory {
+  uint64_t begin;
+  uint64_t end;
+  uint64_t Size() {
+    assert(begin < end);
+    return end - begin;
+  }
+};
+
+class MemoryManager {
+private:
+  std::vector<Memory*> memories_;
+public:
+  ~MemoryManager();
+  Memory* Allocate(uint64_t k);
+  bool Free(Memory* m);
+  uint64_t Pages();
+};
+
 class ModuleManager {
 private:
   wabt::Module module_;
