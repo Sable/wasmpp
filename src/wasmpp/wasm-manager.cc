@@ -4,6 +4,8 @@
 #include <src/binary-writer.h>
 #include <src/stream.h>
 #include <src/cast.h>
+#include <src/validator.h>
+#include <src/resolve-names.h>
 #include <sstream>
 #include <stack>
 #include <algorithm>
@@ -55,6 +57,20 @@ bool MemoryManager::Free(wasmpp::Memory *m) {
 
 const wabt::Module& ModuleManager::GetModule() const {
   return module_;
+}
+
+bool ModuleManager::Validate() {
+  wabt::Errors errors;
+  wabt::ValidateOptions options;
+  if(wabt::Succeeded(wabt::ResolveNamesModule(&module_, &errors))) {
+    if(wabt::Succeeded(wabt::ValidateModule(&module_, &errors, options))) {
+      return true;
+    }
+  }
+  for(auto error : errors) {
+    fprintf(stderr, "%s\n", error.message.c_str());
+  }
+  return false;
 }
 
 std::string ModuleManager::ToWat(bool folded, bool inline_import_export) const {

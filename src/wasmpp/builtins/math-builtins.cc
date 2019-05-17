@@ -15,10 +15,10 @@ MathBuiltins::MathBuiltins(ModuleManager *module_manager, ModuleManagerOptions* 
 }
 
 Var MathBuiltins::BuildSigmoid() {
-  return module_manager_->MakeFunction(nullptr, {{Type::F32}, {Type::F32}}, {}, [&](FuncBody f, std::vector<Var> params,
+  return module_manager_->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f, std::vector<Var> params,
                                                                                     std::vector<Var> locals) {
     auto exp = MakeCall(Exp(), {MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0]))});
-    auto div = MakeBinary(Opcode::F64Div, MakeI32Const(1), MakeBinary(Opcode::I32Add, MakeI32Const(1), exp));
+    auto div = MakeBinary(Opcode::F64Div, MakeF64Const(1), MakeBinary(Opcode::F64Add, MakeF64Const(1), exp));
     f.Insert(div);
   });
 }

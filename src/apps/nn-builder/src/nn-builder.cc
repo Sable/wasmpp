@@ -21,11 +21,15 @@ int main() {
   auto dstMem = mm.Memory().Allocate(100);
   auto dst    = wasmpp::NDArray(dstMem, {10, 10});
 
-  mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32},
+  mm.MakeMemory(1);
+  Type type = Type::F64;
+  mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
                   [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
     nn::compute::math::Multiply2DArrays(Type::F64, &mm, &f, a1, a2, dst, locals);
   });
 
-  std::cout << mm.ToWat(true, true);
+  if(mm.Validate()) {
+    std::cout << mm.ToWat(true, true);
+  }
   return 0;
 }

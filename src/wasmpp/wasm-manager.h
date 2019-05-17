@@ -71,6 +71,9 @@ public:
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
 
+  // Validation
+  bool Validate();
+
   // Generate code
   std::string ToWat(bool folded, bool inline_import_export) const;
   wabt::OutputBuffer ToWasm() const;
