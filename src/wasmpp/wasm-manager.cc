@@ -12,7 +12,7 @@ namespace wasmpp {
 
 void ContentManager::Insert(exprs_sptr e) {
   while(e->size() > 0) {
-    expr_list->push_back(e->extract_front());
+    expr_list_->push_back(e->extract_front());
   }
 }
 
@@ -120,8 +120,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   }
 
   // Populate content
-  FuncBody func_body;
-  func_body.expr_list = &func->exprs;
+  FuncBody func_body(&func->exprs);
   content(func_body, param_vars, local_vars);
   return func_name;
 }

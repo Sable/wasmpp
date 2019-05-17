@@ -1,36 +1,22 @@
 #include <src/wasmpp/wasm-instructions-gen.h>
-#include <utility>
+#include <src/wasmpp/wasm-manager.h>
 
 namespace wasmpp {
 
-exprs_sptr GenerateIncrement(wabt::Type type, wabt::Var var, exprs_sptr inc, bool tee) {
-  auto lhs = MakeLocalGet(var);
-  wabt::Opcode op;
-  switch(type) {
-    case wabt::Type::I32:
-      op = wabt::Opcode::I32Add;
-      break;
-    case wabt::Type::I64:
-      op = wabt::Opcode::I64Add;
-      break;
-    case wabt::Type::F32:
-      op = wabt::Opcode::F32Add;
-      break;
-    case wabt::Type::F64:
-      op = wabt::Opcode::F64Add;
-      break;
-    default:
-      assert(!"Type not supported");
-  }
-  exprs_sptr add = MakeBinary(op, lhs, inc);
-  return tee ? MakeLocalTree(var, add) : MakeLocalSet(var, add);
-}
-
-exprs_sptr GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op,
-                                       wabt::Var comp_lhs, exprs_sptr lhs_inc_amount, exprs_sptr comp_rhs) {
-  auto tee = GenerateIncrement(type, std::move(comp_lhs), lhs_inc_amount, true);
-  auto comp = MakeBinary(comp_op, tee, comp_rhs);
-  return MakeBrIf(std::move(label), comp);
+exprs_sptr GenerateRangeLoop(ModuleManager* mm,
+                             wabt::Var var, uint32_t start, uint32_t end,
+                             uint32_t inc, std::function<void(BlockBody*)> content) {
+  exprs_sptr e = CreateExprList();
+  Merge(e, MakeLocalSet(var, MakeI32Const(start)));
+  auto loop = MakeLoop(mm, [&](BlockBody b, wabt::Var label) {
+    content(&b);
+    auto tee_local = MakeLocalTree(var, MakeBinary(wabt::Opcode::I32Add, MakeLocalGet(var), MakeI32Const(inc)));
+    auto cmp = MakeBinary(wabt::Opcode::I32Ne, tee_local, MakeI32Const(end));
+    auto br_if = MakeBrIf(label, cmp);
+    b.Insert(br_if);
+  });
+  Merge(e, loop);
+  return e;
 }
 
 } // namespace wasmpp

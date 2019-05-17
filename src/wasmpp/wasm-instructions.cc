@@ -21,7 +21,7 @@ void Merge(exprs_sptr e1, exprs_sptr e2) {
     assert(!"Cannot merge empty expression list. "
             "Maybe this expression list has already been merged/used?");
   }
-  while(e2->size() > 0) {
+  while(!e2->empty()) {
     e1->push_back(e2->extract_front());
   }
 }
@@ -30,8 +30,7 @@ exprs_sptr MakeLoop(ModuleManager* mm, std::function<void(BlockBody, wabt::Var)>
   exprs_sptr e = CreateExprList();
   auto loop = wabt::MakeUnique<wabt::LoopExpr>();
   loop->block.label = mm->GenerateUid();
-  BlockBody block_body;
-  block_body.expr_list= &loop->block.exprs;
+  BlockBody block_body(&loop->block.exprs);
   content(block_body, wabt::Var(loop->block.label));
   e->push_back(std::move(loop));
   return e;
@@ -41,8 +40,7 @@ exprs_sptr MakeBlock(ModuleManager* mm, std::function<void(BlockBody, wabt::Var)
   exprs_sptr e = CreateExprList();
   auto block = wabt::MakeUnique<wabt::BlockExpr>();
   block->block.label = mm->GenerateUid();
-  BlockBody block_body;
-  block_body.expr_list = &block->block.exprs;
+  BlockBody block_body(&block->block.exprs);
   content(block_body, wabt::Var(block->block.label));
   e->push_back(std::move(block));
   return e;

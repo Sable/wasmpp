@@ -18,7 +18,7 @@ private:
 public:
   NDArray(Memory* memory, std::vector<uint64_t> shape);
   void Reshape(std::vector<uint64_t> shape);
-  std::vector<uint64_t >GetShape() const { return shape_;}
+  std::vector<uint64_t >Shape() const { return shape_;}
   uint64_t GetLinearIndex(std::vector<uint64_t> index) const;
 };
 

@@ -8,13 +8,16 @@
 
 namespace wasmpp {
 
-struct ContentManager {
-  wabt::ExprList* expr_list;
+class ContentManager {
+private:
+  wabt::ExprList* expr_list_;
+public:
   // Extract the elements from input list
   // into structure list. Do not re-use the
   // input list as it will become empty after
   // calling this method
   void Insert(exprs_sptr e);
+  ContentManager(wabt::ExprList* expr_list) : expr_list_(expr_list) {}
 };
 
 typedef ContentManager FuncBody;

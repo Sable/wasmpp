@@ -18,7 +18,7 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt/src)
 include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
 
 # Create wasmpp library
-file(GLOB_RECURSE SRC_FILES src/wasmpp/*.cc)
+file(GLOB_RECURSE SRC_FILES src/wasmpp/*.cc src/wasmpp/*/*.cc)
 add_library(${PROJECT_NAME} ${SRC_FILES})
 target_link_libraries(${PROJECT_NAME} wabt)
 
