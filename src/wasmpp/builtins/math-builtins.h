@@ -17,6 +17,11 @@ private:
     MATH_BUILTINS(CREATE_VAR)
 #undef CREATE_VAR
 
+#define CREATE_BUILD_FUNC(var, name) \
+  wabt::Var Build##name();
+    MATH_BUILTINS(CREATE_BUILD_FUNC)
+#undef CREATE_BUILD_FUNC
+
 public:
   MathBuiltins(ModuleManager* moduleManager, ModuleManagerOptions* options);
 
@@ -24,11 +29,6 @@ public:
   wabt::Var name() const;
   MATH_BUILTINS(CREATE_GET_VAR)
 #undef CREATE_VAR
-
-#define CREATE_BUILD_FUNC(var, name) \
-  wabt::Var Build##name();
-    MATH_BUILTINS(CREATE_BUILD_FUNC)
-#undef CREATE_BUILD_FUNC
 };
 
 } // namespace wasmpp
