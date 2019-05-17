@@ -4,20 +4,20 @@
 #include <src/ir.h>
 #include <third_party/wabt/src/stream.h>
 #include <src/wasmpp/builtins/math-builtins.h>
+#include <src/wasmpp/wasm-instructions.h>
 
 namespace wasmpp {
 
 struct ContentManager {
-  wabt::ExprList* exprList;
+  wabt::ExprList* expr_list;
   // Extract the elements from input list
   // into structure list. Do not re-use the
   // input list as it will become empty after
   // calling this method
-  void Insert(wabt::ExprList* e);
+  void Insert(exprs_sptr e);
 };
 
 typedef ContentManager FuncBody;
-typedef ContentManager BlockBody;
 
 struct Memory {
   uint64_t begin;

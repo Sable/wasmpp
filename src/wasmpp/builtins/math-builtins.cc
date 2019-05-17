@@ -17,14 +17,9 @@ MathBuiltins::MathBuiltins(ModuleManager *module_manager, ModuleManagerOptions* 
 Var MathBuiltins::BuildSigmoid() {
   return module_manager_->MakeFunction(nullptr, {{Type::F32}, {Type::F32}}, {}, [&](FuncBody f, std::vector<Var> params,
                                                                                     std::vector<Var> locals) {
-    auto val = MakeLocalGet(params[0]);
-    auto negVal = MakeUnary(Opcode::F64Neg, &val);
-    auto exp = MakeCall(Exp(), {&negVal});
-    auto one1 = MakeI32Const(1);
-    auto one2 = MakeI32Const(1);
-    auto add = MakeBinary(Opcode::I32Add, &one1, &exp);
-    auto div = MakeBinary(Opcode::F64Div, &one2, &add);
-    f.Insert(&div);
+    auto exp = MakeCall(Exp(), {MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0]))});
+    auto div = MakeBinary(Opcode::F64Div, MakeI32Const(1), MakeBinary(Opcode::I32Add, MakeI32Const(1), exp));
+    f.Insert(div);
   });
 }
 

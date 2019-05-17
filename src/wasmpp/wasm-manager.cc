@@ -10,8 +10,10 @@
 
 namespace wasmpp {
 
-void ContentManager::Insert(wabt::ExprList *e) {
-  Merge(exprList, e);
+void ContentManager::Insert(exprs_sptr e) {
+  while(e->size() > 0) {
+    expr_list->push_back(e->extract_front());
+  }
 }
 
 MemoryManager::~MemoryManager() {
@@ -119,7 +121,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
 
   // Populate content
   FuncBody func_body;
-  func_body.exprList = &func->exprs;
+  func_body.expr_list = &func->exprs;
   content(func_body, param_vars, local_vars);
   return func_name;
 }

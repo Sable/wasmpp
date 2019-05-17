@@ -1,35 +1,36 @@
 #include <src/wasmpp/wasm-instructions-gen.h>
+#include <utility>
 
 namespace wasmpp {
 
-wabt::ExprList GenerateIncrement(wabt::Type type, wabt::Var var, wabt::ExprList *inc, bool tee) {
+exprs_sptr GenerateIncrement(wabt::Type type, wabt::Var var, exprs_sptr inc, bool tee) {
   auto lhs = MakeLocalGet(var);
-  wabt::ExprList add;
+  wabt::Opcode op;
   switch(type) {
     case wabt::Type::I32:
-      add = MakeBinary(wabt::Opcode::I32Add, &lhs, inc);
+      op = wabt::Opcode::I32Add;
       break;
     case wabt::Type::I64:
-      add = MakeBinary(wabt::Opcode::I64Add, &lhs, inc);
+      op = wabt::Opcode::I64Add;
       break;
     case wabt::Type::F32:
-      add = MakeBinary(wabt::Opcode::F32Add, &lhs, inc);
+      op = wabt::Opcode::F32Add;
       break;
     case wabt::Type::F64:
-      add = MakeBinary(wabt::Opcode::F64Add, &lhs, inc);
+      op = wabt::Opcode::F64Add;
       break;
     default:
       assert(!"Type not supported");
   }
-  return tee ? MakeLocalTree(var, &add) : MakeLocalSet(var, &add);
+  exprs_sptr add = MakeBinary(op, lhs, inc);
+  return tee ? MakeLocalTree(var, add) : MakeLocalSet(var, add);
 }
 
-wabt::ExprList GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op,
-                                       wabt::Var comp_lhs, wabt::ExprList *lhs_inc_amount,
-                                       wabt::ExprList *comp_rhs) {
+exprs_sptr GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op,
+                                       wabt::Var comp_lhs, exprs_sptr lhs_inc_amount, exprs_sptr comp_rhs) {
   auto tee = GenerateIncrement(type, std::move(comp_lhs), lhs_inc_amount, true);
-  auto comp = MakeBinary(comp_op, &tee, comp_rhs);
-  return MakeBrIf(std::move(label), &comp);
+  auto comp = MakeBinary(comp_op, tee, comp_rhs);
+  return MakeBrIf(std::move(label), comp);
 }
 
 } // namespace wasmpp

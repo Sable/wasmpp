@@ -11,7 +11,7 @@ namespace wasmpp {
 //   {inc}
 //   [i32,i64,f32,f64].add
 //   set_local {var} | tee_local {var}
-wabt::ExprList GenerateIncrement(wabt::Type type, wabt::Var var, wabt::ExprList* inc, bool tee);
+exprs_sptr GenerateIncrement(wabt::Type type, wabt::Var var, exprs_sptr inc, bool tee);
 
 // Generate
 //   get_local {comp_lhs}
@@ -21,8 +21,8 @@ wabt::ExprList GenerateIncrement(wabt::Type type, wabt::Var var, wabt::ExprList*
 //   {comp_rhs}
 //   {comp_op}
 //   br_if
-wabt::ExprList GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op, wabt::Var comp_lhs,
-                                         wabt::ExprList* lhs_inc_amount, wabt::ExprList* comp_rhs);
+exprs_sptr GenerateBranchIfCompInc(wabt::Var label, wabt::Type type, wabt::Opcode comp_op, wabt::Var comp_lhs,
+                                         exprs_sptr lhs_inc_amount, exprs_sptr comp_rhs);
 
 } // namespace wasmpp
 
