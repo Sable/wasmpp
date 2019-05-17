@@ -4,6 +4,8 @@
 #include <src/wasmpp/wasm-manager.h>
 #include <iostream>
 
+using namespace wabt;
+
 int main() {
   wasmpp::ModuleManagerOptions options;
   options.math.sigmoid = true;
@@ -19,9 +21,9 @@ int main() {
   auto dstMem = mm.Memory().Allocate(100);
   auto dst    = wasmpp::NDArray(dstMem, {10, 10});
 
-  mm.MakeFunction("example", {}, {wabt::Type::I32, wabt::Type::I32, wabt::Type::I32}, [&](wasmpp::FuncBody f, std::vector<wabt::Var> params,
-                                         std::vector<wabt::Var> locals) {
-    nn::compute::math::Multiply2DArrays(&mm, &f, a1, a2, dst, locals[0], locals[1], locals[2]);
+  mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32},
+                  [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
+    nn::compute::math::Multiply2DArrays(Type::F64, &mm, &f, a1, a2, dst, locals);
   });
 
   std::cout << mm.ToWat(true, true);
