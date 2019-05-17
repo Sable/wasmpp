@@ -17,6 +17,10 @@ exprs_sptr ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
 void Merge(exprs_sptr e1, exprs_sptr e2) {
   assert(e1 != nullptr);
   assert(e2 != nullptr);
+  if(e2->empty()) {
+    assert(!"Cannot merge empty expression list. "
+            "Maybe this expression list has already been merged/used?");
+  }
   while(e2->size() > 0) {
     e1->push_back(e2->extract_front());
   }
