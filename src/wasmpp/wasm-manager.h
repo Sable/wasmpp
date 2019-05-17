@@ -3,6 +3,7 @@
 
 #include <src/ir.h>
 #include <third_party/wabt/src/stream.h>
+#include <src/wasmpp/builtins/math-builtins.h>
 
 namespace wasmpp {
 
@@ -37,33 +38,44 @@ public:
   uint64_t Pages();
 };
 
+struct ModuleManagerOptions {
+  struct Math {
+#define DEFINE_MATH_OPTIONS(var, name) \
+  bool var = false;
+  MATH_BUILTINS(DEFINE_MATH_OPTIONS)
+#undef DEFINE_MATH_OPTIONS
+  } math;
+};
+
+class ModuleManager;
+struct BuiltinManager {
+  BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options) :
+      math(module_manager, options) {}
+  MathBuiltins math;
+};
+
 class ModuleManager {
 private:
   wabt::Module module_;
   int uid_ = 0;
-
+  MemoryManager memory_manager_;
+  ModuleManagerOptions options_;
 public:
+  BuiltinManager builtins;
 
-  // Generate a unique id
+  ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins(this, &options_) {}
   std::string GenerateUid();
-
-  // Get module
   const wabt::Module& GetModule() const;
+  MemoryManager& Memory() { return memory_manager_; }
 
-  // Generate wat code
+  // Generate code
   std::string ToWat(bool folded, bool inline_import_export) const;
-
-  // Generate wasm code
   wabt::OutputBuffer ToWasm() const;
 
-  // Make a new function in a module
+  // Make sections entries
   wabt::Var MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                            std::function<void(FuncBody, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
-
-  // Make import
   wabt::Var MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
-
-  // Make memory
   wabt::Var MakeMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
 };
 

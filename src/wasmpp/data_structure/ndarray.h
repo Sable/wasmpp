@@ -2,7 +2,7 @@
 #define WASM_WASM_NDARRAY_H_
 
 #include <vector>
-#include <stdint.h>
+#include <cstdint>
 
 namespace wasmpp {
 class Memory;

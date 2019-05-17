@@ -7,7 +7,10 @@ using namespace wasmpp;
 using namespace wabt;
 
 int main() {
-  wasmpp::ModuleManager mm;
+  wasmpp::ModuleManagerOptions options;
+  options.math.sigmoid = true;
+  options.math.exp = true;
+  wasmpp::ModuleManager mm(options);
   std::cout << mm.ToWat(true, true);
   return 0;
 }
