@@ -5,13 +5,16 @@
 namespace wasmpp {
 using namespace wabt;
 
-MathBuiltins::MathBuiltins(ModuleManager *module_manager, ModuleManagerOptions* options) :
-    Builtins(module_manager, options) {
-#define BUILD_FUNC(var, name) \
-  if(options->math.var) \
-    var##_ = Build##name();
-  MATH_BUILTINS(BUILD_FUNC)
-#undef BUILD_FUNC
+void MathBuiltins::InitImports() {
+  if(options_->math.exp)
+    exp_ = BuildExp();
+  if(options_->math.random)
+    random_ = BuildRandom();
+}
+
+void MathBuiltins::InitDefinitions() {
+  if(options_->math.sigmoid)
+    sigmoid_ = BuildSigmoid();
 }
 
 Var MathBuiltins::BuildSigmoid() {

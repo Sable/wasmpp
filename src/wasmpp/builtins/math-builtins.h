@@ -24,7 +24,9 @@ private:
 #undef CREATE_BUILD_FUNC
 
 public:
-  MathBuiltins(ModuleManager* moduleManager, ModuleManagerOptions* options);
+  MathBuiltins(ModuleManager* moduleManager, ModuleManagerOptions* options) : Builtins(moduleManager, options) {}
+  void InitImports();
+  void InitDefinitions();
 
 #define CREATE_GET_VAR(var, name) \
   wabt::Var name() const;

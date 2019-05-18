@@ -14,6 +14,8 @@ public:
   Builtins(ModuleManager* module_manager, ModuleManagerOptions* options) :
       module_manager_(module_manager),
       options_(options) {}
+  virtual void InitImports() = 0;
+  virtual void InitDefinitions() = 0;
 };
 
 } // namespace wasmpp

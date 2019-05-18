@@ -5,14 +5,18 @@
 namespace wasmpp {
 using namespace wabt;
 
-SystemBuiltins::SystemBuiltins(ModuleManager *module_manager, ModuleManagerOptions* options) :
-    Builtins(module_manager, options) {
-#define BUILD_FUNC(var, name) \
-  if(options->system.var) \
-    var##_ = Build##name();
-  SYSTEM_BUILTINS(BUILD_FUNC)
-#undef BUILD_FUNC
+void SystemBuiltins::InitImports() {
+  if(options_->system.print_i32)
+    print_i32_ = BuildPrintI32();
+  if(options_->system.print_i64)
+    print_i64_ = BuildPrintI64();
+  if(options_->system.print_f32)
+    print_f32_ = BuildPrintF32();
+  if(options_->system.print_f64)
+    print_f64_ = BuildPrintF64();
 }
+
+void SystemBuiltins::InitDefinitions() {}
 
 #define BUILD_PRINT_FUNC(t1, t2)                                                     \
 Var SystemBuiltins::BuildPrint##t1() {                                               \

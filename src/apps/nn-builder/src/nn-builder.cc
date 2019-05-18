@@ -10,8 +10,8 @@ using namespace std;
 
 int main() {
   wasmpp::ModuleManagerOptions options;
-//  options.math.EnableAll();
-//  options.memory.EnableAll();
+  options.math.EnableAll();
+  options.memory.EnableAll();
   options.system.EnableAll();
   wasmpp::ModuleManager mm(options);
 

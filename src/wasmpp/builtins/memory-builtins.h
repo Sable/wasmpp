@@ -25,7 +25,9 @@ private:
 #undef CREATE_BUILD_FUNC
 
 public:
-  MemoryBuiltins(ModuleManager* moduleManager, ModuleManagerOptions* options);
+  MemoryBuiltins(ModuleManager* moduleManager, ModuleManagerOptions* options) : Builtins(moduleManager, options){}
+  void InitImports();
+  void InitDefinitions();
 
 #define CREATE_GET_VAR(var, name) \
   wabt::Var name() const;

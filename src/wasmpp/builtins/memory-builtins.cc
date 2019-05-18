@@ -6,13 +6,17 @@
 namespace wasmpp {
 using namespace wabt;
 
-MemoryBuiltins::MemoryBuiltins(ModuleManager *module_manager, ModuleManagerOptions* options) :
-    Builtins(module_manager, options) {
-#define BUILD_FUNC(var, name) \
-  if(options->memory.var) \
-    var##_ = Build##name();
-  MEMORY_BUILTINS(BUILD_FUNC)
-#undef BUILD_FUNC
+void MemoryBuiltins::InitImports() {}
+
+void MemoryBuiltins::InitDefinitions() {
+  if(options_->memory.fill_i32)
+    fill_i32_ = BuildFillI32();
+  if(options_->memory.fill_i64)
+    fill_i64_ = BuildFillI64();
+  if(options_->memory.fill_f32)
+    fill_f32_ = BuildFillF32();
+  if(options_->memory.fill_f64)
+    fill_f64_ = BuildFillF64();
 }
 
 template <Type type>

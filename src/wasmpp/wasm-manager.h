@@ -59,10 +59,7 @@ CREATE_MEMBERS(SYSTEM_BUILTINS)
 
 class ModuleManager;
 struct BuiltinManager {
-  BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options) :
-      math(module_manager, options),
-      memory(module_manager, options),
-      system(module_manager, options){}
+  BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options);
   MathBuiltins math;
   MemoryBuiltins memory;
   SystemBuiltins system;
