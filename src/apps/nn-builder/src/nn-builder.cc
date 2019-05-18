@@ -10,6 +10,10 @@ int main() {
   wasmpp::ModuleManagerOptions options;
   options.math.sigmoid = true;
   options.math.exp = true;
+  options.memory.fill_i32 = true;
+  options.memory.fill_i64 = true;
+  options.memory.fill_f32 = true;
+  options.memory.fill_f64 = true;
   wasmpp::ModuleManager mm(options);
 
   auto a1Mem = mm.Memory().Allocate(100);
@@ -21,12 +25,12 @@ int main() {
   auto dstMem = mm.Memory().Allocate(100);
   auto dst    = wasmpp::NDArray(dstMem, {10, 10});
 
-  mm.MakeMemory(1);
+  mm.MakeMemory(mm.Memory().Pages());
   Type type = Type::F64;
-  mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
-                  [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
-    nn::compute::math::Multiply2DArrays<Type::F64>(&f, a1, a2, dst, locals);
-  });
+//  mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
+//                  [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
+//    nn::compute::math::Multiply2DArrays<Type::F64>(&f, a1, a2, dst, locals);
+//  });
 
   if(mm.Validate()) {
     std::cout << mm.ToWat(true, true);

@@ -4,6 +4,7 @@
 #include <src/ir.h>
 #include <third_party/wabt/src/stream.h>
 #include <src/wasmpp/builtins/math-builtins.h>
+#include <src/wasmpp/builtins/memory-builtins.h>
 #include <src/wasmpp/wasm-instructions.h>
 
 namespace wasmpp {
@@ -28,19 +29,26 @@ public:
 };
 
 struct ModuleManagerOptions {
-  struct Math {
-#define DEFINE_MATH_OPTIONS(var, name) \
-  bool var = false;
-  MATH_BUILTINS(DEFINE_MATH_OPTIONS)
-#undef DEFINE_MATH_OPTIONS
+#define DEFINE_OPTIONS(var, name) \
+    bool var = false;
+
+  struct {
+MATH_BUILTINS(DEFINE_OPTIONS)
   } math;
+
+  struct {
+MEMORY_BUILTINS(DEFINE_OPTIONS)
+  } memory;
+
+#undef DEFINE_OPTIONS
 };
 
 class ModuleManager;
 struct BuiltinManager {
   BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options) :
-      math(module_manager, options) {}
+      math(module_manager, options), memory(module_manager, options) {}
   MathBuiltins math;
+  MemoryBuiltins memory;
 };
 
 class ContentManager {
