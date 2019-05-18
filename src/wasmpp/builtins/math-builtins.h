@@ -8,7 +8,8 @@ namespace wasmpp {
 // Order is important
 #define MATH_BUILTINS(V) \
   V(exp, Exp) \
-  V(sigmoid, Sigmoid)
+  V(random, Random) \
+  V(sigmoid, Sigmoid) \
 
 class MathBuiltins : public Builtins {
 private:

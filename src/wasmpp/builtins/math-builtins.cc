@@ -27,6 +27,10 @@ Var MathBuiltins::BuildExp() {
   return module_manager_->MakeFuncImport("Math", "exp", {{Type::F64}, {Type::F64}});
 }
 
+Var MathBuiltins::BuildRandom() {
+  return module_manager_->MakeFuncImport("Math", "random", {{}, {Type::F64}});
+}
+
 Var MathBuiltins::Sigmoid() const {
   assert(options_->math.sigmoid);
   assert(options_->math.exp);
@@ -36,6 +40,11 @@ Var MathBuiltins::Sigmoid() const {
 Var MathBuiltins::Exp() const {
   assert(options_->math.exp);
   return exp_;
+}
+
+Var MathBuiltins::Random() const {
+  assert(options_->math.random);
+  return random_;
 }
 
 } // namespace wasmpp

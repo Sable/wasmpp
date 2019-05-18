@@ -31,16 +31,25 @@ public:
 struct ModuleManagerOptions {
 #define DEFINE_OPTIONS(var, name) \
     bool var = false;
+#define ENABLE_OPTION(var, name) \
+    var = true;
+#define CREATE_MEMBERS(V) \
+  V(DEFINE_OPTIONS)       \
+  void EnableAll() {      \
+     V(ENABLE_OPTION)     \
+    }
 
   struct {
-MATH_BUILTINS(DEFINE_OPTIONS)
+CREATE_MEMBERS(MATH_BUILTINS)
   } math;
 
   struct {
-MEMORY_BUILTINS(DEFINE_OPTIONS)
+CREATE_MEMBERS(MEMORY_BUILTINS)
   } memory;
 
 #undef DEFINE_OPTIONS
+#undef ENABLE_OPTION
+#undef CREATE_MEMBERS
 };
 
 class ModuleManager;
@@ -79,6 +88,9 @@ private:
   int uid_ = 0;
   MemoryManager memory_manager_;
   ModuleManagerOptions options_;
+
+  // Function copied from WastParser::CheckImportOrdering
+  void CheckImportOrdering();
 public:
   BuiltinManager builtins;
 

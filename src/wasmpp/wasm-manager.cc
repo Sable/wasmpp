@@ -1,5 +1,6 @@
 #include <src/wasmpp/wasm-manager.h>
 #include <src/wasmpp/wasm-instructions.h>
+#include <src/wasmpp/common.h>
 #include <src/wat-writer.h>
 #include <src/binary-writer.h>
 #include <src/stream.h>
@@ -9,7 +10,6 @@
 #include <sstream>
 #include <stack>
 #include <algorithm>
-#include "wasm-manager.h"
 
 namespace wasmpp {
 
@@ -127,20 +127,29 @@ std::string ModuleManager::NextLabel() {
   return ss.str();
 }
 
+void ModuleManager::CheckImportOrdering() {
+  if (module_.funcs.size() != module_.num_func_imports ||
+      module_.tables.size() != module_.num_table_imports ||
+      module_.memories.size() != module_.num_memory_imports ||
+      module_.globals.size() != module_.num_global_imports ||
+      module_.events.size() != module_.num_event_imports) {
+    ERROR_EXIT("imports must occur before all non-import definitions\n")
+  }
+}
+
 wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                                    std::function<void(FuncBody, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
   wabt::Var func_name = wabt::Var(NextLabel());
-  module_.AppendField(std::move(wabt::MakeUnique<wabt::FuncModuleField>(wabt::Location(), func_name.name())));
-  auto func = module_.funcs.back();
-  func->decl.sig = sig;
+  auto field = wabt::MakeUnique<wabt::FuncModuleField>(wabt::Location(), func_name.name());
+  field->func.decl.sig = sig;
 
   // Create params
   std::vector<wabt::Var> param_vars;
-  for(wabt::Index i=0; i < func->GetNumParams(); i++) {
+  for(wabt::Index i=0; i < field->func.GetNumParams(); i++) {
     std::string uid = NextLabel();
-    func->bindings.emplace(uid, wabt::Binding(wabt::Location(), i));
+    field->func.bindings.emplace(uid, wabt::Binding(wabt::Location(), i));
     param_vars.emplace_back(wabt::Var(uid));
   }
 
@@ -149,11 +158,13 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   std::vector<wabt::Type> local_types;
   for(wabt::Index i=0; i < locals.size(); i++) {
     std::string uid = NextLabel();
-    func->bindings.emplace(uid, wabt::Binding(wabt::Location(), func->GetNumParams() + i));
+    field->func.bindings.emplace(uid, wabt::Binding(wabt::Location(), field->func.GetNumParams() + i));
     local_vars.emplace_back(wabt::Var(uid));
     local_types.emplace_back(locals[i]);
   }
-  func->local_types.Set(local_types);
+  field->func.local_types.Set(local_types);
+  FuncBody func_body(this, &field->func.exprs);
+  module_.AppendField(std::move(field));
 
   // Create an export field
   if(name) {
@@ -167,12 +178,12 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   }
 
   // Populate content
-  FuncBody func_body(this, &func->exprs);
   content(func_body, param_vars, local_vars);
   return func_name;
 }
 
 wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
+  CheckImportOrdering();
   wabt::Var import_name(NextLabel());
   auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
   import->func.decl.sig = std::move(sig);

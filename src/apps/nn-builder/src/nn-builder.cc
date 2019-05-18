@@ -8,12 +8,8 @@ using namespace wabt;
 
 int main() {
   wasmpp::ModuleManagerOptions options;
-  options.math.sigmoid = true;
-  options.math.exp = true;
-  options.memory.fill_i32 = true;
-  options.memory.fill_i64 = true;
-  options.memory.fill_f32 = true;
-  options.memory.fill_f64 = true;
+  options.math.EnableAll();
+  options.memory.EnableAll();
   wasmpp::ModuleManager mm(options);
 
   auto a1Mem = mm.Memory().Allocate(100);
