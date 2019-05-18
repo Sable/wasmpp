@@ -10,8 +10,9 @@ using namespace std;
 
 int main() {
   wasmpp::ModuleManagerOptions options;
-  options.math.EnableAll();
-  options.memory.EnableAll();
+//  options.math.EnableAll();
+//  options.memory.EnableAll();
+  options.system.EnableAll();
   wasmpp::ModuleManager mm(options);
 
   auto a1Mem = mm.Memory().Allocate(9);
@@ -31,7 +32,7 @@ int main() {
   });
 
   mm.MakeFunction("main", {{},{Type::I32}}, {}, [&](FuncBody f, vector<Var> params, vector<Var> locals) {
-    f.Insert(MakeCall(mm.builtins.memory.FillI32(), {MakeI32Const(4), MakeI32Const(10), MakeI32Const(42)}));
+//    f.Insert(MakeCall(mm.builtins.memory.FillI32(), {MakeI32Const(4), MakeI32Const(10), MakeI32Const(42)}));
     f.Insert(MakeI32Load(MakeI32Const(11*4)));
   });
 

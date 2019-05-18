@@ -5,6 +5,7 @@
 #include <third_party/wabt/src/stream.h>
 #include <src/wasmpp/builtins/math-builtins.h>
 #include <src/wasmpp/builtins/memory-builtins.h>
+#include <src/wasmpp/builtins/system-builtins.h>
 #include <src/wasmpp/wasm-instructions.h>
 
 namespace wasmpp {
@@ -47,6 +48,10 @@ CREATE_MEMBERS(MATH_BUILTINS)
 CREATE_MEMBERS(MEMORY_BUILTINS)
   } memory;
 
+  struct {
+CREATE_MEMBERS(SYSTEM_BUILTINS)
+  } system;
+
 #undef DEFINE_OPTIONS
 #undef ENABLE_OPTION
 #undef CREATE_MEMBERS
@@ -55,9 +60,12 @@ CREATE_MEMBERS(MEMORY_BUILTINS)
 class ModuleManager;
 struct BuiltinManager {
   BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options) :
-      math(module_manager, options), memory(module_manager, options) {}
+      math(module_manager, options),
+      memory(module_manager, options),
+      system(module_manager, options){}
   MathBuiltins math;
   MemoryBuiltins memory;
+  SystemBuiltins system;
 };
 
 class ContentManager {
