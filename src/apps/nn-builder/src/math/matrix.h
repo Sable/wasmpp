@@ -9,8 +9,8 @@ namespace compute {
 namespace math {
 
 // Multiply two matrices
-void Multiply2DArrays(wabt::Type type, wasmpp::ContentManager* ctn,
-                      wasmpp::NDArray lhs, wasmpp::NDArray rhs, wasmpp::NDArray dst,
+template<wabt::Type type>
+void Multiply2DArrays(wasmpp::ContentManager* ctn, wasmpp::NDArray lhs, wasmpp::NDArray rhs, wasmpp::NDArray dst,
                       std::vector<wabt::Var> locals);
 
 } // namespace math

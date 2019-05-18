@@ -8,8 +8,8 @@ namespace math {
 using namespace wasmpp;
 using namespace wabt;
 
-void Multiply2DArrays(Type type, ContentManager* ctn,
-                      NDArray lhs, NDArray rhs, NDArray dst, std::vector<wabt::Var> locals) {
+template<Type type>
+void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst, std::vector<wabt::Var> locals) {
   assert(ctn != nullptr);
   assert(lhs.Shape().size() == 2);
   assert(rhs.Shape().size() == 2);
@@ -106,6 +106,15 @@ void Multiply2DArrays(Type type, ContentManager* ctn,
   });
   ctn->Insert(loopX);
 }
+
+#define EXPLICIT_INSTANTIATION(t) \
+template void Multiply2DArrays<t>(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst, std::vector<Var> locals);
+EXPLICIT_INSTANTIATION(Type::I32)
+EXPLICIT_INSTANTIATION(Type::I64)
+EXPLICIT_INSTANTIATION(Type::F32)
+EXPLICIT_INSTANTIATION(Type::F64)
+#undef EXPLICIT_INSTANTIATION
+
 
 } // namespace math
 } // namespace compute
