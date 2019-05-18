@@ -24,6 +24,7 @@ exprs_sptr MakeBinary(wabt::Opcode opcode, exprs_sptr op1,
                                            exprs_sptr op2);
 
 // Make constants
+
 exprs_sptr MakeI32Const(uint32_t val);
 exprs_sptr MakeI64Const(uint64_t val);
 exprs_sptr MakeF32Const(float val);
@@ -48,7 +49,7 @@ exprs_sptr MakeF64Const(double val);
 
 #define DECLARE_LOAD(opcode) \
   exprs_sptr Make##opcode(exprs_sptr index,  \
-                                               wabt::Address align = 0, uint32_t offset = 0);
+  wabt::Address align = wabt::WABT_USE_NATURAL_ALIGNMENT, uint32_t offset = 0);
   LOAD_INSTRUCTIONS_LIST(DECLARE_LOAD)
 #undef DECLARE_LOAD
 
@@ -66,8 +67,8 @@ exprs_sptr MakeF64Const(double val);
 
 #define DECLARE_STORE(opcode) \
   exprs_sptr Make##opcode(exprs_sptr index, \
-                                               exprs_sptr val, wabt::Address align = 0,  \
-                                               uint32_t offset = 0);
+  exprs_sptr val, wabt::Address align = wabt::WABT_USE_NATURAL_ALIGNMENT,  \
+  uint32_t offset = 0);
   STORE_INSTRUCTIONS_LIST(DECLARE_STORE)
 #undef DECLARE_STORE
 

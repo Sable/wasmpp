@@ -76,12 +76,12 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
         auto lhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
             MakeBinary(Opcode::I32Add, MakeLocalGet(row_n), MakeLocalGet(col_row)), MakeI32Const(shift));
         auto lhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs.GetLinearIndex({0,0})), lhs_cell_rel_addr);
-        auto lhs_cell = load_func(lhs_cell_abs_addr, 1, 0);
+        auto lhs_cell = load_func(lhs_cell_abs_addr, wabt::WABT_USE_NATURAL_ALIGNMENT, 0);
 
         auto rhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
             MakeBinary(Opcode::I32Add, MakeLocalGet(col_row_p), MakeLocalGet(col)), MakeI32Const(shift));
         auto rhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs.GetLinearIndex({0,0})), rhs_cell_rel_addr);
-        auto rhs_cell = load_func(rhs_cell_abs_addr, 1, 0);
+        auto rhs_cell = load_func(rhs_cell_abs_addr, wabt::WABT_USE_NATURAL_ALIGNMENT, 0);
 
         auto mul_cells = MakeBinary(op_add, lhs_cell, rhs_cell);
         auto update_res_cell = MakeLocalSet(res_cell, MakeBinary(op_add, MakeLocalGet(res_cell), mul_cells));
@@ -95,7 +95,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
       auto dst_cell_rel_addr = MakeBinary(Opcode::I32Shl,
           MakeBinary(Opcode::I32Add, MakeLocalGet(row_p), MakeLocalGet(col)), MakeI32Const(shift));
       auto dst_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst.GetLinearIndex({0,0})), dst_cell_rel_addr);
-      auto update_dst_cell = store_func(dst_cell_abs_addr, MakeLocalGet(res_cell), 1, 0);
+      auto update_dst_cell = store_func(dst_cell_abs_addr, MakeLocalGet(res_cell), wabt::WABT_USE_NATURAL_ALIGNMENT, 0);
       bY->Insert(update_dst_cell);;
     });
     bX->Insert(loopY);
