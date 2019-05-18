@@ -8,8 +8,9 @@ namespace math {
 using namespace wasmpp;
 using namespace wabt;
 
-void Multiply2DArrays(Type type, ModuleManager* mm, ContentManager* ctn,
+void Multiply2DArrays(Type type, ContentManager* ctn,
                       NDArray lhs, NDArray rhs, NDArray dst, std::vector<wabt::Var> locals) {
+  assert(ctn != nullptr);
   assert(lhs.Shape().size() == 2);
   assert(rhs.Shape().size() == 2);
   assert(dst.Shape().size() == 2);
@@ -67,11 +68,11 @@ void Multiply2DArrays(Type type, ModuleManager* mm, ContentManager* ctn,
 
   ctn->Insert(MakeLocalSet(row_n, MakeI32Const(0)));
   ctn->Insert(MakeLocalSet(row_p, MakeI32Const(0)));
-  auto loopX = GenerateRangeLoop(mm, row, 0, lhs.Shape()[0], 1, [&](BlockBody* bX) {
-    auto loopY = GenerateRangeLoop(mm, col, 0, rhs.Shape()[1], 1, [&](BlockBody* bY) {
+  auto loopX = GenerateRangeLoop(ctn, row, 0, lhs.Shape()[0], 1, [&](BlockBody* bX) {
+    auto loopY = GenerateRangeLoop(ctn, col, 0, rhs.Shape()[1], 1, [&](BlockBody* bY) {
       bY->Insert(MakeLocalSet(res_cell, reset_res_cell));
       bY->Insert(MakeLocalSet(col_row_p, MakeI32Const(0)));
-      auto loopZ = GenerateRangeLoop(mm, col_row, 0, rhs.Shape()[0], 1, [&](BlockBody* bZ) {
+      auto loopZ = GenerateRangeLoop(ctn, col_row, 0, rhs.Shape()[0], 1, [&](BlockBody* bZ) {
         auto lhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
             MakeBinary(Opcode::I32Add, MakeLocalGet(row_n), MakeLocalGet(col_row)), MakeI32Const(shift));
         auto lhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs.GetLinearIndex({0,0})), lhs_cell_rel_addr);

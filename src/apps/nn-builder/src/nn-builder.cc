@@ -25,7 +25,7 @@ int main() {
   Type type = Type::F64;
   mm.MakeFunction("example", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
                   [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
-    nn::compute::math::Multiply2DArrays(Type::F64, &mm, &f, a1, a2, dst, locals);
+    nn::compute::math::Multiply2DArrays(Type::F64, &f, a1, a2, dst, locals);
   });
 
   if(mm.Validate()) {

@@ -8,20 +8,6 @@
 
 namespace wasmpp {
 
-class ContentManager {
-private:
-  wabt::ExprList* expr_list_;
-public:
-  // Extract the elements from input list
-  // into structure list. Do not re-use the
-  // input list as it will become empty after
-  // calling this method
-  void Insert(exprs_sptr e);
-  ContentManager(wabt::ExprList* expr_list) : expr_list_(expr_list) {}
-};
-
-typedef ContentManager FuncBody;
-
 struct Memory {
   uint64_t begin;
   uint64_t end;
@@ -57,6 +43,28 @@ struct BuiltinManager {
   MathBuiltins math;
 };
 
+class ContentManager {
+private:
+  wabt::ExprList* expr_list_;
+  bool parent_module_;
+  union {
+    ModuleManager* module_manager_;
+    ContentManager* content_manager_;
+  } parent;
+  bool HasParent() const;
+public:
+  // Extract the elements from input list
+  // into structure list. Do not re-use the
+  // input list as it will become empty after
+  // calling this method
+  void Insert(exprs_sptr e);
+  ContentManager(ModuleManager* mm, wabt::ExprList* expr_list);
+  ContentManager(ContentManager* parent_ctn, wabt::ExprList* expr_list);
+  std::string NextLabel() const;
+};
+
+  typedef ContentManager FuncBody;
+
 class ModuleManager {
 private:
   wabt::Module module_;
@@ -67,7 +75,7 @@ public:
   BuiltinManager builtins;
 
   ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins(this, &options_) {}
-  std::string GenerateUid();
+  std::string NextLabel();
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
 

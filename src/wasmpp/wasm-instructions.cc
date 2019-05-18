@@ -26,21 +26,21 @@ void Merge(exprs_sptr e1, exprs_sptr e2) {
   }
 }
 
-exprs_sptr MakeLoop(ModuleManager* mm, std::function<void(BlockBody, wabt::Var)> content) {
+exprs_sptr MakeLoop(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content) {
   exprs_sptr e = CreateExprList();
   auto loop = wabt::MakeUnique<wabt::LoopExpr>();
-  loop->block.label = mm->GenerateUid();
-  BlockBody block_body(&loop->block.exprs);
+  BlockBody block_body(ctn, &loop->block.exprs);
+  loop->block.label = block_body.NextLabel();
   content(block_body, wabt::Var(loop->block.label));
   e->push_back(std::move(loop));
   return e;
 }
 
-exprs_sptr MakeBlock(ModuleManager* mm, std::function<void(BlockBody, wabt::Var)> content) {
+exprs_sptr MakeBlock(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content) {
   exprs_sptr e = CreateExprList();
   auto block = wabt::MakeUnique<wabt::BlockExpr>();
-  block->block.label = mm->GenerateUid();
-  BlockBody block_body(&block->block.exprs);
+  BlockBody block_body(ctn, &block->block.exprs);
+  block->block.label = block_body.NextLabel();
   content(block_body, wabt::Var(block->block.label));
   e->push_back(std::move(block));
   return e;
@@ -73,15 +73,15 @@ exprs_sptr MakeI64Const(uint64_t val) {
 }
 
 exprs_sptr MakeF32Const(float val) {
-  uint32_t value;
-  memcpy(&val, &value, sizeof(val));
-  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F32(value)));
+  uint32_t value_bits;
+  memcpy(&value_bits, &val, sizeof(val));
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F32(value_bits)));
 }
 
 exprs_sptr MakeF64Const(double val) {
-  uint64_t value;
-  memcpy(&val, &value, sizeof(val));
-  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value)));
+  uint64_t value_bits;
+  memcpy(&value_bits, &val, sizeof(val));
+  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value_bits)));
 }
 
 exprs_sptr MakeBr(wabt::Var label) {

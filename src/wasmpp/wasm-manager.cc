@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stack>
 #include <algorithm>
+#include "wasm-manager.h"
 
 namespace wasmpp {
 
@@ -16,6 +17,36 @@ void ContentManager::Insert(exprs_sptr e) {
   while(e->size() > 0) {
     expr_list_->push_back(e->extract_front());
   }
+}
+
+ContentManager::ContentManager(wasmpp::ModuleManager *mm, wabt::ExprList *expr_list) {
+  assert(mm != nullptr);
+  assert(expr_list != nullptr);
+  parent.module_manager_ = mm;
+  parent_module_ = true;
+  expr_list_ = expr_list;
+}
+
+ContentManager::ContentManager(wasmpp::ContentManager *parent_ctn, wabt::ExprList *expr_list) {
+  assert(parent_ctn != nullptr);
+  assert(expr_list != nullptr);
+  parent.content_manager_= parent_ctn;
+  parent_module_ = false;
+  expr_list_ = expr_list;
+}
+
+std::string ContentManager::NextLabel() const {
+  assert(HasParent());
+  if(parent_module_) {
+    return parent.module_manager_->NextLabel();
+  }
+  return parent.content_manager_->NextLabel();
+}
+
+bool ContentManager::HasParent() const {
+  return parent_module_ ?
+         parent.module_manager_ != nullptr :
+         parent.content_manager_ != nullptr;
 }
 
 MemoryManager::~MemoryManager() {
@@ -90,7 +121,7 @@ wabt::OutputBuffer ModuleManager::ToWasm() const {
   return stream.output_buffer();
 }
 
-std::string ModuleManager::GenerateUid() {
+std::string ModuleManager::NextLabel() {
   std::stringstream ss;
   ss << "$" << uid_++;
   return ss.str();
@@ -100,7 +131,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
                                    std::function<void(FuncBody, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
-  wabt::Var func_name = wabt::Var(GenerateUid());
+  wabt::Var func_name = wabt::Var(NextLabel());
   module_.AppendField(std::move(wabt::MakeUnique<wabt::FuncModuleField>(wabt::Location(), func_name.name())));
   auto func = module_.funcs.back();
   func->decl.sig = sig;
@@ -108,7 +139,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   // Create params
   std::vector<wabt::Var> param_vars;
   for(wabt::Index i=0; i < func->GetNumParams(); i++) {
-    std::string uid = GenerateUid();
+    std::string uid = NextLabel();
     func->bindings.emplace(uid, wabt::Binding(wabt::Location(), i));
     param_vars.emplace_back(wabt::Var(uid));
   }
@@ -117,7 +148,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   std::vector<wabt::Var> local_vars;
   std::vector<wabt::Type> local_types;
   for(wabt::Index i=0; i < locals.size(); i++) {
-    std::string uid = GenerateUid();
+    std::string uid = NextLabel();
     func->bindings.emplace(uid, wabt::Binding(wabt::Location(), func->GetNumParams() + i));
     local_vars.emplace_back(wabt::Var(uid));
     local_types.emplace_back(locals[i]);
@@ -136,13 +167,13 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   }
 
   // Populate content
-  FuncBody func_body(&func->exprs);
+  FuncBody func_body(this, &func->exprs);
   content(func_body, param_vars, local_vars);
   return func_name;
 }
 
 wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
-  wabt::Var import_name(GenerateUid());
+  wabt::Var import_name(NextLabel());
   auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
   import->func.decl.sig = std::move(sig);
   auto field = wabt::MakeUnique<wabt::ImportModuleField>(std::move(import));
@@ -153,7 +184,7 @@ wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function
 }
 
 wabt::Var ModuleManager::MakeMemory(uint64_t init_page, uint64_t max, bool shared) {
-  wabt::Var memory_name(GenerateUid());
+  wabt::Var memory_name(NextLabel());
   auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());
   field->memory.page_limits.initial = init_page;
   field->memory.page_limits.is_shared = shared;
