@@ -49,6 +49,12 @@ bool ContentManager::HasParent() const {
          parent.content_manager_ != nullptr;
 }
 
+Memory::Memory(uint64_t begin, uint64_t end) {
+  begin_ = begin;
+  end_ = end;
+  assert(begin < end);
+}
+
 MemoryManager::~MemoryManager() {
   for(size_t i=0; i < memories_.size(); i++) {
     delete memories_[i];
@@ -57,8 +63,8 @@ MemoryManager::~MemoryManager() {
 
 uint64_t MemoryManager::Pages() {
   if(memories_.empty()) return 0;
-  uint64_t val = memories_.back()->end / WABT_PAGE_SIZE;
-  return val * WABT_PAGE_SIZE == memories_.back()->end ? val : val + 1;
+  uint64_t val = memories_.back()->End() / WABT_PAGE_SIZE;
+  return val * WABT_PAGE_SIZE == memories_.back()->End() ? val : val + 1;
 }
 
 Memory* MemoryManager::Allocate(uint64_t k) {
@@ -66,10 +72,10 @@ Memory* MemoryManager::Allocate(uint64_t k) {
   uint64_t start = 0;
   size_t i;
   for(i=0; i < memories_.size(); i++) {
-    if(memories_[i]->begin - start >= k) {
+    if(memories_[i]->Begin() - start >= k) {
       break;
     }
-    start = memories_[i]->end;
+    start = memories_[i]->End();
   }
   auto memory = new Memory{start, start + k};
   memories_.insert(memories_.begin() + i, memory);

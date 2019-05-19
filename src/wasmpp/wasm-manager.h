@@ -10,13 +10,15 @@
 
 namespace wasmpp {
 
-struct Memory {
-  uint64_t begin;
-  uint64_t end;
-  uint64_t Size() {
-    assert(begin < end);
-    return end - begin;
-  }
+class Memory {
+public:
+  Memory(uint64_t begin, uint64_t end);
+  uint64_t Bytes() const { return end_ - begin_; }
+  uint64_t Begin() const { return begin_; }
+  uint64_t End() const { return end_; }
+private:
+  uint64_t begin_;
+  uint64_t end_;
 };
 
 class MemoryManager {
@@ -24,6 +26,7 @@ private:
   std::vector<Memory*> memories_;
 public:
   ~MemoryManager();
+  // Allocate memory
   Memory* Allocate(uint64_t k);
   bool Free(Memory* m);
   uint64_t Pages();
