@@ -15,6 +15,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
   assert(rhs.Shape().size() == 2);
   assert(dst.Shape().size() == 2);
   assert(lhs.Shape()[1] == rhs.Shape()[0]);
+  assert(locals.size() == 7);
   auto row = locals[0];
   auto col = locals[1];
   auto col_row = locals[2];
@@ -27,6 +28,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
   auto load_func = MakeI32Load;
   auto store_func = MakeI32Store;
   auto op_add = Opcode::I32Add;
+  auto op_mul = Opcode::I32Mul;
   exprs_sptr reset_res_cell = nullptr;
   uint32_t shift = 2;
 
@@ -39,6 +41,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
       load_func = MakeI64Load;
       store_func = MakeI64Store;
       op_add = Opcode::I64Add;
+      op_mul = Opcode::I64Mul;
       reset_res_cell = MakeI64Const(0);
       shift = 3;
       break;
@@ -46,6 +49,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
       load_func = MakeF32Load;
       store_func = MakeF32Store;
       op_add = Opcode::F32Add;
+      op_mul = Opcode::F32Mul;
       reset_res_cell = MakeF32Const(0);
       shift = 2;
       break;
@@ -53,6 +57,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
       load_func = MakeF64Load;
       store_func = MakeF64Store;
       op_add = Opcode::F64Add;
+      op_mul = Opcode::F64Mul;
       reset_res_cell = MakeF64Const(0);
       shift = 3;
       break;
@@ -83,7 +88,7 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
         auto rhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs.GetLinearIndex({0,0})), rhs_cell_rel_addr);
         auto rhs_cell = load_func(rhs_cell_abs_addr, wabt::WABT_USE_NATURAL_ALIGNMENT, 0);
 
-        auto mul_cells = MakeBinary(op_add, lhs_cell, rhs_cell);
+        auto mul_cells = MakeBinary(op_mul, lhs_cell, rhs_cell);
         auto update_res_cell = MakeLocalSet(res_cell, MakeBinary(op_add, MakeLocalGet(res_cell), mul_cells));
         bZ->Insert(update_res_cell);
 
