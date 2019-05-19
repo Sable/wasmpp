@@ -15,6 +15,8 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
   assert(rhs.Shape().size() == 2);
   assert(dst.Shape().size() == 2);
   assert(lhs.Shape()[1] == rhs.Shape()[0]);
+  assert(dst.Shape()[0] == lhs.Shape()[0]);
+  assert(dst.Shape()[1] == rhs.Shape()[1]);
   assert(locals.size() == 7);
   auto row = locals[0];
   auto col = locals[1];
