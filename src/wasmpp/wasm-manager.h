@@ -7,6 +7,7 @@
 #include <src/wasmpp/builtins/memory-builtins.h>
 #include <src/wasmpp/builtins/system-builtins.h>
 #include <src/wasmpp/wasm-instructions.h>
+#include <src/wasmpp/common.h>
 
 namespace wasmpp {
 
@@ -89,8 +90,36 @@ public:
   std::string NextLabel() const;
   const BuiltinManager* Builtins() const { return builtins_; }
 };
+typedef ContentManager FuncBody;
 
-  typedef ContentManager FuncBody;
+struct DataEntry {
+  union {
+    uint8_t byte;
+    uint32_t i32;
+    uint64_t i64;
+    float f32;
+    double f64;
+  } val;
+  enum Kind {
+    Byte,
+    I32,
+    I64,
+    F32,
+    F64
+  } kind;
+  uint32_t Size() const {
+    if(kind == I32) return WASMPP_I32_SIZE;
+    if(kind == I64) return WASMPP_I64_SIZE;
+    if(kind == F32) return WASMPP_F32_SIZE;
+    if(kind == F64) return WASMPP_F64_SIZE;
+    assert(kind == Byte); return 1;
+  }
+  static DataEntry MakeI32(uint32_t val) { return {{.i32 = val}, I32}; }
+  static DataEntry MakeI64(uint64_t val) { return {{.i64 = val}, I64}; }
+  static DataEntry MakeF32(float val) { return {{.f32 = val}, F32}; }
+  static DataEntry MakeF64(double val) { return {{.f64 = val}, F64}; }
+  static DataEntry MakeByte(uint8_t val) { return {{.byte = val}, Byte}; }
+};
 
 class ModuleManager {
 private:
@@ -122,6 +151,7 @@ public:
                            std::function<void(FuncBody, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
   wabt::Var MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
   wabt::Var MakeMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
+  void MakeData(wabt::Var var, uint32_t index, std::vector<DataEntry> entries);
 };
 
 } // namespace wasm

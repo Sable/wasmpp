@@ -230,5 +230,37 @@ wabt::Var ModuleManager::MakeMemory(uint64_t init_page, uint64_t max, bool share
   return memory_name;
 }
 
+void ModuleManager::MakeData(wabt::Var var, uint32_t index, std::vector<wasmpp::DataEntry> entries) {
+  assert(var.type() == wabt::VarType::Name);
+  auto field = wabt::MakeUnique<wabt::DataSegmentModuleField>(wabt::Location(), var.name());
+  field->data_segment.memory_var = var;
+  field->data_segment.offset.splice(field->data_segment.offset.end(), *MakeI32Const(index));
+
+  // Insert data in little endian
+  std::vector<uint8_t> data;
+  for(auto entry : entries) {
+    uint64_t value_bits;
+    uint64_t mask = 0x00000000000000ff;
+    if(entry.kind == DataEntry::Kind::I32) {
+      memcpy(&value_bits, &entry.val.i32, entry.Size());
+    } else if(entry.kind == DataEntry::Kind::I64) {
+      memcpy(&value_bits, &entry.val.i64, entry.Size());
+    } else if(entry.kind == DataEntry::Kind::F32) {
+      memcpy(&value_bits, &entry.val.f32, entry.Size());
+    } else if(entry.kind == DataEntry::Kind::F64) {
+      memcpy(&value_bits, &entry.val.f64, entry.Size());
+    } else {
+      assert(entry.kind == DataEntry::Kind::Byte);
+      memcpy(&value_bits, &entry.val.f64, entry.Size());
+    }
+    for(int i=0; i < entry.Size(); i++) {
+      data.push_back((uint8_t) (mask & value_bits));
+      value_bits >>= 8;
+    }
+  }
+  field->data_segment.data = data;
+  module_.AppendField(std::move(field));
+}
+
 } // namespace wasm
 

@@ -28,7 +28,7 @@ int main() {
   auto a3Mem = mm.Memory().Allocate(total_bytes);
   auto a3    = NDArray(a3Mem, {side, side}, TypeSize(type));
 
-  mm.MakeMemory(mm.Memory().Pages());
+  auto memo = mm.MakeMemory(mm.Memory().Pages());
 
   auto mat_mul = mm.MakeFunction("mat_mul", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
                   [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
@@ -57,8 +57,8 @@ int main() {
         f.Insert(MakeCall(f.Builtins()->system.PrintF64(), {MakeF64Load(MakeI32Const(a3.GetLinearIndex({r, c})))}));
       }
     }
-
   });
+
 
   if(mm.Validate()) {
     std::cout << mm.ToWat(true, true);
