@@ -76,6 +76,7 @@ private:
     ModuleManager* module_manager_;
     ContentManager* content_manager_;
   } parent;
+  const BuiltinManager* builtins_;
   bool HasParent() const;
 public:
   // Extract the elements from input list
@@ -86,6 +87,7 @@ public:
   ContentManager(ModuleManager* mm, wabt::ExprList* expr_list);
   ContentManager(ContentManager* parent_ctn, wabt::ExprList* expr_list);
   std::string NextLabel() const;
+  const BuiltinManager* Builtins() const { return builtins_; }
 };
 
   typedef ContentManager FuncBody;
@@ -96,16 +98,17 @@ private:
   int uid_ = 0;
   MemoryManager memory_manager_;
   ModuleManagerOptions options_;
+  BuiltinManager builtins_;
 
   // Function copied from WastParser::CheckImportOrdering
   void CheckImportOrdering();
 public:
-  BuiltinManager builtins;
 
-  ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins(this, &options_) {}
+  ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins_(this, &options_) {}
   std::string NextLabel();
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
+  const BuiltinManager& Builtins() const { return builtins_; }
 
   // Validation
   bool Validate();

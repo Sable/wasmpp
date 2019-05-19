@@ -25,6 +25,7 @@ ContentManager::ContentManager(wasmpp::ModuleManager *mm, wabt::ExprList *expr_l
   parent.module_manager_ = mm;
   parent_module_ = true;
   expr_list_ = expr_list;
+  builtins_ = &mm->Builtins();
 }
 
 ContentManager::ContentManager(wasmpp::ContentManager *parent_ctn, wabt::ExprList *expr_list) {
@@ -33,6 +34,7 @@ ContentManager::ContentManager(wasmpp::ContentManager *parent_ctn, wabt::ExprLis
   parent.content_manager_= parent_ctn;
   parent_module_ = false;
   expr_list_ = expr_list;
+  builtins_ = parent_ctn->builtins_;
 }
 
 std::string ContentManager::NextLabel() const {
