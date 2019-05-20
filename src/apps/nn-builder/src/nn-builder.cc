@@ -2,9 +2,15 @@
 #include <iostream>
 
 using namespace nn;
+using namespace nn::arch;
+using namespace wabt;
 
 int main() {
-  arch::Model model;
+  Model model;
+  model.SetLayers({
+     MakeLayer<InputLayer>(784),
+     MakeLayer<FullyConnectedLayer>(100, model.Builtins().sigmoid)
+  });
   model.Setup();
 
   assert(model.Validate());

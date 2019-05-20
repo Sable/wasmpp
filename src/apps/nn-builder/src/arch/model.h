@@ -15,7 +15,7 @@ private:
   std::vector<layer_sptr> layers_;
 
   // Builtin functions
-  struct {
+  struct Builtins {
     // system functions
     wabt::Var print_i32;
     wabt::Var print_i64;
@@ -39,6 +39,7 @@ public:
   layer_sptr GetLayer(uint32_t index) const;
   void Setup();
   bool Validate();
+  const Builtins& Builtins() const { return builtins; }
 };
 
 } // namespace arch

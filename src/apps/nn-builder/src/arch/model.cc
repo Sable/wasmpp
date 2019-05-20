@@ -48,6 +48,8 @@ void Model::Setup() {
   InitImports();
   InitDefinitions();
 
+  // TODO feed-forward
+
   auto train = module_manager_.MakeFunction("main", {}, {},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     f.Insert(MakeCall(builtins.print_i32, {MakeI32Const(2)}));
