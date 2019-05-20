@@ -1,4 +1,4 @@
-#include <src/apps/nn-builder/src/nn-model.h>
+#include <src/apps/nn-builder/src/model.h>
 #include <src/apps/nn-builder/src/math/matrix.h>
 #include <src/wasmpp/data_structure/ndarray.h>
 #include <src/wasmpp/wasm-manager.h>
@@ -10,6 +10,7 @@ using namespace wasmpp;
 using namespace std;
 
 int main() {
+
   wasmpp::ModuleManagerOptions options;
   options.math.EnableAll();
   options.memory.EnableAll();
@@ -58,7 +59,6 @@ int main() {
       }
     }
   });
-
 
   if(mm.Validate()) {
     std::cout << mm.ToWat(true, true);
