@@ -1,6 +1,6 @@
 #include <src/apps/nn-builder/src/model.h>
 #include <src/apps/nn-builder/src/math/matrix.h>
-#include <src/wasmpp/data_structure/ndarray.h>
+#include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <src/wasmpp/wasm-manager.h>
 #include <src/wasmpp/common.h>
 #include <iostream>
@@ -8,6 +8,7 @@
 using namespace wabt;
 using namespace wasmpp;
 using namespace std;
+using namespace nn;
 
 int main() {
 
@@ -21,19 +22,19 @@ int main() {
   uint64_t side = 3;
   auto total_bytes = side * side * TypeSize(type);
   auto a1Mem = mm.Memory().Allocate(total_bytes);
-  auto a1    = NDArray(a1Mem, {side, side}, TypeSize(type));
+  auto a1    = ds::NDArray(a1Mem, {side, side}, TypeSize(type));
 
   auto a2Mem = mm.Memory().Allocate(total_bytes);
-  auto a2    = NDArray(a2Mem, {side, side}, TypeSize(type));
+  auto a2    = ds::NDArray(a2Mem, {side, side}, TypeSize(type));
 
   auto a3Mem = mm.Memory().Allocate(total_bytes);
-  auto a3    = NDArray(a3Mem, {side, side}, TypeSize(type));
+  auto a3    = ds::NDArray(a3Mem, {side, side}, TypeSize(type));
 
   auto memo = mm.MakeMemory(mm.Memory().Pages());
 
   auto mat_mul = mm.MakeFunction("mat_mul", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
                   [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
-    f.Insert(nn::compute::math::Multiply2DArrays<type>(f.Label(), a1, a2, a3, locals));
+    f.Insert(math::Multiply2DArrays<type>(f.Label(), a1, a2, a3, locals));
   });
 
   mm.MakeFunction("main", {{},{}}, {}, [&](FuncBody f, vector<Var> params, vector<Var> locals) {

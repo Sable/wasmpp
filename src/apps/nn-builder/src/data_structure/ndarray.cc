@@ -1,8 +1,9 @@
-#include <src/wasmpp/data_structure/ndarray.h>
+#include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <src/wasmpp/wasm-manager.h>
 #include <cassert>
 
-namespace wasmpp {
+namespace nn {
+namespace ds {
 
 NDArray::NDArray(wasmpp::Memory *memory, std::vector<uint64_t> shape, uint64_t unit_size) {
   assert(memory != nullptr);
@@ -45,4 +46,5 @@ void NDArray::Reshape(std::vector<uint64_t> shape) {
   }
 }
 
-} // namespace wasmpp
+} // namespace ds
+} // namespace nn

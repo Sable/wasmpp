@@ -2,14 +2,13 @@
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
-namespace compute {
 namespace math {
 
 using namespace wasmpp;
 using namespace wabt;
 
 template<Type type>
-exprs_sptr Multiply2DArrays(LabelManager* label_manager, NDArray lhs, NDArray rhs, NDArray dst,
+exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
                             std::vector<wabt::Var> locals) {
   assert(label_manager != nullptr);
   assert(lhs.Shape().size() == 2);
@@ -117,8 +116,8 @@ exprs_sptr Multiply2DArrays(LabelManager* label_manager, NDArray lhs, NDArray rh
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template exprs_sptr Multiply2DArrays<t>(LabelManager* label_manager, NDArray lhs, NDArray rhs, NDArray dst, \
-    std::vector<Var> locals);
+template exprs_sptr Multiply2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
+    ds::NDArray dst, std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)
 EXPLICIT_INSTANTIATION(Type::F32)
@@ -127,5 +126,4 @@ EXPLICIT_INSTANTIATION(Type::F64)
 
 
 } // namespace math
-} // namespace compute
 } // namespace nn
