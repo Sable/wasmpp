@@ -71,24 +71,16 @@ struct BuiltinManager {
 
 class ContentManager {
 private:
-  wabt::ExprList* expr_list_;
-  bool parent_module_;
-  union {
-    ModuleManager* module_manager_;
-    ContentManager* content_manager_;
-  } parent;
-  const BuiltinManager* builtins_;
-  bool HasParent() const;
+  wabt::ExprList* expr_list_ = nullptr;
+  LabelManager* label_manager_ = nullptr;
 public:
   // Extract the elements from input list
   // into structure list. Do not re-use the
   // input list as it will become empty after
   // calling this method
   void Insert(exprs_sptr e);
-  ContentManager(ModuleManager* mm, wabt::ExprList* expr_list);
-  ContentManager(ContentManager* parent_ctn, wabt::ExprList* expr_list);
-  std::string NextLabel() const;
-  const BuiltinManager* Builtins() const { return builtins_; }
+  ContentManager(LabelManager* label_manager, wabt::ExprList* expr_list);
+  LabelManager* Label() const { return label_manager_; };
 };
 typedef ContentManager FuncBody;
 
@@ -121,11 +113,18 @@ struct DataEntry {
   static DataEntry MakeByte(uint8_t val) { return {{.byte = val}, Byte}; }
 };
 
+class LabelManager {
+private:
+  int uid_ = 0;
+public:
+  std::string Next();
+};
+
 class ModuleManager {
 private:
   wabt::Module module_;
-  int uid_ = 0;
   MemoryManager memory_manager_;
+  LabelManager label_manager_;
   ModuleManagerOptions options_;
   BuiltinManager builtins_;
 
@@ -134,9 +133,9 @@ private:
 public:
 
   ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins_(this, &options_) {}
-  std::string NextLabel();
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
+  LabelManager& Label() { return label_manager_; }
   const BuiltinManager& Builtins() const { return builtins_; }
 
   // Validation

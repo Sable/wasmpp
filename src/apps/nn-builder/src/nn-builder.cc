@@ -33,7 +33,7 @@ int main() {
 
   auto mat_mul = mm.MakeFunction("mat_mul", {}, {Type::I32, Type::I32, Type::I32, type, Type::I32, Type::I32, Type::I32},
                   [&](wasmpp::FuncBody f, std::vector<wabt::Var> params, std::vector<wabt::Var> locals) {
-    nn::compute::math::Multiply2DArrays<type>(&f, a1, a2, a3, locals);
+    f.Insert(nn::compute::math::Multiply2DArrays<type>(f.Label(), a1, a2, a3, locals));
   });
 
   mm.MakeFunction("main", {{},{}}, {}, [&](FuncBody f, vector<Var> params, vector<Var> locals) {
@@ -55,7 +55,7 @@ int main() {
 
     for(uint32_t r=0; r < side; r++) {
       for(uint32_t c=0; c < side; c++) {
-        f.Insert(MakeCall(f.Builtins()->system.PrintF64(), {MakeF64Load(MakeI32Const(a3.GetLinearIndex({r, c})))}));
+        f.Insert(MakeCall(mm.Builtins().system.PrintF64(), {MakeF64Load(MakeI32Const(a3.GetLinearIndex({r, c})))}));
       }
     }
   });

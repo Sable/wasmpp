@@ -10,8 +10,8 @@ namespace math {
 
 // Multiply two matrices
 template<wabt::Type type>
-void Multiply2DArrays(wasmpp::ContentManager* ctn, wasmpp::NDArray lhs, wasmpp::NDArray rhs, wasmpp::NDArray dst,
-                      std::vector<wabt::Var> locals);
+wasmpp::exprs_sptr Multiply2DArrays(wasmpp::LabelManager* label_manager, wasmpp::NDArray lhs, wasmpp::NDArray rhs,
+                                    wasmpp::NDArray dst, std::vector<wabt::Var> locals);
 
 } // namespace math
 } // namespace compute

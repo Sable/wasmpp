@@ -9,8 +9,9 @@ using namespace wasmpp;
 using namespace wabt;
 
 template<Type type>
-void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst, std::vector<wabt::Var> locals) {
-  assert(ctn != nullptr);
+exprs_sptr Multiply2DArrays(LabelManager* label_manager, NDArray lhs, NDArray rhs, NDArray dst,
+                            std::vector<wabt::Var> locals) {
+  assert(label_manager != nullptr);
   assert(lhs.Shape().size() == 2);
   assert(rhs.Shape().size() == 2);
   assert(dst.Shape().size() == 2);
@@ -72,14 +73,14 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
   // m |        | n |        |
   //   |        |   |        |
   //   +--------+   +--------+
-
-  ctn->Insert(MakeLocalSet(row_n, MakeI32Const(0)));
-  ctn->Insert(MakeLocalSet(row_p, MakeI32Const(0)));
-  auto loopX = GenerateRangeLoop(ctn, row, 0, lhs.Shape()[0], 1, [&](BlockBody* bX) {
-    auto loopY = GenerateRangeLoop(ctn, col, 0, rhs.Shape()[1], 1, [&](BlockBody* bY) {
+  exprs_sptr e = CreateExprList();
+  Merge(e, MakeLocalSet(row_n, MakeI32Const(0)));
+  Merge(e, MakeLocalSet(row_p, MakeI32Const(0)));
+  auto loopX = GenerateRangeLoop(label_manager, row, 0, lhs.Shape()[0], 1, [&](BlockBody* bX) {
+    auto loopY = GenerateRangeLoop(label_manager, col, 0, rhs.Shape()[1], 1, [&](BlockBody* bY) {
       bY->Insert(MakeLocalSet(res_cell, reset_res_cell));
       bY->Insert(MakeLocalSet(col_row_p, MakeI32Const(0)));
-      auto loopZ = GenerateRangeLoop(ctn, col_row, 0, rhs.Shape()[0], 1, [&](BlockBody* bZ) {
+      auto loopZ = GenerateRangeLoop(label_manager, col_row, 0, rhs.Shape()[0], 1, [&](BlockBody* bZ) {
         auto lhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
             MakeBinary(Opcode::I32Add, MakeLocalGet(row_n), MakeLocalGet(col_row)), MakeI32Const(shift));
         auto lhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs.GetLinearIndex({0,0})), lhs_cell_rel_addr);
@@ -111,11 +112,13 @@ void Multiply2DArrays(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst
     auto acc_row_p = MakeBinary(Opcode::I32Add, MakeLocalGet(row_p), MakeI32Const(rhs.Shape()[1]));
     bX->Insert(MakeLocalSet(row_p, acc_row_p));
   });
-  ctn->Insert(loopX);
+  Merge(e, loopX);
+  return e;
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template void Multiply2DArrays<t>(ContentManager* ctn, NDArray lhs, NDArray rhs, NDArray dst, std::vector<Var> locals);
+template exprs_sptr Multiply2DArrays<t>(LabelManager* label_manager, NDArray lhs, NDArray rhs, NDArray dst, \
+    std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)
 EXPLICIT_INSTANTIATION(Type::F32)

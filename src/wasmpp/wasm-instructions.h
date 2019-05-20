@@ -5,6 +5,7 @@
 
 namespace wasmpp {
 
+class LabelManager;
 class ContentManager;
 typedef ContentManager BlockBody;
 typedef std::shared_ptr<wabt::ExprList> exprs_sptr;
@@ -15,8 +16,8 @@ exprs_sptr ExprToExprList(std::unique_ptr<wabt::Expr> expr);
 void Merge(exprs_sptr e1, exprs_sptr e2);
 
 // Make block expressions
-exprs_sptr MakeLoop(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content);
-exprs_sptr MakeBlock(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content);
+exprs_sptr MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
+exprs_sptr MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
 
 // Make arithmetic expression
 exprs_sptr MakeUnary(wabt::Opcode opcode, exprs_sptr op);

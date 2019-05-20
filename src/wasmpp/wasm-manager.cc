@@ -19,36 +19,11 @@ void ContentManager::Insert(exprs_sptr e) {
   }
 }
 
-ContentManager::ContentManager(wasmpp::ModuleManager *mm, wabt::ExprList *expr_list) {
-  assert(mm != nullptr);
+ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr_list) {
+  assert(label_manager != nullptr);
   assert(expr_list != nullptr);
-  parent.module_manager_ = mm;
-  parent_module_ = true;
+  label_manager_ = label_manager;
   expr_list_ = expr_list;
-  builtins_ = &mm->Builtins();
-}
-
-ContentManager::ContentManager(wasmpp::ContentManager *parent_ctn, wabt::ExprList *expr_list) {
-  assert(parent_ctn != nullptr);
-  assert(expr_list != nullptr);
-  parent.content_manager_= parent_ctn;
-  parent_module_ = false;
-  expr_list_ = expr_list;
-  builtins_ = parent_ctn->builtins_;
-}
-
-std::string ContentManager::NextLabel() const {
-  assert(HasParent());
-  if(parent_module_) {
-    return parent.module_manager_->NextLabel();
-  }
-  return parent.content_manager_->NextLabel();
-}
-
-bool ContentManager::HasParent() const {
-  return parent_module_ ?
-         parent.module_manager_ != nullptr :
-         parent.content_manager_ != nullptr;
 }
 
 Memory::Memory(uint64_t begin, uint64_t end) {
@@ -129,7 +104,7 @@ wabt::OutputBuffer ModuleManager::ToWasm() const {
   return stream.output_buffer();
 }
 
-std::string ModuleManager::NextLabel() {
+std::string LabelManager::Next() {
   std::stringstream ss;
   ss << "$" << uid_++;
   return ss.str();
@@ -149,14 +124,14 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
                                    std::function<void(FuncBody, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
   // Create a function field
-  wabt::Var func_name = wabt::Var(NextLabel());
+  wabt::Var func_name = wabt::Var(label_manager_.Next());
   auto field = wabt::MakeUnique<wabt::FuncModuleField>(wabt::Location(), func_name.name());
   field->func.decl.sig = sig;
 
   // Create params
   std::vector<wabt::Var> param_vars;
   for(wabt::Index i=0; i < field->func.GetNumParams(); i++) {
-    std::string uid = NextLabel();
+    std::string uid = label_manager_.Next();
     field->func.bindings.emplace(uid, wabt::Binding(wabt::Location(), i));
     param_vars.emplace_back(wabt::Var(uid));
   }
@@ -165,13 +140,13 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   std::vector<wabt::Var> local_vars;
   std::vector<wabt::Type> local_types;
   for(wabt::Index i=0; i < locals.size(); i++) {
-    std::string uid = NextLabel();
+    std::string uid = label_manager_.Next();
     field->func.bindings.emplace(uid, wabt::Binding(wabt::Location(), field->func.GetNumParams() + i));
     local_vars.emplace_back(wabt::Var(uid));
     local_types.emplace_back(locals[i]);
   }
   field->func.local_types.Set(local_types);
-  FuncBody func_body(this, &field->func.exprs);
+  FuncBody func_body(&label_manager_, &field->func.exprs);
   module_.AppendField(std::move(field));
 
   // Create an export field
@@ -209,7 +184,7 @@ system(module_manager, options)
 
 wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
   CheckImportOrdering();
-  wabt::Var import_name(NextLabel());
+  wabt::Var import_name(label_manager_.Next());
   auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
   import->func.decl.sig = std::move(sig);
   auto field = wabt::MakeUnique<wabt::ImportModuleField>(std::move(import));
@@ -220,7 +195,7 @@ wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function
 }
 
 wabt::Var ModuleManager::MakeMemory(uint64_t init_page, uint64_t max, bool shared) {
-  wabt::Var memory_name(NextLabel());
+  wabt::Var memory_name(label_manager_.Next());
   auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());
   field->memory.page_limits.initial = init_page;
   field->memory.page_limits.is_shared = shared;

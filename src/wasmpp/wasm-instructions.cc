@@ -26,21 +26,23 @@ void Merge(exprs_sptr e1, exprs_sptr e2) {
   }
 }
 
-exprs_sptr MakeLoop(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content) {
+exprs_sptr MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+  assert(label_manager != nullptr);
   exprs_sptr e = CreateExprList();
   auto loop = wabt::MakeUnique<wabt::LoopExpr>();
-  BlockBody block_body(ctn, &loop->block.exprs);
-  loop->block.label = block_body.NextLabel();
+  BlockBody block_body(label_manager, &loop->block.exprs);
+  loop->block.label = label_manager->Next();
   content(block_body, wabt::Var(loop->block.label));
   e->push_back(std::move(loop));
   return e;
 }
 
-exprs_sptr MakeBlock(ContentManager* ctn, std::function<void(BlockBody, wabt::Var)> content) {
+exprs_sptr MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+  assert(label_manager != nullptr);
   exprs_sptr e = CreateExprList();
   auto block = wabt::MakeUnique<wabt::BlockExpr>();
-  BlockBody block_body(ctn, &block->block.exprs);
-  block->block.label = block_body.NextLabel();
+  BlockBody block_body(label_manager, &block->block.exprs);
+  block->block.label = label_manager->Next();
   content(block_body, wabt::Var(block->block.label));
   e->push_back(std::move(block));
   return e;

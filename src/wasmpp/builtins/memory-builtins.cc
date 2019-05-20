@@ -23,7 +23,7 @@ template <Type type>
 exprs_sptr Fill(ContentManager* ctn, const Var &offset, const Var &repeat, const Var &value) {
   auto e = CreateExprList();
   uint32_t type_size = TypeSize(type);
-  auto loop = MakeLoop(ctn, [&](BlockBody b, Var label) {
+  auto loop = MakeLoop(ctn->Label(), [&](BlockBody b, Var label) {
     auto store_func = MakeI32Store;
     switch (type) {
       case Type::I32:
