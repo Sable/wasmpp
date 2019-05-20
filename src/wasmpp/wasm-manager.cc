@@ -165,23 +165,6 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   return func_name;
 }
 
-BuiltinManager::BuiltinManager(wasmpp::ModuleManager *module_manager, wasmpp::ModuleManagerOptions *options) :
-math(module_manager, options),
-memory(module_manager, options),
-system(module_manager, options)
-{
-
-  // Initialize imports
-  math.InitImports();
-  memory.InitImports();
-  system.InitImports();
-
-  // Initialize definitions
-  math.InitDefinitions();
-  memory.InitDefinitions();
-  system.InitDefinitions();
-}
-
 wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig) {
   CheckImportOrdering();
   wabt::Var import_name(label_manager_.Next());

@@ -3,9 +3,6 @@
 
 #include <src/ir.h>
 #include <third_party/wabt/src/stream.h>
-#include <src/wasmpp/builtins/math-builtins.h>
-#include <src/wasmpp/builtins/memory-builtins.h>
-#include <src/wasmpp/builtins/system-builtins.h>
 #include <src/wasmpp/wasm-instructions.h>
 #include <src/wasmpp/common.h>
 
@@ -31,42 +28,6 @@ public:
   Memory* Allocate(uint64_t k);
   bool Free(Memory* m);
   uint64_t Pages();
-};
-
-struct ModuleManagerOptions {
-#define DEFINE_OPTIONS(var, name) \
-    bool var = false;
-#define ENABLE_OPTION(var, name) \
-    var = true;
-#define CREATE_MEMBERS(V) \
-  V(DEFINE_OPTIONS)       \
-  void EnableAll() {      \
-     V(ENABLE_OPTION)     \
-    }
-
-  struct {
-CREATE_MEMBERS(MATH_BUILTINS)
-  } math;
-
-  struct {
-CREATE_MEMBERS(MEMORY_BUILTINS)
-  } memory;
-
-  struct {
-CREATE_MEMBERS(SYSTEM_BUILTINS)
-  } system;
-
-#undef DEFINE_OPTIONS
-#undef ENABLE_OPTION
-#undef CREATE_MEMBERS
-};
-
-class ModuleManager;
-struct BuiltinManager {
-  BuiltinManager(ModuleManager* module_manager, ModuleManagerOptions* options);
-  MathBuiltins math;
-  MemoryBuiltins memory;
-  SystemBuiltins system;
 };
 
 class ContentManager {
@@ -125,18 +86,14 @@ private:
   wabt::Module module_;
   MemoryManager memory_manager_;
   LabelManager label_manager_;
-  ModuleManagerOptions options_;
-  BuiltinManager builtins_;
 
   // Function copied from WastParser::CheckImportOrdering
   void CheckImportOrdering();
 public:
 
-  ModuleManager(ModuleManagerOptions options = {}) : options_(options), builtins_(this, &options_) {}
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
   LabelManager& Label() { return label_manager_; }
-  const BuiltinManager& Builtins() const { return builtins_; }
 
   // Validation
   bool Validate();
