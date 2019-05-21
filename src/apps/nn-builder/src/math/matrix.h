@@ -12,6 +12,11 @@ template<wabt::Type type>
 wasmpp::exprs_sptr Multiply2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,
                                     ds::NDArray dst, std::vector<wabt::Var> locals);
 
+// Add two matrices
+  template<wabt::Type type>
+  wasmpp::exprs_sptr Add2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,
+                                      ds::NDArray dst, std::vector<wabt::Var> locals);
+
 } // namespace math
 } // namespace nn
 

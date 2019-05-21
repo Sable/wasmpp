@@ -1,5 +1,6 @@
 #include <src/apps/nn-builder/src/arch/model.h>
 #include <src/apps/nn-builder/src/data_structure/ndarray.h>
+#include <src/apps/nn-builder/src/math/matrix.h>
 
 namespace nn {
 namespace arch {
@@ -47,20 +48,55 @@ void Model::InitDefinitions() {
 void Model::Setup() {
   InitImports();
   InitDefinitions();
+#define CAST(x, cls) std::static_pointer_cast<cls>(x);
+  std::vector<ds::NDArray*> Z(layers_.size());
+  std::vector<ds::NDArray*> W(layers_.size());
+  std::vector<ds::NDArray*> b(layers_.size());
 
-  std::vector<ds::NDArray*> vals;
-  std::vector<ds::NDArray*> weights;
-  for(auto i = 0;i < layers_.size(); ++i) {
-    uint32_t type_size = TypeSize(Type::F64);
-    auto fc_layer = std::static_pointer_cast<FullyConnectedLayer>(layers_[i]);
-    auto layer_vals_mem = module_manager_.Memory().Allocate(fc_layer->Nodes() * type_size);
-    vals.push_back(new ds::NDArray(layer_vals_mem, {fc_layer->Nodes(), 1}, type_size));
-    printf("(%ld, %ld)\n", vals.back()->Shape()[0], vals.back()->Shape()[1]);
+  const Type type = Type::F64;
+  uint64_t type_size = TypeSize(type);
+  for(auto l = 0; l < layers_.size(); ++l) {
+    auto layer = CAST(layers_[l], FullyConnectedLayer);
+    // values
+    auto memZ = module_manager_.Memory().Allocate(layer->Nodes() * type_size);
+    Z[l] = new ds::NDArray(memZ, {layer->Nodes(), 1}, type_size);
+    if(l > 0) {
+      auto prev_layer = CAST(layers_[l-1], FullyConnectedLayer);
+      // weight
+      auto memW = module_manager_.Memory().Allocate(layer->Nodes() * prev_layer->Nodes() * type_size);
+      W[l] = new ds::NDArray(memW, {layer->Nodes(), prev_layer->Nodes()}, type_size);
+      // bias
+      auto memb = module_manager_.Memory().Allocate(layer->Nodes() * type_size);
+      b[l] = new ds::NDArray(memb, {layer->Nodes(), 1}, type_size);
+    }
   }
 
-  auto train = module_manager_.MakeFunction("main", {}, {},
+  module_manager_.MakeMemory(1);
+  auto train = module_manager_.MakeFunction("main", {}, {Type::I32, Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    f.Insert(MakeCall(builtins.print_i32, {MakeI32Const(2)}));
+    uint64_t side = 3;
+    auto a1 = module_manager_.Memory().Allocate(side * side * type_size);
+    ds::NDArray A1(a1, {side, side}, type_size);
+
+    auto a2 = module_manager_.Memory().Allocate(side * side * type_size);
+    ds::NDArray A2(a2, {side, side}, type_size);
+
+    auto a3 = module_manager_.Memory().Allocate(side * side * type_size);
+    ds::NDArray A3(a3, {side, side}, type_size);
+
+    for(int r=0; r < side; r++) {
+      for(int c=0; c < side; c++) {
+        f.Insert(MakeF64Store(MakeI32Const(A1.GetLinearIndex({r, c})), MakeF64Const(side)));
+        f.Insert(MakeF64Store(MakeI32Const(A2.GetLinearIndex({r, c})), MakeF64Const(side)));
+      }
+    }
+    f.Insert(math::Add2DArrays<type>(f.Label(), A1, A2, A3, locals));
+
+    for(int r=0; r < side; r++) {
+      for(int c=0; c < side; c++) {
+        f.Insert(MakeCall(builtins.print_f64, {MakeF64Load(MakeI32Const(A3.GetLinearIndex({r, c})))}));
+      }
+    }
   });
 }
 

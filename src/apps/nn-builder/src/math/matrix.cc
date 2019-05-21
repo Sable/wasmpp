@@ -125,5 +125,73 @@ EXPLICIT_INSTANTIATION(Type::F64)
 #undef EXPLICIT_INSTANTIATION
 
 
+template<Type type>
+exprs_sptr Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
+                          std::vector<wabt::Var> locals) {
+  assert(label_manager != nullptr);
+  assert(lhs.Shape().size() == 2);
+  assert(rhs.Shape().size() == 2);
+  assert(dst.Shape().size() == 2);
+  assert(lhs.Shape()[0] == rhs.Shape()[0]);
+  assert(lhs.Shape()[1] == rhs.Shape()[1]);
+  assert(rhs.Shape()[0] == dst.Shape()[0]);
+  assert(rhs.Shape()[1] == dst.Shape()[1]);
+  assert(locals.size() == 2);
+
+  auto row_col = locals[0];
+  auto addr = locals[1];
+
+  // Type based variables
+  auto store_func = MakeI32Store;
+  auto load_func = MakeI32Load;
+  auto op_add = Opcode::I32Add;
+  switch (type) {
+    case Type::I32:
+      // default values
+      break;
+    case Type::I64:
+      store_func = MakeI64Store;
+      load_func = MakeI64Load;
+      op_add = Opcode::I64Add;
+      break;
+    case Type::F32:
+      store_func = MakeF32Store;
+      load_func = MakeF32Load;
+      op_add = Opcode::F32Add;
+      break;
+    case Type::F64:
+      store_func = MakeF64Store;
+      load_func = MakeF64Load;
+      op_add = Opcode::F64Add;
+      break;
+    default:
+      assert(!"Matrix addition type not supported");
+  }
+
+  exprs_sptr e = CreateExprList();
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, lhs.Shape()[0] * lhs.Shape()[1], 1, [&](BlockBody* b) {
+    auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs.GetLinearIndex({0, 0})), MakeLocalGet(addr));
+    auto lhs_cell = load_func(lhs_addr, WABT_USE_NATURAL_ALIGNMENT, 0);
+    auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs.GetLinearIndex({0, 0})), MakeLocalGet(addr));
+    auto rhs_cell = load_func(rhs_addr, WABT_USE_NATURAL_ALIGNMENT, 0);
+    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst.GetLinearIndex({0, 0})), MakeLocalGet(addr));
+    b->Insert(store_func(dst_addr, MakeBinary(op_add, lhs_cell, rhs_cell), WABT_USE_NATURAL_ALIGNMENT, 0));
+    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(type)))));
+  });
+  Merge(e, loopRC);
+  return e;
+}
+
+#define EXPLICIT_INSTANTIATION(t) \
+template exprs_sptr Add2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
+    ds::NDArray dst, std::vector<Var> locals);
+EXPLICIT_INSTANTIATION(Type::I32)
+EXPLICIT_INSTANTIATION(Type::I64)
+EXPLICIT_INSTANTIATION(Type::F32)
+EXPLICIT_INSTANTIATION(Type::F64)
+#undef EXPLICIT_INSTANTIATION
+
+
 } // namespace math
 } // namespace nn
