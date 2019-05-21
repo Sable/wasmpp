@@ -48,48 +48,61 @@ void Model::InitDefinitions() {
 void Model::Setup() {
   InitImports();
   InitDefinitions();
+
 #define CAST(x, cls) std::static_pointer_cast<cls>(x);
+
   std::vector<ds::NDArray*> Z(layers_.size());
   std::vector<ds::NDArray*> W(layers_.size());
   std::vector<ds::NDArray*> b(layers_.size());
 
-  const Type type = Type::F64;
-  uint64_t type_size = TypeSize(type);
+  const Type val_type = Type::F64;
+  const uint64_t val_type_size = TypeSize(val_type);
   for(auto l = 0; l < layers_.size(); ++l) {
     auto layer = CAST(layers_[l], FullyConnectedLayer);
     // values
-    auto memZ = module_manager_.Memory().Allocate(layer->Nodes() * type_size);
-    Z[l] = new ds::NDArray(memZ, {layer->Nodes(), 1}, type_size);
+    auto memZ = module_manager_.Memory().Allocate(layer->Nodes() * val_type_size);
+    Z[l] = new ds::NDArray(memZ, {layer->Nodes(), 1}, val_type_size);
     if(l > 0) {
       auto prev_layer = CAST(layers_[l-1], FullyConnectedLayer);
       // weight
-      auto memW = module_manager_.Memory().Allocate(layer->Nodes() * prev_layer->Nodes() * type_size);
-      W[l] = new ds::NDArray(memW, {layer->Nodes(), prev_layer->Nodes()}, type_size);
+      auto memW = module_manager_.Memory().Allocate(layer->Nodes() * prev_layer->Nodes() * val_type_size);
+      W[l] = new ds::NDArray(memW, {layer->Nodes(), prev_layer->Nodes()}, val_type_size);
       // bias
-      auto memb = module_manager_.Memory().Allocate(layer->Nodes() * type_size);
-      b[l] = new ds::NDArray(memb, {layer->Nodes(), 1}, type_size);
+      auto memb = module_manager_.Memory().Allocate(layer->Nodes() * val_type_size);
+      b[l] = new ds::NDArray(memb, {layer->Nodes(), 1}, val_type_size);
     }
   }
 
-  module_manager_.MakeMemory(1);
-  auto train = module_manager_.MakeFunction("train", {}, {Type::I32, Type::I32},
+  module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  auto feedforward = module_manager_.MakeFunction("feedforward", {},
+      {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, val_type},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    uint64_t side = 3;
-    auto a1 = module_manager_.Memory().Allocate(side * side * type_size);
-    ds::NDArray A1(a1, {side, side}, type_size);
-
-    for(int r=0; r < side; r++) {
-      for(int c=0; c < side; c++) {
-        f.Insert(MakeF64Store(MakeI32Const(A1.GetLinearIndex({r, c})), MakeF64Const(side)));
-      }
+    auto vi32_1 = locals[0];
+    auto vi32_2 = locals[1];
+    auto vi32_3 = locals[2];
+    auto vi32_4 = locals[3];
+    auto vi32_5 = locals[4];
+    auto vi32_6 = locals[5];
+    auto vtype_1 = locals[6];
+    for(int l=1; l < layers_.size(); ++l) {
+      auto mul = math::Multiply2DArrays<val_type>(f.Label(), *W[l], *Z[l-1], *Z[l],
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vtype_1});
+      auto add = math::Add2DArrays<val_type>(f.Label(), *Z[l], *b[l], *Z[l], {vi32_1, vi32_2});
+      auto app = math::ApplyFx2DArrays<val_type>(f.Label(), *Z[l], builtins.sigmoid, *Z[l], {vi32_1, vi32_2});
+      f.Insert(mul);
+      f.Insert(add);
+      f.Insert(app);
     }
-    f.Insert(math::ApplyFx2DArrays<type>(f.Label(), A1, builtins.sigmoid, A1, locals));
+  });
 
-    for(int r=0; r < side; r++) {
-      for(int c=0; c < side; c++) {
-        f.Insert(MakeCall(builtins.print_f64, {MakeF64Load(MakeI32Const(A1.GetLinearIndex({r, c})))}));
-      }
-    }
+  auto train = module_manager_.MakeFunction("train", {}, {},
+      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeCall(feedforward, {}));
+  });
+
+  auto main = module_manager_.MakeFunction("main", {}, {},
+      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeCall(train, {}));
   });
 }
 

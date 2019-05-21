@@ -21,10 +21,10 @@ exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::ND
   auto row = locals[0];
   auto col = locals[1];
   auto col_row = locals[2];
-  auto res_cell = locals[3];
-  auto row_n = locals[4];
-  auto row_p = locals[5];
-  auto col_row_p = locals[6];
+  auto row_n = locals[3];
+  auto row_p = locals[4];
+  auto col_row_p = locals[5];
+  auto res_cell = locals[6];
 
   // Type based variables
   auto load_func = MakeI32Load;
