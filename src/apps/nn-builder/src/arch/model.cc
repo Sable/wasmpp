@@ -83,7 +83,7 @@ void Model::Setup() {
         f.Insert(MakeF64Store(MakeI32Const(A1.GetLinearIndex({r, c})), MakeF64Const(side)));
       }
     }
-    f.Insert(math::Scalar2DArrays<type>(f.Label(), A1, MakeF64Const(10), A1, locals));
+    f.Insert(math::ApplyFx2DArrays<type>(f.Label(), A1, builtins.sigmoid, A1, locals));
 
     for(int r=0; r < side; r++) {
       for(int c=0; c < side; c++) {

@@ -20,7 +20,12 @@ wasmpp::exprs_sptr Add2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray 
 // Scalar matrix
 template<wabt::Type type>
 wasmpp::exprs_sptr Scalar2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray src, wasmpp::exprs_sptr scalar,
-                                 ds::NDArray dst, std::vector<wabt::Var> locals);
+                                    ds::NDArray dst, std::vector<wabt::Var> locals);
+
+// Apply function to matrix
+template<wabt::Type type>
+wasmpp::exprs_sptr ApplyFx2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray src, wabt::Var func,
+                                    ds::NDArray dst, std::vector<wabt::Var> locals);
 
 } // namespace math
 } // namespace nn
