@@ -72,29 +72,22 @@ void Model::Setup() {
   }
 
   module_manager_.MakeMemory(1);
-  auto train = module_manager_.MakeFunction("main", {}, {Type::I32, Type::I32},
+  auto train = module_manager_.MakeFunction("train", {}, {Type::I32, Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     uint64_t side = 3;
     auto a1 = module_manager_.Memory().Allocate(side * side * type_size);
     ds::NDArray A1(a1, {side, side}, type_size);
 
-    auto a2 = module_manager_.Memory().Allocate(side * side * type_size);
-    ds::NDArray A2(a2, {side, side}, type_size);
-
-    auto a3 = module_manager_.Memory().Allocate(side * side * type_size);
-    ds::NDArray A3(a3, {side, side}, type_size);
-
     for(int r=0; r < side; r++) {
       for(int c=0; c < side; c++) {
         f.Insert(MakeF64Store(MakeI32Const(A1.GetLinearIndex({r, c})), MakeF64Const(side)));
-        f.Insert(MakeF64Store(MakeI32Const(A2.GetLinearIndex({r, c})), MakeF64Const(side)));
       }
     }
-    f.Insert(math::Add2DArrays<type>(f.Label(), A1, A2, A3, locals));
+    f.Insert(math::Scalar2DArrays<type>(f.Label(), A1, MakeF64Const(10), A1, locals));
 
     for(int r=0; r < side; r++) {
       for(int c=0; c < side; c++) {
-        f.Insert(MakeCall(builtins.print_f64, {MakeF64Load(MakeI32Const(A3.GetLinearIndex({r, c})))}));
+        f.Insert(MakeCall(builtins.print_f64, {MakeF64Load(MakeI32Const(A1.GetLinearIndex({r, c})))}));
       }
     }
   });

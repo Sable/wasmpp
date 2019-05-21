@@ -13,9 +13,14 @@ wasmpp::exprs_sptr Multiply2DArrays(wasmpp::LabelManager* label_manager, ds::NDA
                                     ds::NDArray dst, std::vector<wabt::Var> locals);
 
 // Add two matrices
-  template<wabt::Type type>
-  wasmpp::exprs_sptr Add2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,
-                                      ds::NDArray dst, std::vector<wabt::Var> locals);
+template<wabt::Type type>
+wasmpp::exprs_sptr Add2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,
+                                    ds::NDArray dst, std::vector<wabt::Var> locals);
+
+// Scalar matrix
+template<wabt::Type type>
+wasmpp::exprs_sptr Scalar2DArrays(wasmpp::LabelManager* label_manager, ds::NDArray src, wasmpp::exprs_sptr scalar,
+                                 ds::NDArray dst, std::vector<wabt::Var> locals);
 
 } // namespace math
 } // namespace nn
