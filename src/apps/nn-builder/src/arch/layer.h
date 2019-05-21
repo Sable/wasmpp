@@ -5,7 +5,6 @@ namespace nn {
 namespace arch {
 
 enum LayerType {
-  Input,
   FullyConnected
 };
 
@@ -25,13 +24,6 @@ public:
   TypedLayer() : Layer(type) {}
 };
 
-class InputLayer : public TypedLayer<Input> {
-private:
-  uint32_t nodes_;
-public:
-  InputLayer(uint32_t nodes) : nodes_(nodes) {}
-};
-
 class FullyConnectedLayer : public TypedLayer<FullyConnected> {
 private:
   uint32_t nodes_;
@@ -43,7 +35,7 @@ public:
 };
 
 template <class T, typename... Args>
-layer_sptr MakeLayer(Args&&... args) {
+static layer_sptr MakeLayer(Args&&... args) {
     return std::make_shared<T>(std::forward<Args>(args)...);
 }
 

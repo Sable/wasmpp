@@ -1,5 +1,5 @@
 #include <src/apps/nn-builder/src/arch/model.h>
-#include "model.h"
+#include <src/apps/nn-builder/src/data_structure/ndarray.h>
 
 namespace nn {
 namespace arch {
@@ -48,7 +48,15 @@ void Model::Setup() {
   InitImports();
   InitDefinitions();
 
-  // TODO feed-forward
+  std::vector<ds::NDArray*> vals;
+  std::vector<ds::NDArray*> weights;
+  for(auto i = 0;i < layers_.size(); ++i) {
+    uint32_t type_size = TypeSize(Type::F64);
+    auto fc_layer = std::static_pointer_cast<FullyConnectedLayer>(layers_[i]);
+    auto layer_vals_mem = module_manager_.Memory().Allocate(fc_layer->Nodes() * type_size);
+    vals.push_back(new ds::NDArray(layer_vals_mem, {fc_layer->Nodes(), 1}, type_size));
+    printf("(%ld, %ld)\n", vals.back()->Shape()[0], vals.back()->Shape()[1]);
+  }
 
   auto train = module_manager_.MakeFunction("main", {}, {},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
