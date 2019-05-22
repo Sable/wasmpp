@@ -8,9 +8,9 @@ using namespace wabt;
 int main() {
   Model model;
   model.SetLayers({
-     MakeLayer<FullyConnectedLayer>(2, model.Builtins().sigmoid),
-     MakeLayer<FullyConnectedLayer>(100, model.Builtins().sigmoid),
-     MakeLayer<FullyConnectedLayer>(1, model.Builtins().sigmoid)
+     new FullyConnectedLayer(2, model.Builtins().sigmoid),
+     new FullyConnectedLayer(100, model.Builtins().sigmoid),
+     new FullyConnectedLayer(1, model.Builtins().sigmoid)
   });
   model.Setup();
 

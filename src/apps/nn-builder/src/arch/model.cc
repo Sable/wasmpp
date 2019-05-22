@@ -8,8 +8,14 @@ namespace arch {
 using namespace wasmpp;
 using namespace wabt;
 
-void Model::AddLayer(layer_sptr layer) {
+void Model::AddLayer(Layer* layer) {
   layers_.push_back(layer);
+}
+
+Model::~Model() {
+  for(auto l=0; l < layers_.size(); ++l) {
+    delete layers_[l];
+  }
 }
 
 bool Model::RemoveLayer(uint32_t index) {
@@ -20,7 +26,7 @@ bool Model::RemoveLayer(uint32_t index) {
   return true;
 }
 
-layer_sptr Model::GetLayer(uint32_t index) const {
+Layer* Model::GetLayer(uint32_t index) const {
   if(index < layers_.size()) {
     return layers_[index];
   }
@@ -49,8 +55,6 @@ void Model::Setup() {
   InitImports();
   InitDefinitions();
 
-#define CAST(x, cls) std::static_pointer_cast<cls>(x);
-
   std::vector<ds::NDArray*> Z(layers_.size());
   std::vector<ds::NDArray*> W(layers_.size());
   std::vector<ds::NDArray*> b(layers_.size());
@@ -58,12 +62,12 @@ void Model::Setup() {
   const Type val_type = Type::F64;
   const uint64_t val_type_size = TypeSize(val_type);
   for(auto l = 0; l < layers_.size(); ++l) {
-    auto layer = CAST(layers_[l], FullyConnectedLayer);
+    auto layer = static_cast<FullyConnectedLayer*>(layers_[l]);
     // values
     auto memZ = module_manager_.Memory().Allocate(layer->Nodes() * val_type_size);
     Z[l] = new ds::NDArray(memZ, {layer->Nodes(), 1}, val_type_size);
     if(l > 0) {
-      auto prev_layer = CAST(layers_[l-1], FullyConnectedLayer);
+      auto prev_layer = static_cast<FullyConnectedLayer*>(layers_[l-1]);
       // weight
       auto memW = module_manager_.Memory().Allocate(layer->Nodes() * prev_layer->Nodes() * val_type_size);
       W[l] = new ds::NDArray(memW, {layer->Nodes(), prev_layer->Nodes()}, val_type_size);

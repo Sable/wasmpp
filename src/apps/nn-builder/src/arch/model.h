@@ -12,7 +12,7 @@ namespace arch {
 class Model {
 private:
   wasmpp::ModuleManager module_manager_;
-  std::vector<layer_sptr> layers_;
+  std::vector<Layer*> layers_;
 
   // Builtin functions
   struct Builtins {
@@ -32,11 +32,12 @@ private:
   // Initialize all defined functions
   void InitDefinitions();
 public:
+  ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
-  void SetLayers(std::vector<layer_sptr> layers) { layers_ = std::move(layers); }
-  void AddLayer(layer_sptr layer);
+  void SetLayers(std::vector<Layer*> layers) { layers_ = std::move(layers); }
+  void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
-  layer_sptr GetLayer(uint32_t index) const;
+  Layer* GetLayer(uint32_t index) const;
   void Setup();
   bool Validate();
   const Builtins& Builtins() const { return builtins; }

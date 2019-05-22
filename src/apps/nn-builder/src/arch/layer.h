@@ -16,8 +16,6 @@ public:
   LayerType Type() const  { return type_; }
 };
 
-typedef std::shared_ptr<Layer> layer_sptr;
-
 template <LayerType type>
 class TypedLayer : public Layer {
 public:
@@ -33,11 +31,6 @@ public:
   uint32_t Nodes() const { return nodes_; }
   wabt::Var Activation() const { return activation_; }
 };
-
-template <class T, typename... Args>
-static layer_sptr MakeLayer(Args&&... args) {
-    return std::make_shared<T>(std::forward<Args>(args)...);
-}
 
 } // namespace arch
 } // namespace nn
