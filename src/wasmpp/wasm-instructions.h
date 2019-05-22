@@ -8,28 +8,25 @@ namespace wasmpp {
 class LabelManager;
 class ContentManager;
 typedef ContentManager BlockBody;
-typedef std::shared_ptr<wabt::ExprList> exprs_sptr;
 
 // Helpers
-exprs_sptr CreateExprList();
-exprs_sptr ExprToExprList(std::unique_ptr<wabt::Expr> expr);
-void Merge(exprs_sptr e1, exprs_sptr e2);
+wabt::ExprList* ExprToExprList(std::unique_ptr<wabt::Expr> expr);
+void Merge(wabt::ExprList* e1, wabt::ExprList* e2);
 
 // Make block expressions
-exprs_sptr MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
-exprs_sptr MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
+wabt::ExprList* MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
+wabt::ExprList* MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
 
 // Make arithmetic expression
-exprs_sptr MakeUnary(wabt::Opcode opcode, exprs_sptr op);
-exprs_sptr MakeBinary(wabt::Opcode opcode, exprs_sptr op1,
-                                           exprs_sptr op2);
+wabt::ExprList* MakeUnary(wabt::Opcode opcode, wabt::ExprList* op);
+wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprList* op2);
 
 // Make constants
 
-exprs_sptr MakeI32Const(uint32_t val);
-exprs_sptr MakeI64Const(uint64_t val);
-exprs_sptr MakeF32Const(float val);
-exprs_sptr MakeF64Const(double val);
+wabt::ExprList* MakeI32Const(uint32_t val);
+wabt::ExprList* MakeI64Const(uint64_t val);
+wabt::ExprList* MakeF32Const(float val);
+wabt::ExprList* MakeF64Const(double val);
 
   // Make loads
 #define LOAD_INSTRUCTIONS_LIST(V) \
@@ -49,7 +46,7 @@ exprs_sptr MakeF64Const(double val);
   V(I64Load32U)
 
 #define DECLARE_LOAD(opcode) \
-  exprs_sptr Make##opcode(exprs_sptr index,  \
+  wabt::ExprList* Make##opcode(wabt::ExprList* index,  \
   wabt::Address align = wabt::WABT_USE_NATURAL_ALIGNMENT, uint32_t offset = 0);
   LOAD_INSTRUCTIONS_LIST(DECLARE_LOAD)
 #undef DECLARE_LOAD
@@ -67,23 +64,23 @@ exprs_sptr MakeF64Const(double val);
   V(I64Store32)
 
 #define DECLARE_STORE(opcode) \
-  exprs_sptr Make##opcode(exprs_sptr index, \
-  exprs_sptr val, wabt::Address align = wabt::WABT_USE_NATURAL_ALIGNMENT,  \
+  wabt::ExprList* Make##opcode(wabt::ExprList* index, \
+  wabt::ExprList* val, wabt::Address align = wabt::WABT_USE_NATURAL_ALIGNMENT,  \
   uint32_t offset = 0);
   STORE_INSTRUCTIONS_LIST(DECLARE_STORE)
 #undef DECLARE_STORE
 
 // Make branch
-exprs_sptr MakeBr(wabt::Var label);
-exprs_sptr MakeBrIf(wabt::Var label, exprs_sptr cond);
+wabt::ExprList* MakeBr(wabt::Var label);
+wabt::ExprList* MakeBrIf(wabt::Var label, wabt::ExprList* cond);
 
 // Make locals
-exprs_sptr MakeLocalGet(wabt::Var var);
-exprs_sptr MakeLocalSet(wabt::Var var, exprs_sptr val);
-exprs_sptr MakeLocalTree(wabt::Var var, exprs_sptr val);
+wabt::ExprList* MakeLocalGet(wabt::Var var);
+wabt::ExprList* MakeLocalSet(wabt::Var var, wabt::ExprList* val);
+wabt::ExprList* MakeLocalTree(wabt::Var var, wabt::ExprList* val);
 
 // Make calls
-exprs_sptr MakeCall(wabt::Var var, std::vector<exprs_sptr> args);
+wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args);
 
 }
 

@@ -39,7 +39,7 @@ public:
   // into structure list. Do not re-use the
   // input list as it will become empty after
   // calling this method
-  void Insert(exprs_sptr e);
+  void Insert(wabt::ExprList* e);
   ContentManager(LabelManager* label_manager, wabt::ExprList* expr_list);
   LabelManager* Label() const { return label_manager_; };
 };

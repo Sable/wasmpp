@@ -8,7 +8,7 @@ using namespace wasmpp;
 using namespace wabt;
 
 template<Type type>
-exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
+wabt::ExprList* Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
                             std::vector<wabt::Var> locals) {
   assert(label_manager != nullptr);
   assert(lhs.Shape().size() == 2);
@@ -31,7 +31,7 @@ exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::ND
   auto store_func = MakeI32Store;
   auto op_add = Opcode::I32Add;
   auto op_mul = Opcode::I32Mul;
-  exprs_sptr reset_res_cell = nullptr;
+  wabt::ExprList* reset_res_cell = nullptr;
   uint32_t shift = 2;
 
   switch (type) {
@@ -72,7 +72,7 @@ exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::ND
   // m |        | n |        |
   //   |        |   |        |
   //   +--------+   +--------+
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(row_n, MakeI32Const(0)));
   Merge(e, MakeLocalSet(row_p, MakeI32Const(0)));
   auto loopX = GenerateRangeLoop(label_manager, row, 0, lhs.Shape()[0], 1, [&](BlockBody* bX) {
@@ -116,7 +116,7 @@ exprs_sptr Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::ND
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template exprs_sptr Multiply2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
+template wabt::ExprList* Multiply2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
     ds::NDArray dst, std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)
@@ -126,7 +126,7 @@ EXPLICIT_INSTANTIATION(Type::F64)
 
 
 template<Type type>
-exprs_sptr Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
+wabt::ExprList* Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
                           std::vector<wabt::Var> locals) {
   assert(label_manager != nullptr);
   assert(lhs.Shape().size() == 2);
@@ -168,7 +168,7 @@ exprs_sptr Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray
       assert(!"Matrix addition type not supported");
   }
 
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
   auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, lhs.Shape()[0] * lhs.Shape()[1], 1, [&](BlockBody* b) {
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs.GetLinearIndex({0, 0})), MakeLocalGet(addr));
@@ -184,7 +184,7 @@ exprs_sptr Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template exprs_sptr Add2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
+template wabt::ExprList* Add2DArrays<t>(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs,  \
     ds::NDArray dst, std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)
@@ -193,7 +193,7 @@ EXPLICIT_INSTANTIATION(Type::F64)
 #undef EXPLICIT_INSTANTIATION
 
 template<Type type>
-exprs_sptr Scalar2DArrays(LabelManager* label_manager, ds::NDArray src, exprs_sptr scalar, ds::NDArray dst,
+wabt::ExprList* Scalar2DArrays(LabelManager* label_manager, ds::NDArray src, wabt::ExprList* scalar, ds::NDArray dst,
                        std::vector<wabt::Var> locals) {
   assert(label_manager != nullptr);
   assert(src.Shape().size() == 2);
@@ -232,7 +232,7 @@ exprs_sptr Scalar2DArrays(LabelManager* label_manager, ds::NDArray src, exprs_sp
       assert(!"Matrix scalar type not supported");
   }
 
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
   auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, src.Shape()[0] * src.Shape()[1], 1, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src.GetLinearIndex({0, 0})), MakeLocalGet(addr));
@@ -246,7 +246,7 @@ exprs_sptr Scalar2DArrays(LabelManager* label_manager, ds::NDArray src, exprs_sp
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template exprs_sptr Scalar2DArrays<t>(LabelManager* label_manager, ds::NDArray src, exprs_sptr scalar,  \
+template wabt::ExprList* Scalar2DArrays<t>(LabelManager* label_manager, ds::NDArray src, wabt::ExprList* scalar,  \
     ds::NDArray dst, std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)
@@ -255,7 +255,7 @@ EXPLICIT_INSTANTIATION(Type::F64)
 #undef EXPLICIT_INSTANTIATION
 
 template<Type type>
-exprs_sptr ApplyFx2DArrays(LabelManager* label_manager, ds::NDArray src, Var func, ds::NDArray dst,
+wabt::ExprList* ApplyFx2DArrays(LabelManager* label_manager, ds::NDArray src, Var func, ds::NDArray dst,
                           std::vector<Var> locals) {
   assert(label_manager != nullptr);
   assert(src.Shape().size() == 2);
@@ -290,7 +290,7 @@ exprs_sptr ApplyFx2DArrays(LabelManager* label_manager, ds::NDArray src, Var fun
       assert(!"Matrix addition type not supported");
   }
 
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
   auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, src.Shape()[0] * src.Shape()[1], 1, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src.GetLinearIndex({0, 0})), MakeLocalGet(addr));
@@ -304,7 +304,7 @@ exprs_sptr ApplyFx2DArrays(LabelManager* label_manager, ds::NDArray src, Var fun
 }
 
 #define EXPLICIT_INSTANTIATION(t) \
-template exprs_sptr ApplyFx2DArrays<t>(LabelManager* label_manager, ds::NDArray src, Var func,  \
+template wabt::ExprList* ApplyFx2DArrays<t>(LabelManager* label_manager, ds::NDArray src, Var func,  \
     ds::NDArray dst, std::vector<Var> locals);
 EXPLICIT_INSTANTIATION(Type::I32)
 EXPLICIT_INSTANTIATION(Type::I64)

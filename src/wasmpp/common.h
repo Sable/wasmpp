@@ -5,9 +5,18 @@
 
 namespace wasmpp {
 
-#define ERROR_EXIT(...) \
-fprintf(stderr, __VA_ARGS__); \
-exit(1);
+#define ERROR_EXIT(...)         \
+do {                            \
+  fprintf(stderr, __VA_ARGS__); \
+  exit(1);                      \
+} while(0);
+
+#define ERROR_UNLESS(cond, ...) \
+do {                            \
+  if(!(cond)) {                 \
+    ERROR_EXIT(__VA_ARGS__);    \
+  }                             \
+} while(0);
 
 // Wasm type sizes in bytes
 const uint32_t WASMPP_I32_SIZE = 4;

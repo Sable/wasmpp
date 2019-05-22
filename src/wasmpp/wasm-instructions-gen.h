@@ -19,7 +19,7 @@ namespace wasmpp {
 //   i32.ne
 //   br_if {label}
 //   end
-exprs_sptr GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, uint32_t end, uint32_t inc,
+wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, uint32_t end, uint32_t inc,
                              std::function<void(BlockBody*)> content);
 
 } // namespace wasmpp

@@ -3,11 +3,11 @@
 
 namespace wasmpp {
 
-exprs_sptr GenerateRangeLoop(LabelManager* label_manager,
+wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager,
                              wabt::Var var, uint32_t start, uint32_t end,
                              uint32_t inc, std::function<void(BlockBody*)> content) {
   assert(label_manager != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(var, MakeI32Const(start)));
   auto loop = MakeLoop(label_manager, [&](BlockBody b, wabt::Var label) {
     content(&b);

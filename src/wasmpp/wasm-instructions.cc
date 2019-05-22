@@ -3,18 +3,14 @@
 
 namespace wasmpp {
 
-exprs_sptr CreateExprList() {
-  return std::make_shared<wabt::ExprList>();
-}
-
-exprs_sptr ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
+wabt::ExprList* ExprToExprList(std::unique_ptr<wabt::Expr> expr) {
   assert(expr != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   e->push_back(std::move(expr));
   return e;
 }
 
-void Merge(exprs_sptr e1, exprs_sptr e2) {
+void Merge(wabt::ExprList* e1, wabt::ExprList* e2) {
   assert(e1 != nullptr);
   assert(e2 != nullptr);
   if(e2->empty()) {
@@ -26,9 +22,9 @@ void Merge(exprs_sptr e1, exprs_sptr e2) {
   }
 }
 
-exprs_sptr MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+wabt::ExprList* MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
   assert(label_manager != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   auto loop = wabt::MakeUnique<wabt::LoopExpr>();
   BlockBody block_body(label_manager, &loop->block.exprs);
   loop->block.label = label_manager->Next();
@@ -37,9 +33,9 @@ exprs_sptr MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, w
   return e;
 }
 
-exprs_sptr MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+wabt::ExprList* MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
   assert(label_manager != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   auto block = wabt::MakeUnique<wabt::BlockExpr>();
   BlockBody block_body(label_manager, &block->block.exprs);
   block->block.label = label_manager->Next();
@@ -48,78 +44,78 @@ exprs_sptr MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, 
   return e;
 }
 
-exprs_sptr MakeUnary(wabt::Opcode opcode, exprs_sptr op) {
+wabt::ExprList* MakeUnary(wabt::Opcode opcode, wabt::ExprList* op) {
   assert(op != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, op);
   e->push_back(wabt::MakeUnique<wabt::UnaryExpr>(opcode));
   return e;
 }
 
-exprs_sptr MakeBinary(wabt::Opcode opcode, exprs_sptr op1, exprs_sptr op2) {
+wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprList* op2) {
   assert(op1 != nullptr);
   assert(op2 != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, op1);
   Merge(e, op2);
   e->push_back(wabt::MakeUnique<wabt::BinaryExpr>(opcode));
   return e;
 }
 
-exprs_sptr MakeI32Const(uint32_t val) {
+wabt::ExprList* MakeI32Const(uint32_t val) {
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I32(val)));
 }
 
-exprs_sptr MakeI64Const(uint64_t val) {
+wabt::ExprList* MakeI64Const(uint64_t val) {
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I64(val)));
 }
 
-exprs_sptr MakeF32Const(float val) {
+wabt::ExprList* MakeF32Const(float val) {
   uint32_t value_bits;
   memcpy(&value_bits, &val, sizeof(val));
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F32(value_bits)));
 }
 
-exprs_sptr MakeF64Const(double val) {
+wabt::ExprList* MakeF64Const(double val) {
   uint64_t value_bits;
   memcpy(&value_bits, &val, sizeof(val));
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value_bits)));
 }
 
-exprs_sptr MakeBr(wabt::Var label) {
+wabt::ExprList* MakeBr(wabt::Var label) {
   return ExprToExprList(wabt::MakeUnique<wabt::BrExpr>(label));
 }
 
-exprs_sptr MakeBrIf(wabt::Var label, exprs_sptr cond) {
+wabt::ExprList* MakeBrIf(wabt::Var label, wabt::ExprList* cond) {
   assert(cond != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, cond);
   e->push_back(wabt::MakeUnique<wabt::BrIfExpr>(label));
   return e;
 }
 
-exprs_sptr MakeLocalGet(wabt::Var var) {
+wabt::ExprList* MakeLocalGet(wabt::Var var) {
   return ExprToExprList(wabt::MakeUnique<wabt::LocalGetExpr>(var));
 }
 
-exprs_sptr MakeLocalSet(wabt::Var var, exprs_sptr val) {
+wabt::ExprList* MakeLocalSet(wabt::Var var, wabt::ExprList* val) {
   assert(val != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, val);
   e->push_back(wabt::MakeUnique<wabt::LocalSetExpr>(var));
   return e;
 }
 
-exprs_sptr MakeLocalTree(wabt::Var var, exprs_sptr val) {
+wabt::ExprList* MakeLocalTree(wabt::Var var, wabt::ExprList* val) {
   assert(val != nullptr);
-  exprs_sptr e = CreateExprList();
+  wabt::ExprList* e = new wabt::ExprList();
   Merge(e, val);
   e->push_back(wabt::MakeUnique<wabt::LocalTeeExpr>(var));
   return e;
 }
 
-exprs_sptr MakeCall(wabt::Var var, std::vector<exprs_sptr> args) {
-  exprs_sptr e = CreateExprList();
+wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args) {
+  wabt::ExprList* e = new wabt::ExprList();
   for(auto arg : args) {
     assert(arg != nullptr);
     Merge(e, arg);
@@ -129,25 +125,26 @@ exprs_sptr MakeCall(wabt::Var var, std::vector<exprs_sptr> args) {
 }
 
 #define DEFINE_LOAD(opcode) \
-exprs_sptr Make##opcode(exprs_sptr index, wabt::Address align, uint32_t offset) {         \
-  assert(index != nullptr);                                                               \
-  exprs_sptr e = CreateExprList();                                                        \
-  Merge(e, index);                                                                        \
-  e->push_back(wabt::MakeUnique<wabt::LoadExpr>(wabt::Opcode::opcode, align, offset));    \
-  return e;                                                                               \
+wabt::ExprList* Make##opcode(wabt::ExprList* index, wabt::Address align, uint32_t offset) { \
+  assert(index != nullptr);                                                                 \
+  wabt::ExprList* e = new wabt::ExprList();                                                 \
+  Merge(e, index);                                                                          \
+  e->push_back(wabt::MakeUnique<wabt::LoadExpr>(wabt::Opcode::opcode, align, offset));      \
+  return e;                                                                                 \
 }
 LOAD_INSTRUCTIONS_LIST(DEFINE_LOAD)
 #undef DEFINE_LOAD
 
 #define DEFINE_STORE(opcode) \
-exprs_sptr Make##opcode(exprs_sptr index, exprs_sptr val, wabt::Address align, uint32_t offset) { \
-  assert(index != nullptr);                                                                       \
-  assert(val != nullptr);                                                                         \
-  exprs_sptr e = CreateExprList();                                                                \
-  Merge(e, index);                                                                                \
-  Merge(e, val);                                                                                  \
-  e->push_back(wabt::MakeUnique<wabt::StoreExpr>(wabt::Opcode::opcode, align, offset));           \
-  return e;                                                                                       \
+wabt::ExprList* Make##opcode(wabt::ExprList* index, wabt::ExprList* val, wabt::Address align, \
+    uint32_t offset) {                                                                        \
+  assert(index != nullptr);                                                                   \
+  assert(val != nullptr);                                                                     \
+  wabt::ExprList* e = new wabt::ExprList();                                                   \
+  Merge(e, index);                                                                            \
+  Merge(e, val);                                                                              \
+  e->push_back(wabt::MakeUnique<wabt::StoreExpr>(wabt::Opcode::opcode, align, offset));       \
+  return e;                                                                                   \
 }
 STORE_INSTRUCTIONS_LIST(DEFINE_STORE)
 #undef DEFINE_STORE

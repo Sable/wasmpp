@@ -13,10 +13,8 @@
 
 namespace wasmpp {
 
-void ContentManager::Insert(exprs_sptr e) {
-  while(e->size() > 0) {
-    expr_list_->push_back(e->extract_front());
-  }
+void ContentManager::Insert(wabt::ExprList* e) {
+  Merge(expr_list_, e);
 }
 
 ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr_list) {
