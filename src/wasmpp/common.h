@@ -5,10 +5,12 @@
 
 namespace wasmpp {
 
-#define ERROR_EXIT(...)         \
-do {                            \
-  fprintf(stderr, __VA_ARGS__); \
-  exit(1);                      \
+#define ERROR_EXIT(...)                           \
+do {                                              \
+  fprintf(stderr, "%s:%d\n", __FILE__, __LINE__); \
+  fprintf(stderr, __VA_ARGS__);                   \
+  fprintf(stderr, "\n");                          \
+  exit(1);                                        \
 } while(0);
 
 #define ERROR_UNLESS(cond, ...) \

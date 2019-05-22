@@ -30,7 +30,7 @@ Layer* Model::GetLayer(uint32_t index) const {
   if(index < layers_.size()) {
     return layers_[index];
   }
-  assert(!"Index out of bound");
+  ERROR_EXIT("Index out of bound");
 }
 
 void Model::InitImports() {

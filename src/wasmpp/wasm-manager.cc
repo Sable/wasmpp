@@ -18,8 +18,8 @@ void ContentManager::Insert(wabt::ExprList* e) {
 }
 
 ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr_list) {
-  assert(label_manager != nullptr);
-  assert(expr_list != nullptr);
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  ERROR_UNLESS(expr_list != nullptr, "expr_list cannot be null");
   label_manager_ = label_manager;
   expr_list_ = expr_list;
 }
@@ -27,7 +27,7 @@ ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr
 Memory::Memory(uint64_t begin, uint64_t end) {
   begin_ = begin;
   end_ = end;
-  assert(begin < end);
+  ERROR_UNLESS(begin < end, "begin must be strictly less than end");
 }
 
 MemoryManager::~MemoryManager() {
@@ -43,7 +43,7 @@ uint64_t MemoryManager::Pages() {
 }
 
 Memory* MemoryManager::Allocate(uint64_t k) {
-  assert(k > 0);
+  ERROR_UNLESS(k > 0, "k must be positive");
   uint64_t start = 0;
   size_t i;
   for(i=0; i < memories_.size(); i++) {

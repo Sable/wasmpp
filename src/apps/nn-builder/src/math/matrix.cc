@@ -10,14 +10,16 @@ using namespace wabt;
 template<Type type>
 wabt::ExprList* Multiply2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
                             std::vector<wabt::Var> locals) {
-  assert(label_manager != nullptr);
-  assert(lhs.Shape().size() == 2);
-  assert(rhs.Shape().size() == 2);
-  assert(dst.Shape().size() == 2);
-  assert(lhs.Shape()[1] == rhs.Shape()[0]);
-  assert(dst.Shape()[0] == lhs.Shape()[0]);
-  assert(dst.Shape()[1] == rhs.Shape()[1]);
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  ERROR_UNLESS(lhs.Shape().size() == 2, "expected lhs to be a 2D matrix");
+  ERROR_UNLESS(rhs.Shape().size() == 2, "expected rhs to be a 2D matrix");
+  ERROR_UNLESS(dst.Shape().size() == 2, "expected dst to be a 2D matrix");
+  ERROR_UNLESS(lhs.Shape()[1] == rhs.Shape()[0], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(dst.Shape()[0] == lhs.Shape()[0], "dst and lhs matrices are not compatible");
+  ERROR_UNLESS(dst.Shape()[1] == rhs.Shape()[1], "dst and rhs matrices are not compatible");
+
   assert(locals.size() == 7);
+
   auto row = locals[0];
   auto col = locals[1];
   auto col_row = locals[2];
@@ -128,14 +130,15 @@ EXPLICIT_INSTANTIATION(Type::F64)
 template<Type type>
 wabt::ExprList* Add2DArrays(LabelManager* label_manager, ds::NDArray lhs, ds::NDArray rhs, ds::NDArray dst,
                           std::vector<wabt::Var> locals) {
-  assert(label_manager != nullptr);
-  assert(lhs.Shape().size() == 2);
-  assert(rhs.Shape().size() == 2);
-  assert(dst.Shape().size() == 2);
-  assert(lhs.Shape()[0] == rhs.Shape()[0]);
-  assert(lhs.Shape()[1] == rhs.Shape()[1]);
-  assert(rhs.Shape()[0] == dst.Shape()[0]);
-  assert(rhs.Shape()[1] == dst.Shape()[1]);
+  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
+  ERROR_UNLESS(lhs.Shape().size() == 2, "expected lhs to be a 2D matrix");
+  ERROR_UNLESS(rhs.Shape().size() == 2, "expected rhs to be a 2D matrix");
+  ERROR_UNLESS(dst.Shape().size() == 2, "expected dst to be a 2D matrix");
+  ERROR_UNLESS(lhs.Shape()[0] == rhs.Shape()[0], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(lhs.Shape()[1] == rhs.Shape()[1], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(rhs.Shape()[0] == dst.Shape()[0], "rhs and dst matrices are not compatible");
+  ERROR_UNLESS(rhs.Shape()[1] == dst.Shape()[1], "rhs and dst matrices are not compatible");
+
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
@@ -195,11 +198,12 @@ EXPLICIT_INSTANTIATION(Type::F64)
 template<Type type>
 wabt::ExprList* Scalar2DArrays(LabelManager* label_manager, ds::NDArray src, wabt::ExprList* scalar, ds::NDArray dst,
                        std::vector<wabt::Var> locals) {
-  assert(label_manager != nullptr);
-  assert(src.Shape().size() == 2);
-  assert(dst.Shape().size() == 2);
-  assert(src.Shape()[0] == dst.Shape()[0]);
-  assert(src.Shape()[1] == dst.Shape()[1]);
+  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
+  ERROR_UNLESS(src.Shape().size() == 2, "expected src to be a 2D matrix");
+  ERROR_UNLESS(dst.Shape().size() == 2, "expected dst to be a 2D matrix");
+  ERROR_UNLESS(src.Shape()[0] == dst.Shape()[0], "src and dst matrices are not compatible");
+  ERROR_UNLESS(src.Shape()[1] == dst.Shape()[1], "src and dst matrices are not comaptible");
+
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
@@ -257,11 +261,12 @@ EXPLICIT_INSTANTIATION(Type::F64)
 template<Type type>
 wabt::ExprList* ApplyFx2DArrays(LabelManager* label_manager, ds::NDArray src, Var func, ds::NDArray dst,
                           std::vector<Var> locals) {
-  assert(label_manager != nullptr);
-  assert(src.Shape().size() == 2);
-  assert(dst.Shape().size() == 2);
-  assert(src.Shape()[0] == dst.Shape()[0]);
-  assert(src.Shape()[1] == dst.Shape()[1]);
+  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
+  ERROR_UNLESS(src.Shape().size() == 2, "expected src to be a 2D matrix");
+  ERROR_UNLESS(dst.Shape().size() == 2, "expected dst to be a 2D matrix");
+  ERROR_UNLESS(src.Shape()[0] == dst.Shape()[0], "src and dst matrices are not compatible");
+  ERROR_UNLESS(src.Shape()[1] == dst.Shape()[1], "src and dst matrices are not compatible");
+
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
