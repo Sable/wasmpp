@@ -26,6 +26,7 @@ private:
     // math functions
     wabt::Var exp;
     wabt::Var sigmoid;
+    wabt::Var dsigmoid;
   } builtins;
 
   // Initalize all import functions
