@@ -89,10 +89,10 @@ void Model::Setup() {
     auto vi32_6 = locals[5];
     auto vtype_1 = locals[6];
     for(int l=1; l < layers_.size(); ++l) {
-      auto mul = math::Multiply2DArrays<val_type>(f.Label(), *W[l], *Z[l-1], *Z[l],
+      auto mul = math::Multiply2DArrays<val_type>(f.Label(), W[l], Z[l-1], Z[l],
           {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vtype_1});
-      auto add = math::Add2DArrays<val_type>(f.Label(), *Z[l], *b[l], *Z[l], {vi32_1, vi32_2});
-      auto app = math::ApplyFx2DArrays<val_type>(f.Label(), *Z[l], builtins.sigmoid, *Z[l], {vi32_1, vi32_2});
+      auto add = math::Add2DArrays<val_type>(f.Label(), Z[l], b[l], Z[l], {vi32_1, vi32_2});
+      auto app = math::ApplyFx2DArrays<val_type>(f.Label(), Z[l], builtins.sigmoid, Z[l], {vi32_1, vi32_2});
       f.Insert(mul);
       f.Insert(add);
       f.Insert(app);
