@@ -9,10 +9,11 @@
 namespace nn {
 namespace arch {
 
+struct LayerMeta;
 class Model {
 private:
   wasmpp::ModuleManager module_manager_;
-  std::vector<Layer*> layers_;
+  std::vector<LayerMeta*> layers_;
 
   // Builtin functions
   struct Builtins {
@@ -31,10 +32,14 @@ private:
   void InitImports();
   // Initialize all defined functions
   void InitDefinitions();
+  // Setup layers
+  void SetupLayers();
+  // Generate feed-forward algorithm
+  wabt::Var GenerateFeedForward();
 public:
   ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
-  void SetLayers(std::vector<Layer*> layers) { layers_ = std::move(layers); }
+  void SetLayers(std::vector<Layer*> layers);
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
