@@ -107,7 +107,6 @@ void Model::SetupLayers() {
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
-  module_manager_.MakeMemory(module_manager_.Memory().Pages());
   return module_manager_.MakeFunction("feedforward", {}, locals,
           [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
@@ -116,11 +115,14 @@ Var Model::GenerateFeedForward() {
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
     auto vi32_6 = locals[5];
-    auto vtype_1 = locals[6];
+    auto vf64_1 = locals[6];
     for(int l=1; l < layers_.size(); ++l) {
+      // Z[l] = W . A
       auto mul = math::Multiply2DArrays<Type::F64>(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vtype_1});
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1});
+      // Z[l] = Z + b
       auto add = math::Add2DArrays<Type::F64>(f.Label(), layers_[l]->Z, layers_[l]->b, layers_[l]->Z, {vi32_1, vi32_2});
+      // A[l] = g(Z[l])
       auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->Z, builtins.sigmoid, layers_[l]->A,
           {vi32_1, vi32_2});
       f.Insert(mul);
@@ -130,15 +132,22 @@ Var Model::GenerateFeedForward() {
   });
 }
 
+wabt::Var Model::GenerateBackpropagation() {
+
+}
+
 void Model::Setup() {
-  InitImports();
-  InitDefinitions();
   SetupLayers();
-  auto ff = GenerateFeedForward();
+  InitImports();
+  module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  InitDefinitions();
+
+  auto feedforward = GenerateFeedForward();
+  auto backpropagation = GenerateBackpropagation();
 
   auto train = module_manager_.MakeFunction("train", {}, {},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    f.Insert(MakeCall(ff, {}));
+    f.Insert(MakeCall(feedforward, {}));
   });
 
   auto main = module_manager_.MakeFunction("main", {}, {},

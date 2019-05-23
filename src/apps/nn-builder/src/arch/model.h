@@ -29,14 +29,14 @@ private:
     wabt::Var dsigmoid;
   } builtins;
 
-  // Initalize all import functions
+  // Initalize functions
   void InitImports();
-  // Initialize all defined functions
   void InitDefinitions();
   // Setup layers
   void SetupLayers();
-  // Generate feed-forward algorithm
+  // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
+  wabt::Var GenerateBackpropagation();
 public:
   ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
