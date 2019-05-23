@@ -3,6 +3,9 @@
 
 #include <src/wasmpp/wasm-manager.h>
 #include <src/apps/nn-builder/src/arch/layer.h>
+#include <src/apps/nn-builder/src/builtins/activation.h>
+#include <src/apps/nn-builder/src/builtins/math.h>
+#include <src/apps/nn-builder/src/builtins/system.h>
 #include <memory>
 #include <utility>
 
@@ -17,17 +20,10 @@ private:
 
   // Builtin functions
   struct Builtins {
-    // system functions
-    wabt::Var print_i32;
-    wabt::Var print_i64;
-    wabt::Var print_f32;
-    wabt::Var print_f64;
-
-    // math functions
-    wabt::Var exp;
-    wabt::Var sigmoid;
-    wabt::Var dsigmoid;
-  } builtins;
+    builtins::Activation activation;
+    builtins::Math math;
+    builtins::System system;
+  } builtins_;
 
   // Initalize functions
   void InitImports();
@@ -46,7 +42,7 @@ public:
   Layer* GetLayer(uint32_t index) const;
   void Setup();
   bool Validate();
-  const Builtins& Builtins() const { return builtins; }
+  const Builtins& Builtins() const { return builtins_; }
 };
 
 } // namespace arch

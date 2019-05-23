@@ -53,30 +53,15 @@ Layer* Model::GetLayer(uint32_t index) const {
 }
 
 void Model::InitImports() {
-  builtins.print_i32 = module_manager_.MakeFuncImport("System", "print", {{Type::I32}, {}});
-  builtins.print_i64 = module_manager_.MakeFuncImport("System", "print", {{Type::I64}, {}});
-  builtins.print_f32 = module_manager_.MakeFuncImport("System", "print", {{Type::F32}, {}});
-  builtins.print_f64 = module_manager_.MakeFuncImport("System", "print", {{Type::F64}, {}});
-  builtins.exp = module_manager_.MakeFuncImport("Math", "exp", {{Type::F64}, {Type::F64}});
+  builtins_.system.InitImports(this, &module_manager_, "System");
+  builtins_.math.InitImports(this, &module_manager_, "Math");
+  builtins_.activation.InitImports(this, &module_manager_, "Activation");
 }
 
 void Model::InitDefinitions() {
-  builtins.sigmoid = module_manager_.MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {},
-      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    auto denom = MakeBinary(Opcode::F64Add, MakeF64Const(1),
-        MakeCall(builtins.exp, {MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0]))}));
-    auto div = MakeBinary(Opcode::F64Div, MakeF64Const(1), denom);
-    f.Insert(div);
-  });
-
-  builtins.dsigmoid = module_manager_.MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {Type::F64},
-      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    auto sig = MakeLocalSet(locals[0], MakeCall(builtins.sigmoid, { MakeLocalGet(params[0]) }));
-    f.Insert(sig);
-    auto sub = MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(locals[0]));
-    auto mul = MakeBinary(Opcode::F64Mul, MakeLocalGet(locals[0]), sub);
-    f.Insert(mul);
-  });
+  builtins_.system.InitDefinitions(this, &module_manager_);
+  builtins_.math.InitDefinitions(this, &module_manager_);
+  builtins_.activation.InitDefinitions(this, &module_manager_);
 }
 
 void Model::SetupLayers() {
@@ -123,8 +108,8 @@ Var Model::GenerateFeedForward() {
       // Z[l] = Z + b
       auto add = math::Add2DArrays<Type::F64>(f.Label(), layers_[l]->Z, layers_[l]->b, layers_[l]->Z, {vi32_1, vi32_2});
       // A[l] = g(Z[l])
-      auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->Z, builtins.sigmoid, layers_[l]->A,
-          {vi32_1, vi32_2});
+      auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->Z, builtins_.activation.Sigmoid().function,
+          layers_[l]->A, {vi32_1, vi32_2});
       f.Insert(mul);
       f.Insert(add);
       f.Insert(app);
