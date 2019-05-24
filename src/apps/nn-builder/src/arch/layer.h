@@ -13,27 +13,22 @@ enum LayerType {
 class Layer {
 private:
   LayerType type_;
+  uint32_t nodes_;
+  builtins::ActivationFunction func_;
 public:
-  Layer(LayerType type) : type_(type) {}
+  Layer(LayerType type, uint32_t nodes, builtins::ActivationFunction func) : type_(type), nodes_(nodes), func_(func) {}
   LayerType Type() const  { return type_; }
+  uint32_t Nodes() const { return nodes_; }
+  builtins::ActivationFunction ActivationFunction() const { return func_; }
 };
 
 template <LayerType type>
 class TypedLayer : public Layer {
 public:
-  TypedLayer() : Layer(type) {}
+  TypedLayer(uint32_t nodes, builtins::ActivationFunction func) : Layer(type, nodes, func) {}
 };
 
-class FullyConnectedLayer : public TypedLayer<FullyConnected> {
-private:
-  uint32_t nodes_;
-  builtins::ActivationFunction func_;
-public:
-  FullyConnectedLayer(uint32_t nodes, builtins::ActivationFunction func) : nodes_(nodes), func_(func) {}
-  uint32_t Nodes() const { return nodes_; }
-  builtins::ActivationFunction ActivationFunction() const { return func_; }
-};
-
+typedef TypedLayer<FullyConnected> FullyConnectedLayer;
 } // namespace arch
 } // namespace nn
 

@@ -34,6 +34,7 @@ private:
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
 public:
+  Model();
   ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
   void SetLayers(std::vector<Layer*> layers);
