@@ -148,6 +148,70 @@ void Model::Setup() {
   module_manager_.MakeMemoryExport("memory", memo);
 }
 
+wabt::Var Debug(ModuleManager* mm, Model* model) {
+  std::vector<Type> func_locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
+  return mm->MakeFunction("", {{}, {}}, func_locals, [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    auto i32_1 = locals[0];
+    auto i32_2 = locals[1];
+    auto i32_3 = locals[2];
+    auto i32_4 = locals[3];
+    auto i32_5 = locals[4];
+    auto i32_6 = locals[5];
+    auto f64_1 = locals[6];
+
+    uint32_t side = 3;
+    uint32_t type_size = sizeof(double);
+    wasmpp::Memory* A = mm->Memory().Allocate(side * side * type_size);
+    ds::NDArray* A_ = new ds::NDArray(A, {side, side}, type_size);
+    wasmpp::Memory* B = mm->Memory().Allocate(side * side * type_size);
+    ds::NDArray* B_ = new ds::NDArray(B, {side, side}, type_size);
+    wasmpp::Memory* C = mm->Memory().Allocate(side * side * type_size);
+    ds::NDArray* C_ = new ds::NDArray(C, {side, side}, type_size);
+
+    // Populate A
+    uint32_t val = 1;
+    for(int r=0; r < side; ++r) {
+      for(int c=0; c < side; ++c) {
+        f.Insert(MakeF64Store(MakeI32Const(A_->GetLinearIndex({r, c})), MakeF64Const(val++)));
+      }
+    }
+
+    // Print A
+    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
+        MakeI32Const(A_->Memory()->Begin()),
+        MakeI32Const(A_->Shape()[0]),
+        MakeI32Const(A_->Shape()[1])
+    }));
+
+    // Populate B
+    val = 9;
+    for(int r=0; r < side; ++r) {
+      for(int c=0; c < side; ++c) {
+        f.Insert(MakeF64Store(MakeI32Const(B_->GetLinearIndex({r, c})), MakeF64Const(val--)));
+      }
+    }
+
+    // Print B
+    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
+        MakeI32Const(B_->Memory()->Begin()),
+        MakeI32Const(B_->Shape()[0]),
+        MakeI32Const(B_->Shape()[1])
+    }));
+
+    // f.Insert(math::Multiply2DArrays<Type::F64>(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
+     f.Insert(math::ApplyFx2DArrays<Type::F64>(f.Label(), A_, model->Builtins().activation.Sigmoid().function, C_, {i32_1, i32_2}));
+    // f.Insert(math::Add2DArrays<Type::F64>(f.Label(), A_, B_, C_, {i32_1, i32_2}));
+    f.Insert(math::Scalar2DArrays<Type::F64>(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
+
+    // Print C
+    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
+        MakeI32Const(C_->Memory()->Begin()),
+        MakeI32Const(C_->Shape()[0]),
+        MakeI32Const(C_->Shape()[1])
+    }));
+  });
+}
+
 void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
   assert(layers_.size() > 0);
   assert(layers_.front()->a != nullptr);
@@ -166,43 +230,7 @@ void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vecto
     f.Insert(MakeCall(feedforward, {}));
     f.Insert(MakeCall(backpropagation, {}));
 
-    // Debugging
-    auto side = 3;
-    auto type_size = sizeof(double);
-    auto A = module_manager_.Memory().Allocate(side * side * type_size);
-    auto A_ = new ds::NDArray(A, {side, side}, type_size);
-    auto B = module_manager_.Memory().Allocate(side * side * type_size);
-    auto B_ = new ds::NDArray(B, {side, side}, type_size);
-    auto C = module_manager_.Memory().Allocate(side * side * type_size);
-    auto C_ = new ds::NDArray(C, {side, side}, type_size);
-
-    // Print A
-    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-        MakeI32Const(A_->Memory()->Begin()),
-        MakeI32Const(A_->Shape()[0]),
-        MakeI32Const(A_->Shape()[1])
-    }));
-
-    // Print A
-    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-      MakeI32Const(A_->Memory()->Begin()),
-      MakeI32Const(A_->Shape()[0]),
-      MakeI32Const(A_->Shape()[1])
-    }));
-
-    // Print B
-    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-        MakeI32Const(B_->Memory()->Begin()),
-        MakeI32Const(B_->Shape()[0]),
-        MakeI32Const(B_->Shape()[1])
-    }));
-
-    // Print C
-    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-        MakeI32Const(C_->Memory()->Begin()),
-        MakeI32Const(C_->Shape()[0]),
-        MakeI32Const(C_->Shape()[1])
-    }));
+    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }
 
