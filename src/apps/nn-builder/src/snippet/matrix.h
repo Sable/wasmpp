@@ -1,12 +1,12 @@
-#ifndef NN_HELPER_MATRIX_H_
-#define NN_HELPER_MATRIX_H_
+#ifndef NN_SNIPPET_MATRIX_H_
+#define NN_SNIPPET_MATRIX_H_
 
 #include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <src/apps/nn-builder/src/builtins/activation.h>
 #include <src/wasmpp/wasm-manager.h>
 
 namespace nn {
-namespace helper {
+namespace snippet {
 
 //        n            p
 //   +--------+   +--------+
@@ -34,7 +34,7 @@ wabt::ExprList* MatrixScalar(wasmpp::LabelManager* label_manager, ds::NDArray* s
 wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, ds::NDArray* src,
                                  builtins::ActivationFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
-} // namespace helper
+} // namespace snippet
 } // namespace nn
 
 #endif

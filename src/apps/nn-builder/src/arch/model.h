@@ -29,7 +29,7 @@ private:
   void InitImports();
   void InitDefinitions();
   // Setup layers
-  void SetupLayers();
+  void SetupLayers(uint32_t batch_size);
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
@@ -41,7 +41,7 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  void Setup();
+  void Setup(uint32_t batch_size);
   void Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }

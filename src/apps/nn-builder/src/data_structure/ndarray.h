@@ -22,7 +22,7 @@ public:
   void Reshape(std::vector<uint64_t> shape);
   std::vector<uint64_t >Shape() const { return shape_;}
   uint64_t GetLinearIndex(std::vector<uint64_t> index) const;
-  wasmpp::Memory* Memory() const { return memory_; }
+  const wasmpp::Memory* Memory() const { return memory_; }
 };
 
 } // namespace ds

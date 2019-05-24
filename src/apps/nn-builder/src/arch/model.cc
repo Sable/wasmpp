@@ -1,6 +1,6 @@
 #include <src/apps/nn-builder/src/arch/model.h>
 #include <src/apps/nn-builder/src/data_structure/ndarray.h>
-#include <src/apps/nn-builder/src/helper/matrix.h>
+#include <src/apps/nn-builder/src/snippet/matrix.h>
 
 namespace nn {
 namespace arch {
@@ -16,9 +16,9 @@ struct LayerMeta {
   // weights
   ds::NDArray* W = nullptr;
   // values
-  ds::NDArray* z = nullptr;
+  ds::NDArray* Z = nullptr;
   // activations = g(Z)
-  ds::NDArray* a = nullptr;
+  ds::NDArray* A = nullptr;
   // bias
   ds::NDArray* b = nullptr;
 
@@ -26,11 +26,11 @@ struct LayerMeta {
   // weights
   ds::NDArray* dW = nullptr;
   // values
-  ds::NDArray* dz = nullptr;
+  ds::NDArray* dZ = nullptr;
   // activations
-  ds::NDArray* da = nullptr;
+  ds::NDArray* dA = nullptr;
   // bias
-  ds::NDArray* &db = da;
+  ds::NDArray* &db = dA;
 
 };
 
@@ -82,30 +82,26 @@ void Model::InitDefinitions() {
   builtins_.activation.InitDefinitions(this, &module_manager_);
 }
 
-void Model::SetupLayers() {
+#define ALLOCATE_MEMORY(array, rows, cols) \
+    array = new ds::NDArray(module_manager_.Memory().Allocate(rows * cols * TypeSize(Type::F64)), \
+                            {rows, cols}, TypeSize(Type::F64));
+
+void Model::SetupLayers(uint32_t batch_size) {
   ERROR_UNLESS(layers_.size() > 2, "At least an input and output layer should be defined");
-  const uint64_t val_type_size = TypeSize(Type::F64);
   for(auto l = 0; l < layers_.size(); ++l) {
     // FIXME For now only support fully connected layer
     assert(layers_[l]->layer->Type() == FullyConnected);
-    auto cur_layer = layers_[l]->layer;
-    // values
-    auto memZ = module_manager_.Memory().Allocate(cur_layer->Nodes() * val_type_size);
-    layers_[l]->z = new ds::NDArray(memZ, {cur_layer->Nodes(), 1}, val_type_size);
-    // activations
-    auto memA = module_manager_.Memory().Allocate(cur_layer->Nodes() * val_type_size);
-    layers_[l]->a = new ds::NDArray(memA, {cur_layer->Nodes(), 1}, val_type_size);
+
+    ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size);
+    ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size);
     if(l > 0) {
-      auto prev_layer = layers_[l-1]->layer;
-      // weight
-      auto memW = module_manager_.Memory().Allocate(cur_layer->Nodes() * prev_layer->Nodes() * val_type_size);
-      layers_[l]->W = new ds::NDArray(memW, {cur_layer->Nodes(), prev_layer->Nodes()}, val_type_size);
-      // bias
-      auto memb = module_manager_.Memory().Allocate(cur_layer->Nodes() * val_type_size);
-      layers_[l]->b = new ds::NDArray(memb, {cur_layer->Nodes(), 1}, val_type_size);
+      ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
+      ALLOCATE_MEMORY(layers_[l]->b, layers_[l]->layer->Nodes(), 1);
     }
   }
 }
+
+#undef ALLOCATE_MEMORY
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
@@ -118,18 +114,16 @@ Var Model::GenerateFeedForward() {
     auto vi32_5 = locals[4];
     auto vi32_6 = locals[5];
     auto vf64_1 = locals[6];
+
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W . A
-      auto mul = helper::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->a, layers_[l]->z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1});
+      f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1}));
       // Z[l] = Z + b
-      auto add = helper::MatrixAddition(f.Label(), layers_[l]->z, layers_[l]->b, layers_[l]->z, {vi32_1, vi32_2});
+      f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->b, layers_[l]->Z, {vi32_1, vi32_2}));
       // A[l] = g(Z[l])
-      auto app = helper::MatrixActivation(f.Label(), layers_[l]->z, layers_[l]->layer->ActivationFunction(),
-          layers_[l]->a, {vi32_1, vi32_2});
-      f.Insert(mul);
-      f.Insert(add);
-      f.Insert(app);
+      f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
+          layers_[l]->A, {vi32_1, vi32_2}));
     }
   });
 }
@@ -142,8 +136,8 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
-void Model::Setup() {
-  SetupLayers();
+void Model::Setup(uint32_t batch_size) {
+  SetupLayers(batch_size);
   auto memo = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memo);
 }
@@ -198,7 +192,7 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
         MakeI32Const(B_->Shape()[1])
     }));
 
-    f.Insert(helper::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
+//    f.Insert(helper::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
 //    f.Insert(helper::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
 //    f.Insert(helper::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
 //    f.Insert(helper::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
@@ -212,17 +206,18 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
   });
 }
 
-void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels){
   assert(layers_.size() > 0);
-  assert(layers_.front()->a != nullptr);
-  assert(layers_.front()->a->Shape().size() == 2);
+  assert(layers_.front()->A != nullptr);
+  assert(layers_.front()->A->Shape().size() == 2);
   ERROR_UNLESS(input.size() > 0, "training input cannot be empty");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
-  auto train = module_manager_.MakeFunction("train", {}, {}, [&](FuncBody f, std::vector<Var> params,
+
+  module_manager_.MakeFunction("train", {}, {}, [&](FuncBody f, std::vector<Var> params,
       std::vector<Var> locals) {
     for(auto i=0; i < 1; i++) {
-      ERROR_UNLESS(layers_.front()->a->Shape()[0] == input[i].size(), "input at index %d has wrong shape", i);
-      ERROR_UNLESS(layers_.back()->a->Shape()[0] == labels[i].size(), "label at index %d has wrong shape", i);
+      ERROR_UNLESS(layers_.front()->A->Shape()[0] == input[i].size(), "input at index %d has wrong shape", i);
+      ERROR_UNLESS(layers_.back()->A->Shape()[0] == labels[i].size(), "label at index %d has wrong shape", i);
       // TODO copy data to layer->front()->a
     }
     auto feedforward = GenerateFeedForward();
@@ -230,6 +225,7 @@ void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vecto
     f.Insert(MakeCall(feedforward, {}));
     f.Insert(MakeCall(backpropagation, {}));
 
+    // Debugging
     f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }

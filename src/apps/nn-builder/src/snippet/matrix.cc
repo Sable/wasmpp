@@ -1,8 +1,8 @@
-#include <src/apps/nn-builder/src/helper/matrix.h>
+#include <src/apps/nn-builder/src/snippet/matrix.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
-namespace helper {
+namespace snippet {
 
 using namespace wasmpp;
 using namespace wabt;
@@ -161,5 +161,5 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
   return e;
 }
 
-} // namespace math
+} // namespace snippet
 } // namespace nn

@@ -7,12 +7,13 @@ using namespace wabt;
 
 int main() {
   Model model;
+  uint32_t batch = 1;
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
-  model.Setup();
+  model.Setup(batch);
 
   // Train
   std::vector<std::vector<double>> train = {
