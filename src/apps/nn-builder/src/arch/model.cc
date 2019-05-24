@@ -11,26 +11,16 @@ using namespace wabt;
 struct LayerMeta {
   LayerMeta(Layer* l):layer(l) {}
   Layer* layer = nullptr;
-
   // Feed-forward arrays
-  // weights
   ds::NDArray* W = nullptr;
-  // values
   ds::NDArray* Z = nullptr;
-  // activations = g(Z)
   ds::NDArray* A = nullptr;
-  // bias
   ds::NDArray* b = nullptr;
-
   // Back-propagation arrays
-  // weights
   ds::NDArray* dW = nullptr;
-  // values
   ds::NDArray* dZ = nullptr;
-  // activations
   ds::NDArray* dA = nullptr;
-  // bias
-  ds::NDArray* &db = dA;
+  ds::NDArray* db = nullptr;
 
 };
 
@@ -93,10 +83,14 @@ void Model::SetupLayers(uint32_t batch_size) {
     assert(layers_[l]->layer->Type() == FullyConnected);
 
     ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size);
+    ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size);
     ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size);
+    ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size);
     if(l > 0) {
       ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
+      ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->b, layers_[l]->layer->Nodes(), 1);
+      ALLOCATE_MEMORY(layers_[l]->db, layers_[l]->layer->Nodes(), 1);
     }
   }
 }
