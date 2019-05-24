@@ -34,7 +34,7 @@ void Model::AddLayer(Layer* layer) {
   layers_.push_back(new LayerMeta(layer));
 }
 
-Model::Model() {
+Model::Model() : module_manager_({MemoryType::WASM32}) {
   InitImports();
   InitDefinitions();
 }

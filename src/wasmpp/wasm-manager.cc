@@ -24,9 +24,11 @@ ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr
   expr_list_ = expr_list;
 }
 
-Memory::Memory(uint64_t begin, uint64_t end) {
+Memory::Memory(uint64_t begin, uint64_t end, MemoryType type) {
+  type_ = type;
   begin_ = begin;
   end_ = end;
+
   ERROR_UNLESS(begin < end, "begin must be strictly less than end");
 }
 
@@ -52,7 +54,7 @@ Memory* MemoryManager::Allocate(uint64_t k) {
     }
     start = memories_[i]->End();
   }
-  auto memory = new Memory{start, start + k};
+  auto memory = new Memory{start, start + k, type_};
   memories_.insert(memories_.begin() + i, memory);
   return memory;
 }

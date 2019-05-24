@@ -8,13 +8,20 @@
 
 namespace wasmpp {
 
+enum MemoryType {
+  WASM32,
+  WASM64
+};
+
 class Memory {
 public:
-  Memory(uint64_t begin, uint64_t end);
+  Memory(uint64_t begin, uint64_t end, MemoryType type);
   uint64_t Bytes() const { return end_ - begin_; }
   uint64_t Begin() const { return begin_; }
   uint64_t End() const { return end_; }
+  MemoryType Type() const { return type_; }
 private:
+  MemoryType type_;
   uint64_t begin_;
   uint64_t end_;
 };
@@ -22,7 +29,9 @@ private:
 class MemoryManager {
 private:
   std::vector<Memory*> memories_;
+  MemoryType type_;
 public:
+  MemoryManager(MemoryType type) : type_(type) {}
   ~MemoryManager();
   // Allocate memory
   Memory* Allocate(uint64_t k);
@@ -81,11 +90,16 @@ public:
   std::string Next();
 };
 
+struct ModuleManagerOptions {
+  MemoryType memory_type;
+};
+
 class ModuleManager {
 private:
   wabt::Module module_;
   MemoryManager memory_manager_;
   LabelManager label_manager_;
+  ModuleManagerOptions options_;
 
   // Function copied from WastParser::CheckImportOrdering
   void CheckImportOrdering();
@@ -93,7 +107,7 @@ private:
   // Helpers
   void MakeExport(std::string name, wabt::Var var, wabt::ExternalKind kind);
 public:
-
+  ModuleManager(ModuleManagerOptions options) : options_(options), memory_manager_(options.memory_type) {}
   const wabt::Module& GetModule() const;
   MemoryManager& Memory() { return memory_manager_; }
   LabelManager& Label() { return label_manager_; }
