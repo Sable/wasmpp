@@ -11,14 +11,27 @@ using namespace wabt;
 struct LayerMeta {
   LayerMeta(Layer* l):layer(l) {}
   Layer* layer = nullptr;
+
+  // Feed-forward arrays
   // weights
   ds::NDArray* W = nullptr;
   // values
-  ds::NDArray* Z = nullptr;
+  ds::NDArray* z = nullptr;
   // activations = g(Z)
-  ds::NDArray* A = nullptr;
+  ds::NDArray* a = nullptr;
   // bias
   ds::NDArray* b = nullptr;
+
+  // Back-propagation arrays
+  // weights
+  ds::NDArray* dW = nullptr;
+  // values
+  ds::NDArray* dz = nullptr;
+  // activations
+  ds::NDArray* da = nullptr;
+  // bias
+  ds::NDArray* &db = da;
+
 };
 
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
@@ -71,10 +84,10 @@ void Model::SetupLayers() {
       auto cur_layer = static_cast<FullyConnectedLayer*>(layers_[l]->layer);
       // values
       auto memZ = module_manager_.Memory().Allocate(cur_layer->Nodes() * val_type_size);
-      layers_[l]->Z = new ds::NDArray(memZ, {cur_layer->Nodes(), 1}, val_type_size);
+      layers_[l]->z = new ds::NDArray(memZ, {cur_layer->Nodes(), 1}, val_type_size);
       // activations
       auto memA = module_manager_.Memory().Allocate(cur_layer->Nodes() * val_type_size);
-      layers_[l]->A = new ds::NDArray(memA, {cur_layer->Nodes(), 1}, val_type_size);
+      layers_[l]->a = new ds::NDArray(memA, {cur_layer->Nodes(), 1}, val_type_size);
       if(l > 0) {
         auto prev_layer = static_cast<FullyConnectedLayer*>(layers_[l-1]->layer);
         // weight
@@ -103,13 +116,13 @@ Var Model::GenerateFeedForward() {
     auto vf64_1 = locals[6];
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W . A
-      auto mul = math::Multiply2DArrays<Type::F64>(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
+      auto mul = math::Multiply2DArrays<Type::F64>(f.Label(), layers_[l]->W, layers_[l-1]->a, layers_[l]->z,
           {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1});
       // Z[l] = Z + b
-      auto add = math::Add2DArrays<Type::F64>(f.Label(), layers_[l]->Z, layers_[l]->b, layers_[l]->Z, {vi32_1, vi32_2});
+      auto add = math::Add2DArrays<Type::F64>(f.Label(), layers_[l]->z, layers_[l]->b, layers_[l]->z, {vi32_1, vi32_2});
       // A[l] = g(Z[l])
-      auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->Z, builtins_.activation.Sigmoid().function,
-          layers_[l]->A, {vi32_1, vi32_2});
+      auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->z, builtins_.activation.Sigmoid().function,
+          layers_[l]->a, {vi32_1, vi32_2});
       f.Insert(mul);
       f.Insert(add);
       f.Insert(app);
@@ -118,26 +131,28 @@ Var Model::GenerateFeedForward() {
 }
 
 wabt::Var Model::GenerateBackpropagation() {
+  std::vector<Type> locals = {};
+  return module_manager_.MakeFunction("backpropagation", {}, locals, [&](FuncBody f, std::vector<Var> params,
+                                                                     std::vector<Var> locals) {
 
+  });
 }
 
 void Model::Setup() {
   SetupLayers();
   InitImports();
-  module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  auto memo = module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  module_manager_.MakeMemoryExport("memory", memo);
   InitDefinitions();
+}
 
-  auto feedforward = GenerateFeedForward();
-  auto backpropagation = GenerateBackpropagation();
-
-  auto train = module_manager_.MakeFunction("train", {}, {},
-      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+  module_manager_.MakeFunction("train", {}, {}, [&](FuncBody f, std::vector<Var> params,
+      std::vector<Var> locals) {
+    auto feedforward = GenerateFeedForward();
+    auto backpropagation = GenerateBackpropagation();
     f.Insert(MakeCall(feedforward, {}));
-  });
-
-  auto main = module_manager_.MakeFunction("main", {}, {},
-      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    f.Insert(MakeCall(train, {}));
+    f.Insert(MakeCall(backpropagation, {}));
   });
 }
 

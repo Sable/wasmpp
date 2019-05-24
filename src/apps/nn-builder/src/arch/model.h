@@ -41,6 +41,7 @@ public:
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
   void Setup();
+  void Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
 };

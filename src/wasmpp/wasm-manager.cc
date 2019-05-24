@@ -218,5 +218,17 @@ void ModuleManager::MakeData(wabt::Var var, uint32_t index, std::vector<wasmpp::
   module_.AppendField(std::move(field));
 }
 
+void ModuleManager::MakeExport(std::string name, wabt::Var var, wabt::ExternalKind kind) {
+  auto field = wabt::MakeUnique<wabt::ExportModuleField>();
+  field->export_.name = name;
+  field->export_.kind = kind;
+  field->export_.var = var;
+  module_.AppendField(std::move(field));
+}
+
+void ModuleManager::MakeMemoryExport(std::string name, wabt::Var var) {
+  MakeExport(name, var, wabt::ExternalKind::Memory);
+}
+
 } // namespace wasm
 

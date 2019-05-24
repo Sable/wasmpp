@@ -89,6 +89,9 @@ private:
 
   // Function copied from WastParser::CheckImportOrdering
   void CheckImportOrdering();
+
+  // Helpers
+  void MakeExport(std::string name, wabt::Var var, wabt::ExternalKind kind);
 public:
 
   const wabt::Module& GetModule() const;
@@ -108,6 +111,7 @@ public:
   wabt::Var MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
   wabt::Var MakeMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
   void MakeData(wabt::Var var, uint32_t index, std::vector<DataEntry> entries);
+  void MakeMemoryExport(std::string name, wabt::Var var);
 };
 
 } // namespace wasm
