@@ -1,6 +1,6 @@
 #include <src/apps/nn-builder/src/arch/model.h>
 #include <src/apps/nn-builder/src/data_structure/ndarray.h>
-#include <src/apps/nn-builder/src/math/matrix.h>
+#include <src/apps/nn-builder/src/helper/matrix.h>
 
 namespace nn {
 namespace arch {
@@ -120,13 +120,13 @@ Var Model::GenerateFeedForward() {
     auto vf64_1 = locals[6];
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W . A
-      auto mul = math::Multiply2DArrays<Type::F64>(f.Label(), layers_[l]->W, layers_[l-1]->a, layers_[l]->z,
+      auto mul = helper::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->a, layers_[l]->z,
           {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1});
       // Z[l] = Z + b
-      auto add = math::Add2DArrays<Type::F64>(f.Label(), layers_[l]->z, layers_[l]->b, layers_[l]->z, {vi32_1, vi32_2});
+      auto add = helper::MatrixAddition(f.Label(), layers_[l]->z, layers_[l]->b, layers_[l]->z, {vi32_1, vi32_2});
       // A[l] = g(Z[l])
-      auto app = math::ApplyFx2DArrays<Type::F64>(f.Label(), layers_[l]->z,
-          layers_[l]->layer->ActivationFunction().function, layers_[l]->a, {vi32_1, vi32_2});
+      auto app = helper::MatrixActivation(f.Label(), layers_[l]->z, layers_[l]->layer->ActivationFunction(),
+          layers_[l]->a, {vi32_1, vi32_2});
       f.Insert(mul);
       f.Insert(add);
       f.Insert(app);
@@ -198,10 +198,10 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
         MakeI32Const(B_->Shape()[1])
     }));
 
-    // f.Insert(math::Multiply2DArrays<Type::F64>(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
-     f.Insert(math::ApplyFx2DArrays<Type::F64>(f.Label(), A_, model->Builtins().activation.Sigmoid().function, C_, {i32_1, i32_2}));
-    // f.Insert(math::Add2DArrays<Type::F64>(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-    f.Insert(math::Scalar2DArrays<Type::F64>(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
+    f.Insert(helper::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
+//    f.Insert(helper::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
+//    f.Insert(helper::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
+//    f.Insert(helper::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
