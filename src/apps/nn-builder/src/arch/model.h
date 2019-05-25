@@ -7,6 +7,7 @@
 #include <src/apps/nn-builder/src/builtins/loss.h>
 #include <src/apps/nn-builder/src/builtins/math.h>
 #include <src/apps/nn-builder/src/builtins/system.h>
+#include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <memory>
 #include <utility>
 
@@ -43,8 +44,7 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  void Setup(uint32_t batch_size);
-  void Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void Train(uint32_t batch_size, std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
 };

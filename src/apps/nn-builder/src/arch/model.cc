@@ -1,5 +1,4 @@
 #include <src/apps/nn-builder/src/arch/model.h>
-#include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <src/apps/nn-builder/src/snippet/matrix.h>
 
 namespace nn {
@@ -97,8 +96,6 @@ void Model::SetupLayers(uint32_t batch_size) {
   }
 }
 
-#undef ALLOCATE_MEMORY
-
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
   return module_manager_.MakeFunction("feedforward", {}, locals,
@@ -132,15 +129,9 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
-void Model::Setup(uint32_t batch_size) {
-  SetupLayers(batch_size);
-  auto memo = module_manager_.MakeMemory(module_manager_.Memory().Pages());
-  module_manager_.MakeMemoryExport("memory", memo);
-}
-
 wabt::Var Debug(ModuleManager* mm, Model* model) {
   std::vector<Type> func_locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
-  return mm->MakeFunction("", {{}, {}}, func_locals, [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+  return mm->MakeFunction(nullptr, {{}, {}}, func_locals, [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto i32_1 = locals[0];
     auto i32_2 = locals[1];
     auto i32_3 = locals[2];
@@ -194,10 +185,7 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 //    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({0, 0})), MakeF64Const(1.2)));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({1, 0})), MakeF64Const(2.3)));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({2, 0})), MakeF64Const(3.4)));
-    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
@@ -208,27 +196,67 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
   });
 }
 
-void Model::Train(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels){
-  assert(layers_.size() > 0);
-  assert(layers_.front()->A != nullptr);
-  assert(layers_.front()->A->Shape().size() == 2);
+void Model::Train(uint32_t batch_size, std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels){
+  ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   ERROR_UNLESS(input.size() > 0, "training input cannot be empty");
+  ERROR_UNLESS(batch_size <= input.size(), "batch size must be at most equal to the input size");
+  ERROR_UNLESS(input.size() % batch_size == 0, "batch size must be a multiple of the input size");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
 
-  module_manager_.MakeFunction("train", {}, {}, [&](FuncBody f, std::vector<Var> params,
-      std::vector<Var> locals) {
-    for(auto i=0; i < 1; i++) {
-      ERROR_UNLESS(layers_.front()->A->Shape()[0] == input[i].size(), "input at index %d has wrong shape", i);
-      ERROR_UNLESS(layers_.back()->A->Shape()[0] == labels[i].size(), "label at index %d has wrong shape", i);
-      // TODO copy data to layer->front()->a
+  SetupLayers(batch_size);
+
+  std::vector<ds::NDArray*> training_data_arrays;
+  std::vector<ds::NDArray*> labels_arrays;
+
+  auto feedforward = GenerateFeedForward();
+  auto backpropagation = GenerateBackpropagation();
+
+  // Allocate memory
+  for(uint32_t b=0; b < input.size(); b += batch_size) {
+    ds::NDArray* training_array = nullptr;
+    ALLOCATE_MEMORY(training_array, input[0].size(), batch_size);
+    training_data_arrays.push_back(training_array);
+  }
+
+  // Create required memory
+  // Do not allocate anymore memory
+  // after calling MakeMemory
+  auto memo = module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  module_manager_.MakeMemoryExport("memory", memo);
+
+  // Create wasm data entries
+  for(uint32_t i=0; i < training_data_arrays.size(); ++i) {
+    std::vector<DataEntry> entries;
+    auto offset = i * batch_size;
+    for (uint32_t col = 0; col < training_data_arrays[i]->Shape()[0]; ++col) {
+      for (uint32_t rel_row = 0; rel_row < training_data_arrays[i]->Shape()[1]; ++rel_row) {
+        entries.push_back(DataEntry::MakeF64(input[offset+rel_row][col]));
+      }
     }
-    auto feedforward = GenerateFeedForward();
-    auto backpropagation = GenerateBackpropagation();
+    module_manager_.MakeData(memo, training_data_arrays[i]->Memory()->Begin(), entries);
+  }
+
+  std::vector<Type> locals_type = {Type::I32, Type::I32};
+  module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
+                                                             std::vector<Var> locals) {
+    auto i32_1 = locals[0];
+    auto i32_2 = locals[1];
+
+    // Copy training data into the first layer
+    f.Insert(snippet::MatrixCopy(f.Label(), training_data_arrays[0], layers_.front()->A, {i32_1, i32_2}));
+
+    // Print input
+    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
+      MakeI32Const(layers_[1]->W->Memory()->Begin()),
+      MakeI32Const(layers_[1]->W->Shape()[0]),
+      MakeI32Const(layers_[1]->W->Shape()[1])
+    }));
+
     f.Insert(MakeCall(feedforward, {}));
     f.Insert(MakeCall(backpropagation, {}));
 
     // Debugging
-    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
+//    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }
 

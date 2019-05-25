@@ -7,13 +7,11 @@ using namespace wabt;
 
 int main() {
   Model model;
-  uint32_t batch = 2;
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
-  model.Setup(batch);
 
   // Train
   std::vector<std::vector<double>> train = {
@@ -29,7 +27,8 @@ int main() {
     {0, 1},
     {0, 1}
   };
-  model.Train(train, labels);
+  uint32_t batch = 4;
+  model.Train(batch, train, labels);
 
   assert(model.Validate());
   std::cout << model.ModuleManager().ToWat(true, true);
