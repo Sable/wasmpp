@@ -188,11 +188,12 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
         MakeI32Const(B_->Shape()[1])
     }));
 
-//    f.Insert(helper::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
-//    f.Insert(helper::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
-//    f.Insert(helper::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-//    f.Insert(helper::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
-    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
+//    f.Insert(snippet::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
+    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
