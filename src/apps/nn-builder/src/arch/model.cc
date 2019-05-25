@@ -15,12 +15,12 @@ struct LayerMeta {
   ds::NDArray* W = nullptr;
   ds::NDArray* Z = nullptr;
   ds::NDArray* A = nullptr;
-  ds::NDArray* b = nullptr;
+  ds::NDArray* B = nullptr;
   // Back-propagation arrays
   ds::NDArray* dW = nullptr;
   ds::NDArray* dZ = nullptr;
   ds::NDArray* dA = nullptr;
-  ds::NDArray* db = nullptr;
+  ds::NDArray* dB = nullptr;
 
 };
 
@@ -75,7 +75,7 @@ void Model::InitDefinitions() {
 }
 
 #define ALLOCATE_MEMORY(array, rows, cols) \
-    array = new ds::NDArray(module_manager_.Memory().Allocate(rows * cols * TypeSize(Type::F64)), \
+    array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F64)), \
                             {rows, cols}, TypeSize(Type::F64));
 
 void Model::SetupLayers(uint32_t batch_size) {
@@ -91,8 +91,8 @@ void Model::SetupLayers(uint32_t batch_size) {
     if(l > 0) {
       ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
-      ALLOCATE_MEMORY(layers_[l]->b, layers_[l]->layer->Nodes(), 1);
-      ALLOCATE_MEMORY(layers_[l]->db, layers_[l]->layer->Nodes(), 1);
+      ALLOCATE_MEMORY(layers_[l]->B, layers_[l]->layer->Nodes(), batch_size);
+      ALLOCATE_MEMORY(layers_[l]->dB, layers_[l]->layer->Nodes(), batch_size);
     }
   }
 }
@@ -116,7 +116,7 @@ Var Model::GenerateFeedForward() {
       f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
           {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1}));
       // Z[l] = Z + b
-      f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->b, layers_[l]->Z, {vi32_1, vi32_2}));
+      f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
       // A[l] = g(Z[l])
       f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
           layers_[l]->A, {vi32_1, vi32_2}));
@@ -193,7 +193,11 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 //    f.Insert(snippet::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
-    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
+    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({0, 0})), MakeF64Const(1.2)));
+    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({1, 0})), MakeF64Const(2.3)));
+    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({2, 0})), MakeF64Const(3.4)));
+    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {

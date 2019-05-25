@@ -8,8 +8,8 @@ using namespace wasmpp;
 using namespace wabt;
 
 #define MATRIX_CHECK(x) \
-  ERROR_UNLESS(x != nullptr, #x " cannot be null"); \
-  ERROR_UNLESS(x->Shape().size() == 2, #x " is expected to be a 2D matrix");
+  ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
+  ERROR_UNLESS((x)->Shape().size() == 2, #x " is expected to be a 2D matrix");
 
 wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
@@ -154,9 +154,9 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
 wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
-  MATRIX_CHECK(prediction)
-  MATRIX_CHECK(target)
-  MATRIX_CHECK(dst)
+  MATRIX_CHECK(prediction);
+  MATRIX_CHECK(target);
+  MATRIX_CHECK(dst);
   ERROR_UNLESS(prediction->Shape() == target->Shape(), "prediction and target matrices are not compatible");
   ERROR_UNLESS(target->Shape() == dst->Shape(), "prediction and dst matrices are not compatible");
   assert(locals.size() == 2);
@@ -182,8 +182,8 @@ wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* pre
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                            std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
-  MATRIX_CHECK(src)
-  MATRIX_CHECK(dst)
+  MATRIX_CHECK(src);
+  MATRIX_CHECK(dst);
   ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
@@ -196,6 +196,29 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
     auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeF64Store(dst_addr, MakeF64Load(src_addr)));
+    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
+  });
+  Merge(e, loopRC);
+  return e;
+}
+
+wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias, std::vector<Var> locals) {
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(bias);
+  assert(locals.size() == 2);
+
+  auto row_col = locals[0];
+  auto addr = locals[1];
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, bias->Shape()[0] * bias->Shape()[1], 1, [&](BlockBody* b) {
+    auto row_bytes = bias->Shape()[0] * TypeSize(Type::F64);
+    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), MakeLocalGet(addr));
+    auto src_rel_addr = MakeBinary(Opcode::I32Mul,
+        MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(row_bytes)), MakeI32Const(row_bytes));
+    auto src_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), src_rel_addr);
+    b->Insert(MakeF64Store(dst_addr, MakeF64Load(src_abs_addr)));
     b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
   });
   Merge(e, loopRC);

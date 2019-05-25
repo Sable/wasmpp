@@ -7,7 +7,7 @@ using namespace wabt;
 
 int main() {
   Model model;
-  uint32_t batch = 1;
+  uint32_t batch = 2;
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
