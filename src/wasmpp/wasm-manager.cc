@@ -59,7 +59,7 @@ Memory* MemoryManager::Allocate(uint64_t k) {
   return memory;
 }
 
-bool MemoryManager::Free(wasmpp::Memory *m) {
+bool MemoryManager::Free(const wasmpp::Memory *m) {
   auto find = std::find(memories_.begin(), memories_.end(), m);
   if (find != memories_.end()) {
     memories_.erase(find);

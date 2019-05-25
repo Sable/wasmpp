@@ -15,10 +15,15 @@ namespace nn {
 namespace arch {
 
 struct LayerMeta;
+struct ModelMeta;
 class Model {
 private:
   wasmpp::ModuleManager module_manager_;
+  wabt::Var memory_;
   std::vector<LayerMeta*> layers_;
+  std::vector<ds::NDArray*> training_;
+  std::vector<ds::NDArray*> labels_;
+  uint32_t batch_size_;
 
   // Builtin functions
   struct Builtins {
@@ -31,8 +36,12 @@ private:
   // Initalize functions
   void InitImports();
   void InitDefinitions();
-  // Setup layers
-  void SetupLayers(uint32_t batch_size);
+  // Model functions
+  void AllocateLayers();
+  void AllocateInput(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void MakeInputData(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void MakeWeightData();
+  void MakeBiasData();
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
@@ -44,7 +53,8 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  void Train(uint32_t batch_size, std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void Setup(uint32_t batch_size, std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void Train();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
 };

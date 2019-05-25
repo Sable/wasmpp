@@ -20,7 +20,6 @@ struct LayerMeta {
   ds::NDArray* dZ = nullptr;
   ds::NDArray* dA = nullptr;
   ds::NDArray* dB = nullptr;
-
 };
 
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
@@ -77,22 +76,59 @@ void Model::InitDefinitions() {
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F64)), \
                             {rows, cols}, TypeSize(Type::F64));
 
-void Model::SetupLayers(uint32_t batch_size) {
+void Model::AllocateLayers() {
   ERROR_UNLESS(layers_.size() > 2, "At least an input and output layer should be defined");
   for(auto l = 0; l < layers_.size(); ++l) {
     // FIXME For now only support fully connected layer
     assert(layers_[l]->layer->Type() == FullyConnected);
 
-    ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size);
-    ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size);
-    ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size);
-    ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size);
+    ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size_);
+    ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size_);
+    ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size_);
+    ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size_);
     if(l > 0) {
       ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
-      ALLOCATE_MEMORY(layers_[l]->B, layers_[l]->layer->Nodes(), batch_size);
-      ALLOCATE_MEMORY(layers_[l]->dB, layers_[l]->layer->Nodes(), batch_size);
+      ALLOCATE_MEMORY(layers_[l]->B, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(layers_[l]->dB, layers_[l]->layer->Nodes(), batch_size_);
     }
+  }
+}
+
+void Model::AllocateInput(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+  for(uint32_t b=0; b < input.size(); b += batch_size_) {
+    ds::NDArray* training_array = nullptr;
+    ALLOCATE_MEMORY(training_array, input[0].size(), batch_size_);
+    training_.push_back(training_array);
+  }
+}
+
+void Model::MakeInputData(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+  for(uint32_t i=0; i < training_.size(); ++i) {
+    std::vector<DataEntry> entries;
+    auto offset = i * batch_size_;
+    for (uint32_t col = 0; col < training_[i]->Shape()[0]; ++col) {
+      for (uint32_t rel_row = 0; rel_row < training_[i]->Shape()[1]; ++rel_row) {
+        entries.push_back(DataEntry::MakeF64(input[offset+rel_row][col]));
+      }
+    }
+    module_manager_.MakeData(memory_, training_[i]->Memory()->Begin(), entries);
+  }
+}
+
+void Model::MakeWeightData() {
+  for(int l=1; l < layers_.size(); ++l) {
+    auto total = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
+    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.1));
+    module_manager_.MakeData(memory_, layers_[l]->W->Memory()->Begin(), entries);
+  }
+}
+
+void Model::MakeBiasData() {
+  for(int l=1; l < layers_.size(); ++l) {
+    auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
+    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.2));
+    module_manager_.MakeData(memory_, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
 
@@ -196,45 +232,28 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
   });
 }
 
-void Model::Train(uint32_t batch_size, std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels){
+void Model::Setup(uint32_t batch_size, std::vector<std::vector<double>> input,
+                  std::vector<std::vector<double>> labels) {
+  ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   ERROR_UNLESS(input.size() > 0, "training input cannot be empty");
   ERROR_UNLESS(batch_size <= input.size(), "batch size must be at most equal to the input size");
   ERROR_UNLESS(input.size() % batch_size == 0, "batch size must be a multiple of the input size");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
 
-  SetupLayers(batch_size);
+  batch_size_ = batch_size;
+  AllocateLayers();
+  AllocateInput(input, labels);
+  memory_ = module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  module_manager_.MakeMemoryExport("memory", memory_);
+  MakeInputData(input, labels);
+  MakeWeightData();
+  MakeBiasData();
+}
 
-  std::vector<ds::NDArray*> training_data_arrays;
-  std::vector<ds::NDArray*> labels_arrays;
-
+void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
-
-  // Allocate memory
-  for(uint32_t b=0; b < input.size(); b += batch_size) {
-    ds::NDArray* training_array = nullptr;
-    ALLOCATE_MEMORY(training_array, input[0].size(), batch_size);
-    training_data_arrays.push_back(training_array);
-  }
-
-  // Create required memory
-  // Do not allocate anymore memory
-  // after calling MakeMemory
-  auto memo = module_manager_.MakeMemory(module_manager_.Memory().Pages());
-  module_manager_.MakeMemoryExport("memory", memo);
-
-  // Create wasm data entries
-  for(uint32_t i=0; i < training_data_arrays.size(); ++i) {
-    std::vector<DataEntry> entries;
-    auto offset = i * batch_size;
-    for (uint32_t col = 0; col < training_data_arrays[i]->Shape()[0]; ++col) {
-      for (uint32_t rel_row = 0; rel_row < training_data_arrays[i]->Shape()[1]; ++rel_row) {
-        entries.push_back(DataEntry::MakeF64(input[offset+rel_row][col]));
-      }
-    }
-    module_manager_.MakeData(memo, training_data_arrays[i]->Memory()->Begin(), entries);
-  }
 
   std::vector<Type> locals_type = {Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
@@ -243,17 +262,18 @@ void Model::Train(uint32_t batch_size, std::vector<std::vector<double>> input, s
     auto i32_2 = locals[1];
 
     // Copy training data into the first layer
-    f.Insert(snippet::MatrixCopy(f.Label(), training_data_arrays[0], layers_.front()->A, {i32_1, i32_2}));
+    f.Insert(snippet::MatrixCopy(f.Label(), training_[0], layers_.front()->A, {i32_1, i32_2}));
+
+    // Apply neural network algorithms
+    f.Insert(MakeCall(feedforward, {}));
+    f.Insert(MakeCall(backpropagation, {}));
 
     // Print input
     f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-      MakeI32Const(layers_[1]->W->Memory()->Begin()),
-      MakeI32Const(layers_[1]->W->Shape()[0]),
-      MakeI32Const(layers_[1]->W->Shape()[1])
+        MakeI32Const(layers_[2]->A->Memory()->Begin()),
+        MakeI32Const(layers_[2]->A->Shape()[0]),
+        MakeI32Const(layers_[2]->A->Shape()[1])
     }));
-
-    f.Insert(MakeCall(feedforward, {}));
-    f.Insert(MakeCall(backpropagation, {}));
 
     // Debugging
 //    f.Insert(MakeCall(Debug(&module_manager_, this), {}));

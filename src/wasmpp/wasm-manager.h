@@ -35,7 +35,7 @@ public:
   ~MemoryManager();
   // Allocate memory
   Memory* Allocate(uint64_t k);
-  bool Free(Memory* m);
+  bool Free(const Memory* m);
   uint64_t Pages();
 };
 

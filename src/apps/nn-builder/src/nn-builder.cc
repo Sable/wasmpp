@@ -28,7 +28,8 @@ int main() {
     {0, 1}
   };
   uint32_t batch = 4;
-  model.Train(batch, train, labels);
+  model.Setup(batch, train, labels);
+  model.Train();
 
   assert(model.Validate());
   std::cout << model.ModuleManager().ToWat(true, true);
