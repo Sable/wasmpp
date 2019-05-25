@@ -64,12 +64,14 @@ void Model::InitImports() {
   builtins_.system.InitImports(this, &module_manager_, "System");
   builtins_.math.InitImports(this, &module_manager_, "Math");
   builtins_.activation.InitImports(this, &module_manager_, "Activation");
+  builtins_.loss.InitImports(this, &module_manager_, "Loss");
 }
 
 void Model::InitDefinitions() {
   builtins_.system.InitDefinitions(this, &module_manager_);
   builtins_.math.InitDefinitions(this, &module_manager_);
   builtins_.activation.InitDefinitions(this, &module_manager_);
+  builtins_.loss.InitDefinitions(this, &module_manager_);
 }
 
 #define ALLOCATE_MEMORY(array, rows, cols) \
@@ -190,6 +192,7 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 //    f.Insert(helper::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
 //    f.Insert(helper::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
 //    f.Insert(helper::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
+    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {

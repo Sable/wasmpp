@@ -3,6 +3,7 @@
 
 #include <src/apps/nn-builder/src/data_structure/ndarray.h>
 #include <src/apps/nn-builder/src/builtins/activation.h>
+#include <src/apps/nn-builder/src/builtins/loss.h>
 #include <src/wasmpp/wasm-manager.h>
 
 namespace nn {
@@ -30,9 +31,13 @@ wabt::ExprList* MatrixAddition(wasmpp::LabelManager* label_manager, ds::NDArray*
 wabt::ExprList* MatrixScalar(wasmpp::LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar,
                              ds::NDArray* dst, std::vector<wabt::Var> locals);
 
-// Apply function to matrix
+// Apply activation function to matrix
 wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, ds::NDArray* src,
                                  builtins::ActivationFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
+
+// Apply matrix loss function
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
+                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 } // namespace snippet
 } // namespace nn

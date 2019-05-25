@@ -7,15 +7,16 @@ namespace snippet {
 using namespace wasmpp;
 using namespace wabt;
 
+#define MATRIX_CHECK(x) \
+  ERROR_UNLESS(x != nullptr, #x " cannot be null"); \
+  ERROR_UNLESS(x->Shape().size() == 2, #x " is expected to be a 2D matrix");
+
 wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
-  ERROR_UNLESS(lhs != nullptr, "lhs cannot be null");
-  ERROR_UNLESS(rhs != nullptr, "rhs cannot be null");
-  ERROR_UNLESS(dst != nullptr, "dst cannot be null");
-  ERROR_UNLESS(lhs->Shape().size() == 2, "expected lhs to be a 2D matrix");
-  ERROR_UNLESS(rhs->Shape().size() == 2, "expected rhs to be a 2D matrix");
-  ERROR_UNLESS(dst->Shape().size() == 2, "expected dst to be a 2D matrix");
+  MATRIX_CHECK(lhs);
+  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(dst);
   ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[0], "lhs and rhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[1] == rhs->Shape()[1], "dst and rhs matrices are not compatible");
@@ -76,17 +77,12 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
 
 wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                                std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
-  ERROR_UNLESS(lhs != nullptr, "lhs cannot be null");
-  ERROR_UNLESS(rhs != nullptr, "rhs cannot be null");
-  ERROR_UNLESS(dst != nullptr, "dst cannot be null");
-  ERROR_UNLESS(lhs->Shape().size() == 2, "expected lhs to be a 2D matrix");
-  ERROR_UNLESS(rhs->Shape().size() == 2, "expected rhs to be a 2D matrix");
-  ERROR_UNLESS(dst->Shape().size() == 2, "expected dst to be a 2D matrix");
-  ERROR_UNLESS(lhs->Shape()[0] == rhs->Shape()[0], "lhs and rhs matrices are not compatible");
-  ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[1], "lhs and rhs matrices are not compatible");
-  ERROR_UNLESS(rhs->Shape()[0] == dst->Shape()[0], "rhs and dst matrices are not compatible");
-  ERROR_UNLESS(rhs->Shape()[1] == dst->Shape()[1], "rhs and dst matrices are not compatible");
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(lhs);
+  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(dst);
+  ERROR_UNLESS(lhs->Shape() == rhs->Shape(), "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(rhs->Shape() == dst->Shape(), "rhs and dst matrices are not compatible");
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
@@ -109,13 +105,10 @@ wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds
 
 wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
                              std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
-  ERROR_UNLESS(src != nullptr, "src cannot be null");
-  ERROR_UNLESS(dst != nullptr, "dst cannot be null");
-  ERROR_UNLESS(src->Shape().size() == 2, "expected src to be a 2D matrix");
-  ERROR_UNLESS(dst->Shape().size() == 2, "expected dst to be a 2D matrix");
-  ERROR_UNLESS(src->Shape()[0] == dst->Shape()[0], "src and dst matrices are not compatible");
-  ERROR_UNLESS(src->Shape()[1] == dst->Shape()[1], "src and dst matrices are not comaptible");
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(src);
+  MATRIX_CHECK(dst);
+  ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
@@ -136,13 +129,10 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
 
 wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, builtins::ActivationFunction func,
                                  ds::NDArray* dst, std::vector<Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "memory cannot be null");
-  ERROR_UNLESS(src != nullptr, "src cannot be null");
-  ERROR_UNLESS(dst != nullptr, "dst cannot be null");
-  ERROR_UNLESS(src->Shape().size() == 2, "expected src to be a 2D matrix");
-  ERROR_UNLESS(dst->Shape().size() == 2, "expected dst to be a 2D matrix");
-  ERROR_UNLESS(src->Shape()[0] == dst->Shape()[0], "src and dst matrices are not compatible");
-  ERROR_UNLESS(src->Shape()[1] == dst->Shape()[1], "src and dst matrices are not compatible");
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(src);
+  MATRIX_CHECK(dst);
+  ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
   auto row_col = locals[0];
@@ -155,6 +145,34 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
     auto src_cell = MakeF64Load(src_addr);
     auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->GetLinearIndex({0, 0})), MakeLocalGet(addr));
     b->Insert(MakeF64Store(dst_addr, MakeCall(func.function, {src_cell})));
+    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
+  });
+  Merge(e, loopRC);
+  return e;
+}
+
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
+                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals) {
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(prediction)
+  MATRIX_CHECK(target)
+  MATRIX_CHECK(dst)
+  ERROR_UNLESS(prediction->Shape() == target->Shape(), "prediction and target matrices are not compatible");
+  ERROR_UNLESS(target->Shape() == dst->Shape(), "prediction and dst matrices are not compatible");
+  assert(locals.size() == 2);
+
+  auto row_col = locals[0];
+  auto addr = locals[1];
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, dst->Shape()[0] * dst->Shape()[1], 1, [&](BlockBody* b) {
+    auto pre_addr = MakeBinary(Opcode::I32Add, MakeI32Const(prediction->Memory()->Begin()), MakeLocalGet(addr));
+    auto pre_cell = MakeF64Load(pre_addr);
+    auto tar_addr = MakeBinary(Opcode::I32Add, MakeI32Const(target->Memory()->Begin()), MakeLocalGet(addr));
+    auto tar_cell = MakeF64Load(tar_addr);
+    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
+    b->Insert(MakeF64Store(dst_addr, MakeCall(func.derivative, {tar_cell, pre_cell})));
     b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
   });
   Merge(e, loopRC);

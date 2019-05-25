@@ -14,8 +14,8 @@ private:
   wabt::Var print_f64_;
   wabt::Var print_table_f64_;
 public:
-  void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name);
-  void InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager);
+  void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) override;
+  void InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager) override;
 
   const wabt::Var& PrintI32() const { return print_i32_; }
   const wabt::Var& PrintI64() const { return print_i64_; }

@@ -4,6 +4,7 @@
 #include <src/wasmpp/wasm-manager.h>
 #include <src/apps/nn-builder/src/arch/layer.h>
 #include <src/apps/nn-builder/src/builtins/activation.h>
+#include <src/apps/nn-builder/src/builtins/loss.h>
 #include <src/apps/nn-builder/src/builtins/math.h>
 #include <src/apps/nn-builder/src/builtins/system.h>
 #include <memory>
@@ -21,6 +22,7 @@ private:
   // Builtin functions
   struct Builtins {
     builtins::Activation activation;
+    builtins::Loss loss;
     builtins::Math math;
     builtins::System system;
   } builtins_;

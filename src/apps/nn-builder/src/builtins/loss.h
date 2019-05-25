@@ -15,8 +15,8 @@ class Loss : public Builtin {
 private:
   LossFunction mean_squared_error_;
 public:
-  void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name);
-  void InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager);
+  void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) override;
+  void InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager) override;
 
   const LossFunction& MeanSquaredError() const { return mean_squared_error_; }
 };
