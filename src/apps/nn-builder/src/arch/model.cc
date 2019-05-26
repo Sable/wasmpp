@@ -154,7 +154,7 @@ void Model::MakeBiasData() {
 }
 
 Var Model::GenerateFeedForward() {
-  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
+  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
   return module_manager_.MakeFunction("feedforward", {}, locals_types, [&](FuncBody f, std::vector<Var> params,
                                                                            std::vector<Var> locals) {
     auto vi32_1 = locals[0];
@@ -162,28 +162,27 @@ Var Model::GenerateFeedForward() {
     auto vi32_3 = locals[2];
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
-    auto vi32_6 = locals[5];
-    auto vf64_1 = locals[6];
+    auto vf64_1 = locals[5];
 
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W . A + b
-      // {dot} = Z[l] = W . A
-      // {add} = Z[l] = Z[l] + b
+      // {dot} : Z[l] = W . A
+      // {add} : Z[l] = Z[l] + b
       auto dot = snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6, vf64_1});
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1});
       auto add = snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2});
       f.Insert(dot);
       f.Insert(add);
 
       // A[l] = g(Z[l])
       f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
-          layers_[l]->A, {vi32_1, vi32_2}));
+          layers_[l]->A, {vi32_1, vi32_2}, false));
     }
   });
 }
 
 wabt::Var Model::GenerateBackpropagation() {
-  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
+  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
   return module_manager_.MakeFunction("backpropagation", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                                               std::vector<Var> locals) {
     auto vi32_1 = locals[0];
@@ -191,8 +190,7 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vi32_3 = locals[2];
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
-    auto vi32_6 = locals[5];
-    auto vf64_1 = locals[6];
+    auto vf64_1 = locals[5];
 
     // dA[L] = Loss(Target, Prediction)
     f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->A, layers_.back()->T, builtins_.loss.MeanSquaredError(),
@@ -200,7 +198,18 @@ wabt::Var Model::GenerateBackpropagation() {
 
     for(auto l = layers_.size()-1; l > 0; --l) {
        // dZ[l] = dA[l] * g'(Z[l])
-//       f.Insert()
+       // {der} : dZ[l] = g'(Z[l])
+       // {mul} : dZ[l] = dA[l] * dZ[l]
+      auto der = snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
+          layers_[l]->A, {vi32_1, vi32_2}, true);
+      auto mul = snippet::MatrixMultiplication(f.Label(), layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
+          {vi32_1, vi32_2});
+      f.Insert(der);
+      f.Insert(mul);
+
+      // dW[l] = (1/m) dZ[l] . A[l-1]^T
+      // {dot} : dW[l] = dZ[l] . A[l-1]^T
+      // {sca} : dW[l] = (1/m) dW[l]
     }
   });
 }
@@ -216,19 +225,21 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
     auto i32_6 = locals[5];
     auto f64_1 = locals[6];
 
-    uint32_t side = 3;
-    uint32_t type_size = sizeof(double);
-    wasmpp::Memory* A = mm->Memory().Allocate(side * side * type_size);
-    ds::NDArray* A_ = new ds::NDArray(A, {side, side}, type_size);
-    wasmpp::Memory* B = mm->Memory().Allocate(side * side * type_size);
-    ds::NDArray* B_ = new ds::NDArray(B, {side, side}, type_size);
-    wasmpp::Memory* C = mm->Memory().Allocate(side * side * type_size);
-    ds::NDArray* C_ = new ds::NDArray(C, {side, side}, type_size);
+    uint32_t lhs_row = 3;
+    uint32_t lhs_col_rhs_row = 3;
+    uint32_t rhs_col = 3;
+    ds::NDArray* A_ = nullptr;
+    ds::NDArray* B_ = nullptr;
+    ds::NDArray* C_ = nullptr;
+    auto &module_manager_ = *mm;
+    ALLOCATE_MEMORY(A_, lhs_row, lhs_col_rhs_row);
+    ALLOCATE_MEMORY(B_, lhs_col_rhs_row, rhs_col);
+    ALLOCATE_MEMORY(C_, lhs_row, rhs_col);
 
     // Populate A
     uint32_t val = 1;
-    for(int r=0; r < side; ++r) {
-      for(int c=0; c < side; ++c) {
+    for(int r=0; r < lhs_row; ++r) {
+      for(int c=0; c < lhs_col_rhs_row; ++c) {
         f.Insert(MakeF64Store(MakeI32Const(A_->GetLinearIndex({r, c})), MakeF64Const(val++)));
       }
     }
@@ -241,9 +252,9 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
     }));
 
     // Populate B
-    val = 9;
-    for(int r=0; r < side; ++r) {
-      for(int c=0; c < side; ++c) {
+    val = lhs_col_rhs_row * rhs_col;
+    for(int r=0; r < lhs_col_rhs_row; ++r) {
+      for(int c=0; c < rhs_col; ++c) {
         f.Insert(MakeF64Store(MakeI32Const(B_->GetLinearIndex({r, c})), MakeF64Const(val--)));
       }
     }
@@ -255,13 +266,15 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
         MakeI32Const(B_->Shape()[1])
     }));
 
-//    f.Insert(snippet::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
-//    f.Insert(snippet::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
+//    f.Insert(snippet::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2},false));
 //    f.Insert(snippet::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixMultiplication(f.Label(), A_, B_, C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
@@ -310,14 +323,14 @@ void Model::Train(){
     f.Insert(MakeCall(backpropagation, {}));
 
     // Print for debugging
-    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-        MakeI32Const(layers_[2]->T->Memory()->Begin()),
-        MakeI32Const(layers_[2]->T->Shape()[0]),
-        MakeI32Const(layers_[2]->T->Shape()[1])
-    }));
+//    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
+//        MakeI32Const(layers_[2]->T->Memory()->Begin()),
+//        MakeI32Const(layers_[2]->T->Shape()[0]),
+//        MakeI32Const(layers_[2]->T->Shape()[1])
+//    }));
 
     // Debugging
-//    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
+    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }
 

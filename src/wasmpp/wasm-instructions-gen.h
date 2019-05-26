@@ -22,6 +22,13 @@ namespace wasmpp {
 wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, uint32_t end, uint32_t inc,
                              std::function<void(BlockBody*)> content);
 
+// Generate
+//   get_local {var}
+//   {operand}
+//   {op}
+//   set_local {var}
+wabt::ExprList* GenerateCompoundAssignment(wabt::Var var, wabt::Opcode op, wabt::ExprList* operand);
+
 } // namespace wasmpp
 
 #endif

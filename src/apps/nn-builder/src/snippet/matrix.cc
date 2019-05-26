@@ -20,63 +20,47 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
   ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[0], "lhs and rhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[1] == rhs->Shape()[1], "dst and rhs matrices are not compatible");
-  assert(locals.size() == 7);
+  assert(locals.size() == 6);
 
-  auto row = locals[0];
-  auto col = locals[1];
-  auto col_row = locals[2];
-  auto row_n = locals[3];
-  auto row_p = locals[4];
-  auto col_row_p = locals[5];
-  auto res_cell = locals[6];
+  auto rhs_col = locals[0];
+  auto lhs_col_rhs_rows = locals[1];
+  auto lhs_row_offset = locals[2];
+  auto rhs_row_offset = locals[3];
+  auto dst_row_offset = locals[4];
+  auto res_cell = locals[5];
+
+  uint32_t type_size = TypeSize(Type::F64);
+  uint32_t lhs_width_bytes = lhs->Shape()[1] * type_size;
+  uint32_t rhs_height_bytes = rhs->Shape()[0] * type_size;
+  uint32_t rhs_width_bytes = rhs->Shape()[1] * type_size;
 
   wabt::ExprList* e = new wabt::ExprList();
-  uint32_t shift_f64 = 3; // 2^3
-  Merge(e, MakeLocalSet(row_n, MakeI32Const(0)));
-  Merge(e, MakeLocalSet(row_p, MakeI32Const(0)));
-  auto loopX = GenerateRangeLoop(label_manager, row, 0, lhs->Shape()[0], 1, [&](BlockBody* bX) {
-    auto loopY = GenerateRangeLoop(label_manager, col, 0, rhs->Shape()[1], 1, [&](BlockBody* bY) {
-      bY->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
-      bY->Insert(MakeLocalSet(col_row_p, MakeI32Const(0)));
-      auto loopZ = GenerateRangeLoop(label_manager, col_row, 0, rhs->Shape()[0], 1, [&](BlockBody* bZ) {
-        // LHS cell
-        auto lhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
-            MakeBinary(Opcode::I32Add, MakeLocalGet(row_n), MakeLocalGet(col_row)), MakeI32Const(shift_f64));
-        auto lhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), lhs_cell_rel_addr);
-        auto lhs_cell = MakeF64Load(lhs_cell_abs_addr);
-        // RHS cell
-        auto rhs_cell_rel_addr = MakeBinary(Opcode::I32Shl,
-            MakeBinary(Opcode::I32Add, MakeLocalGet(col_row_p), MakeLocalGet(col)), MakeI32Const(shift_f64));
-        auto rhs_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), rhs_cell_rel_addr);
-        auto rhs_cell = MakeF64Load(rhs_cell_abs_addr);
-        // ACC local
-        auto mul_cells = MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell);
-        auto update_res_cell = MakeLocalSet(res_cell, MakeBinary(Opcode::F64Add, MakeLocalGet(res_cell), mul_cells));
-        bZ->Insert(update_res_cell);
-
-        auto acc_col_row_p = MakeBinary(Opcode::I32Add, MakeLocalGet(col_row_p), MakeI32Const(rhs->Shape()[1]));
-        bZ->Insert(MakeLocalSet(col_row_p, acc_col_row_p));
-      });
-      bY->Insert(loopZ);
-      // DST cell
-      auto dst_cell_rel_addr = MakeBinary(Opcode::I32Shl,
-          MakeBinary(Opcode::I32Add, MakeLocalGet(row_p), MakeLocalGet(col)), MakeI32Const(shift_f64));
-      auto dst_cell_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), dst_cell_rel_addr);
-      auto update_dst_cell = MakeF64Store(dst_cell_abs_addr, MakeLocalGet(res_cell));
-      bY->Insert(update_dst_cell);;
-    });
-    bX->Insert(loopY);
-    auto acc_row_n = MakeBinary(Opcode::I32Add, MakeLocalGet(row_n), MakeI32Const(rhs->Shape()[0]));
-    bX->Insert(MakeLocalSet(row_n, acc_row_n));
-    auto acc_row_p = MakeBinary(Opcode::I32Add, MakeLocalGet(row_p), MakeI32Const(rhs->Shape()[1]));
-    bX->Insert(MakeLocalSet(row_p, acc_row_p));
-  });
-  Merge(e, loopX);
+  Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
+  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
+      b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
+      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* bZ) {
+        auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
+        auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
+        bZ->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
+        bZ->Insert(GenerateCompoundAssignment(rhs_row_offset, Opcode::I32Add, MakeI32Const(rhs_width_bytes)));
+      }));
+      auto dst_cell_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(dst_row_offset), MakeLocalGet(rhs_col));
+      b2->Insert(MakeF64Store(dst_cell_addr, MakeLocalGet(res_cell)));
+    }));
+    b1->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(lhs_width_bytes)));
+  }));
   return e;
 }
 
-wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
-                               std::vector<wabt::Var> locals) {
+wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                          std::vector<wabt::Var> locals) {
+  assert(0);
+}
+
+wabt::ExprList* ElementWiseOperation(wabt::Opcode op, LabelManager* label_manager, ds::NDArray* lhs,
+                                           ds::NDArray* rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
@@ -96,11 +80,21 @@ wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
     auto rhs_cell = MakeF64Load(rhs_addr);
     auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeBinary(Opcode::F64Add, lhs_cell, rhs_cell)));
+    b->Insert(MakeF64Store(dst_addr, MakeBinary(op, lhs_cell, rhs_cell)));
     b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
   });
   Merge(e, loopRC);
   return e;
+}
+
+wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                               std::vector<wabt::Var> locals) {
+  return ElementWiseOperation(Opcode::F64Add, label_manager, lhs, rhs, dst, locals);
+}
+
+wabt::ExprList* MatrixMultiplication(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
+                                     ds::NDArray* dst, std::vector<wabt::Var> locals) {
+  return ElementWiseOperation(Opcode::F64Mul, label_manager, lhs, rhs, dst, locals);
 }
 
 wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
@@ -128,7 +122,7 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
 }
 
 wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, builtins::ActivationFunction func,
-                                 ds::NDArray* dst, std::vector<Var> locals) {
+                                 ds::NDArray* dst, std::vector<Var> locals, bool prime) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   MATRIX_CHECK(src);
   MATRIX_CHECK(dst);
@@ -144,7 +138,7 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
     auto src_cell = MakeF64Load(src_addr);
     auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeCall(func.function, {src_cell})));
+    b->Insert(MakeF64Store(dst_addr, MakeCall(prime ? func.derivative : func.function, {src_cell})));
     b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
   });
   Merge(e, loopRC);

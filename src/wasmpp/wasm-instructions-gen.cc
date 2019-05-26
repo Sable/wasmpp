@@ -20,4 +20,10 @@ wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager,
   return e;
 }
 
+wabt::ExprList* GenerateCompoundAssignment(wabt::Var var, wabt::Opcode op, wabt::ExprList* operand) {
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(var, MakeBinary(op, MakeLocalGet(var), operand)));
+  return e;
+}
+
 } // namespace wasmpp

@@ -23,17 +23,25 @@ namespace snippet {
 wabt::ExprList* MatrixDot(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals);
 
+// Multiply two matrices
+wabt::ExprList* MatrixDotRT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                            std::vector<wabt::Var> locals);
+
 // Add two matrices
 wabt::ExprList* MatrixAddition(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
                                ds::NDArray* dst, std::vector<wabt::Var> locals);
 
+// Add two matrices
+wabt::ExprList* MatrixMultiplication(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
+                                   ds::NDArray* dst, std::vector<wabt::Var> locals);
 // Scalar matrix
 wabt::ExprList* MatrixScalar(wasmpp::LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar,
                              ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 // Apply activation function to matrix
 wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, ds::NDArray* src,
-                                 builtins::ActivationFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
+                                 builtins::ActivationFunction func, ds::NDArray* dst,
+                                 std::vector<wabt::Var> locals, bool prime);
 
 // Apply matrix loss function
 wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
