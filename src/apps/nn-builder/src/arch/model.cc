@@ -226,16 +226,18 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
     auto f64_1 = locals[6];
 
     uint32_t lhs_row = 3;
-    uint32_t lhs_col = 3;
-    uint32_t rhs_row = 3;
+    uint32_t lhs_col = 4;
+    uint32_t rhs_row = 5;
     uint32_t rhs_col = 4;
+    uint32_t dst_row = lhs_row;
+    uint32_t dst_col = rhs_row;
     ds::NDArray* A_ = nullptr;
     ds::NDArray* B_ = nullptr;
     ds::NDArray* C_ = nullptr;
     auto &module_manager_ = *mm;
     ALLOCATE_MEMORY(A_, lhs_row, lhs_col);
     ALLOCATE_MEMORY(B_, rhs_row, rhs_col);
-    ALLOCATE_MEMORY(C_, lhs_row, rhs_col);
+    ALLOCATE_MEMORY(C_, dst_row, dst_col);
 
     // Populate A
     uint32_t val = 1;
@@ -273,12 +275,9 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 //    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({0,0})), MakeF64Const(1)));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({1,0})), MakeF64Const(2)));
-    f.Insert(MakeF64Store(MakeI32Const(C_->GetLinearIndex({2,0})), MakeF64Const(3)));
-    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
+//    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixMultiplication(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, i32_6, f64_1}));
+    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {

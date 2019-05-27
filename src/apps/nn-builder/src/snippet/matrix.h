@@ -19,11 +19,11 @@ namespace snippet {
 // matrices are of dimensions
 // (m,n) and (n,p)
 
-// Multiply two matrices
+// Dot product of two matrices
 wabt::ExprList* MatrixDot(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals);
 
-// Multiply two matrices
+// Dot product of two matrices where the right one is treated as transposed
 wabt::ExprList* MatrixDotRT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                             std::vector<wabt::Var> locals);
 

@@ -40,11 +40,11 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
     b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
       b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
-      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* bZ) {
+      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* b3) {
         auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
-        bZ->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
-        bZ->Insert(GenerateCompoundAssignment(rhs_row_offset, Opcode::I32Add, MakeI32Const(rhs_width_bytes)));
+        b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
+        b3->Insert(GenerateCompoundAssignment(rhs_row_offset, Opcode::I32Add, MakeI32Const(rhs_width_bytes)));
       }));
       auto dst_cell_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(dst_row_offset), MakeLocalGet(rhs_col));
       b2->Insert(MakeF64Store(dst_cell_addr, MakeLocalGet(res_cell)));
@@ -56,7 +56,45 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
 
 wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
-  assert(0);
+  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  MATRIX_CHECK(lhs);
+  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(dst);
+  ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[1], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[1] == rhs->Shape()[0], "dst and rhs matrices are not compatible");
+  assert(locals.size() == 6);
+
+  auto rhs_rows = locals[0];
+  auto lhs_col_rhs_rows = locals[1];
+  auto lhs_row_offset = locals[2];
+  auto rhs_row_offset = locals[3];
+  auto dst_row_offset = locals[4];
+  auto res_cell = locals[5];
+
+  uint32_t type_size = TypeSize(Type::F64);
+  uint32_t lhs_width_bytes = lhs->Shape()[1] * type_size;
+  uint32_t rhs_height_bytes = rhs->Shape()[0] * type_size;
+  uint32_t rhs_width_bytes = rhs->Shape()[1] * type_size;
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
+  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
+    b1->Insert(GenerateRangeLoop(label_manager, rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
+      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, [&](BlockBody* b3) {
+        auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
+        auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
+        b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
+      }));
+      auto dst_cell_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(dst_row_offset), MakeLocalGet(rhs_rows));
+      b2->Insert(GenerateCompoundAssignment(rhs_row_offset, Opcode::I32Add, MakeI32Const(rhs_width_bytes)));
+      b2->Insert(MakeF64Store(dst_cell_addr, MakeLocalGet(res_cell)));
+    }));
+    b1->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(lhs_width_bytes)));
+  }));
+  return e;
 }
 
 wabt::ExprList* ElementWiseOperation(wabt::Opcode op, LabelManager* label_manager, ds::NDArray* lhs,
