@@ -69,21 +69,19 @@ wabt::ExprList* ElementWiseOperation(wabt::Opcode op, LabelManager* label_manage
   ERROR_UNLESS(rhs->Shape() == dst->Shape(), "rhs and dst matrices are not compatible");
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
+  auto dst_addr = locals[0];
   auto addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, lhs->Shape()[0] * lhs->Shape()[1], 1, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
-    auto lhs_cell = MakeF64Load(lhs_addr);
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
-    auto rhs_cell = MakeF64Load(rhs_addr);
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeBinary(op, lhs_cell, rhs_cell)));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeBinary(op, MakeF64Load(lhs_addr), MakeF64Load(rhs_addr))));
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
@@ -105,19 +103,18 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
   ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
+  auto dst_addr = locals[0];
   auto addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, src->Shape()[0] * src->Shape()[1], 1, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
-    auto src_cell = MakeF64Load(src_addr);
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeBinary(Opcode::F64Mul, src_cell, scalar)));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F64Mul, MakeF64Load(src_addr), scalar)));
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
@@ -129,19 +126,18 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
   ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
+  auto dst_addr = locals[0];
   auto addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, src->Shape()[0] * src->Shape()[1], 1, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
-    auto src_cell = MakeF64Load(src_addr);
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeCall(prime ? func.derivative : func.function, {src_cell})));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeCall(prime ? func.derivative : func.function, {MakeF64Load(src_addr)})));
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
@@ -155,21 +151,19 @@ wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* pre
   ERROR_UNLESS(target->Shape() == dst->Shape(), "prediction and dst matrices are not compatible");
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
+  auto dst_addr = locals[0];
   auto addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, dst->Shape()[0] * dst->Shape()[1], 1, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
     auto pre_addr = MakeBinary(Opcode::I32Add, MakeI32Const(prediction->Memory()->Begin()), MakeLocalGet(addr));
-    auto pre_cell = MakeF64Load(pre_addr);
     auto tar_addr = MakeBinary(Opcode::I32Add, MakeI32Const(target->Memory()->Begin()), MakeLocalGet(addr));
-    auto tar_cell = MakeF64Load(tar_addr);
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeCall(func.derivative, {tar_cell, pre_cell})));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeCall(func.derivative, {MakeF64Load(tar_addr), MakeF64Load(pre_addr)})));
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
@@ -181,18 +175,17 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
   ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
-  auto addr = locals[1];
+  auto src_addr = locals[0];
+  auto dst_addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, src->Shape()[0] * src->Shape()[1], 1, [&](BlockBody* b) {
-    auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst->Memory()->Begin()), MakeLocalGet(addr));
-    b->Insert(MakeF64Store(dst_addr, MakeF64Load(src_addr)));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+  Merge(e, MakeLocalSet(src_addr, MakeI32Const(src->Memory()->Begin())));
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeF64Load(MakeLocalGet(src_addr))));
+    b->Insert(GenerateCompoundAssignment(src_addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
@@ -201,21 +194,21 @@ wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDA
   MATRIX_CHECK(bias);
   assert(locals.size() == 2);
 
-  auto row_col = locals[0];
+  auto dst_addr = locals[0];
   auto addr = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F64);
+  uint32_t bias_width_bytes = bias->Shape()[1] * type_size;
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  auto loopRC = GenerateRangeLoop(label_manager, row_col, 0, bias->Shape()[0] * bias->Shape()[1], 1, [&](BlockBody* b) {
-    auto row_bytes = bias->Shape()[0] * TypeSize(Type::F64);
-    auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), MakeLocalGet(addr));
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, [&](BlockBody* b) {
     auto src_rel_addr = MakeBinary(Opcode::I32Mul,
-        MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(row_bytes)), MakeI32Const(row_bytes));
+        MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(bias_width_bytes)), MakeI32Const(bias_width_bytes));
     auto src_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), src_rel_addr);
-    b->Insert(MakeF64Store(dst_addr, MakeF64Load(src_abs_addr)));
-    b->Insert(MakeLocalSet(addr, MakeBinary(Opcode::I32Add, MakeLocalGet(addr), MakeI32Const(TypeSize(Type::F64)))));
-  });
-  Merge(e, loopRC);
+    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeF64Load(src_abs_addr)));
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
   return e;
 }
 
