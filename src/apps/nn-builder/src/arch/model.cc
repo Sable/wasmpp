@@ -227,10 +227,10 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 
     uint32_t lhs_row = 3;
     uint32_t lhs_col = 4;
-    uint32_t rhs_row = 5;
-    uint32_t rhs_col = 4;
-    uint32_t dst_row = lhs_row;
-    uint32_t dst_col = rhs_row;
+    uint32_t rhs_row = 3;
+    uint32_t rhs_col = 5;
+    uint32_t dst_row = lhs_col;
+    uint32_t dst_col = rhs_col;
     ds::NDArray* A_ = nullptr;
     ds::NDArray* B_ = nullptr;
     ds::NDArray* C_ = nullptr;
@@ -277,7 +277,8 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
 //    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
 //    f.Insert(snippet::MatrixMultiplication(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
+//    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
+    f.Insert(snippet::MatrixDotLT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
 
     // Print C
     f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {

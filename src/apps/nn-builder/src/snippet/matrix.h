@@ -23,6 +23,10 @@ namespace snippet {
 wabt::ExprList* MatrixDot(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals);
 
+// Dot product of two matrices where the left one is treated as transposed
+wabt::ExprList* MatrixDotLT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                            std::vector<wabt::Var> locals);
+
 // Dot product of two matrices where the right one is treated as transposed
 wabt::ExprList* MatrixDotRT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                             std::vector<wabt::Var> locals);
