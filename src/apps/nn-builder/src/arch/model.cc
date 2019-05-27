@@ -166,13 +166,11 @@ Var Model::GenerateFeedForward() {
 
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W . A + b
-      // {dot} : Z[l] = W . A
-      // {add} : Z[l] = Z[l] + b
-      auto dot = snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1});
-      auto add = snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2});
-      f.Insert(dot);
-      f.Insert(add);
+      // 1) Z[l] = W . A
+      // 2_ Z[l] = Z[l] + b
+      f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
+      f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
 
       // A[l] = g(Z[l])
       f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
@@ -198,18 +196,37 @@ wabt::Var Model::GenerateBackpropagation() {
 
     for(auto l = layers_.size()-1; l > 0; --l) {
        // dZ[l] = dA[l] * g'(Z[l])
-       // {der} : dZ[l] = g'(Z[l])
-       // {mul} : dZ[l] = dA[l] * dZ[l]
-      auto der = snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
-          layers_[l]->A, {vi32_1, vi32_2}, true);
-      auto mul = snippet::MatrixMultiplication(f.Label(), layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
-          {vi32_1, vi32_2});
-      f.Insert(der);
-      f.Insert(mul);
+       // 1) dZ[l] = g'(Z[l])
+       // 2) dZ[l] = dA[l] * dZ[l]
+      f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
+          layers_[l]->dZ, {vi32_1, vi32_2}, true));
+      f.Insert(snippet::MatrixMultiplication(f.Label(), layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
+          {vi32_1, vi32_2}));
 
       // dW[l] = (1/m) dZ[l] . A[l-1]^T
-      // {dot} : dW[l] = dZ[l] . A[l-1]^T
-      // {sca} : dW[l] = (1/m) dW[l]
+      // 1) dW[l] = dZ[l] . A[l-1]^T
+      // 2) dW[l] = (1/m) dW[l]
+      f.Insert(snippet::MatrixDotRT(f.Label(), layers_[l]->dZ, layers_[l-1]->A, layers_[l]->dW,
+                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF64Const(1.0/batch_size_), layers_[l]->dW,
+                                     {vi32_1, vi32_2}));
+
+      // dB[l] = (1/m) dZ[l]
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF64Const(1.0/batch_size_), layers_[l]->dB,
+                                     {vi32_1, vi32_2}));
+
+      if(l-1 > 0) {
+        // dA[l-1] = W[l]^T . dZ[l]
+        f.Insert(snippet::MatrixDotLT(f.Label(), layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
+                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
+      }
+
+      // W[l] = W[l] - alpha * dW[l]
+      // 1) dW[l] = alpha * dW[l]
+      // 2) W[l] = W[l] - dW[l]
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF64Const(learning_rate_), layers_[l]->dW,
+                                     {vi32_1, vi32_2}));
+      f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
     }
   });
 }
@@ -289,7 +306,7 @@ wabt::Var Debug(ModuleManager* mm, Model* model) {
   });
 }
 
-void Model::Setup(uint32_t batch_size, std::vector<std::vector<double>> input,
+void Model::Setup(uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
                   std::vector<std::vector<double>> labels) {
   ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
@@ -299,6 +316,7 @@ void Model::Setup(uint32_t batch_size, std::vector<std::vector<double>> input,
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
 
   batch_size_ = batch_size;
+  learning_rate_ = learning_rate;
   AllocateLayers();
   AllocateInput(input, labels);
   memory_ = module_manager_.MakeMemory(module_manager_.Memory().Pages());
@@ -318,23 +336,39 @@ void Model::Train(){
     auto i32_1 = locals[0];
     auto i32_2 = locals[1];
 
-    // Copy training data into the first layer
-    f.Insert(snippet::MatrixCopy(f.Label(), training_[0], layers_.front()->A, {i32_1, i32_2}));
-    f.Insert(snippet::MatrixCopy(f.Label(), labels_[0], layers_.back()->T, {i32_1, i32_2}));
+    for(int e=0; e < 1000; e++) {
+      for(int t=0; t < training_.size(); ++t) {
+        // Copy training data into the first layer
+        f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
+        f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
 
-    // Apply neural network algorithms
-    f.Insert(MakeCall(feedforward, {}));
-    f.Insert(MakeCall(backpropagation, {}));
+        // Apply neural network algorithms
+        f.Insert(MakeCall(feedforward, {}));
+        f.Insert(MakeCall(backpropagation, {}));
 
-    // Print for debugging
-//    f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-//        MakeI32Const(layers_[2]->T->Memory()->Begin()),
-//        MakeI32Const(layers_[2]->T->Shape()[0]),
-//        MakeI32Const(layers_[2]->T->Shape()[1])
-//    }));
+      }
+    }
+
+    // Test on training data (for debugging)
+    for(int t=0; t < training_.size(); ++t) {
+      // Copy training data into the first layer
+      f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
+      f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
+
+      // Apply neural network algorithms
+      f.Insert(MakeCall(feedforward, {}));
+
+      // Print for debugging
+      auto matrix = layers_[2]->A;
+      f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
+          MakeI32Const(matrix->Memory()->Begin()),
+          MakeI32Const(matrix->Shape()[0]),
+          MakeI32Const(matrix->Shape()[1])
+      }));
+    }
 
     // Debugging
-    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
+//    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }
 

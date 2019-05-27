@@ -170,6 +170,11 @@ wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds
   return ElementWiseOperation(Opcode::F64Add, label_manager, lhs, rhs, dst, locals);
 }
 
+wabt::ExprList* MatrixSubtraction(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                                  std::vector<wabt::Var> locals) {
+  return ElementWiseOperation(Opcode::F64Sub, label_manager, lhs, rhs, dst, locals);
+}
+
 wabt::ExprList* MatrixMultiplication(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
                                      ds::NDArray* dst, std::vector<wabt::Var> locals) {
   return ElementWiseOperation(Opcode::F64Mul, label_manager, lhs, rhs, dst, locals);

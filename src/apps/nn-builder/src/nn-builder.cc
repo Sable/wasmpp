@@ -9,7 +9,7 @@ int main() {
   Model model;
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
+     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
 
@@ -27,8 +27,9 @@ int main() {
     {0, 1},
     {0, 1}
   };
-  uint32_t batch = 4;
-  model.Setup(batch, train, labels);
+  uint32_t batch = 1;
+  double learning_rate = 0.1;
+  model.Setup(batch, learning_rate, train, labels);
   model.Train();
 
   assert(model.Validate());

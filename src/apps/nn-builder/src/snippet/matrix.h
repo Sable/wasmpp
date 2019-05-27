@@ -36,6 +36,10 @@ wabt::ExprList* MatrixAddition(wasmpp::LabelManager* label_manager, ds::NDArray*
                                ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 // Add two matrices
+wabt::ExprList* MatrixSubtraction(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
+                                  ds::NDArray* dst, std::vector<wabt::Var> locals);
+
+// Add two matrices
 wabt::ExprList* MatrixMultiplication(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
                                    ds::NDArray* dst, std::vector<wabt::Var> locals);
 // Scalar matrix
