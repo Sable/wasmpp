@@ -336,7 +336,7 @@ void Model::Train(){
     auto i32_1 = locals[0];
     auto i32_2 = locals[1];
 
-    for(int e=0; e < 1000; e++) {
+    for(int e=0; e < 100; e++) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
         f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
