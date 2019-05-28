@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(1, model.Builtins().activation.Sigmoid())
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
 
   // Train
@@ -73,10 +73,10 @@ int main(int argc, char *argv[]) {
   };
   // Try with one node
   std::vector<std::vector<double>> labels = {
-    {0},
-    {1},
-    {1},
-    {1}
+    {1, 0},
+    {0, 1},
+    {0, 1},
+    {0, 1}
   };
   uint32_t epoch = 300000;
   uint32_t batch = 1;

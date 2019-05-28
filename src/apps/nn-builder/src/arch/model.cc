@@ -156,7 +156,7 @@ void Model::MakeWeightData() {
 void Model::MakeBiasData() {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.1));
+    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.2));
     module_manager_.MakeData(memory_, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
@@ -236,6 +236,13 @@ wabt::Var Model::GenerateBackpropagation() {
       f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF64Const(learning_rate_), layers_[l]->dW,
                                      {vi32_1, vi32_2}));
       f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
+
+      // B[l] = B[l] - alpha * dB[l]
+      // 1) dB[l] = alpha * dB[l]
+      // 2) B[l] = B[l] - dB[l]
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dB, MakeF64Const(learning_rate_), layers_[l]->dB,
+                                     {vi32_1, vi32_2}));
+      f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
     }
   });
 }
