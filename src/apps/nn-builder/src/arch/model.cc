@@ -86,7 +86,7 @@ void Model::InitDefinitions() {
   }));
 
 void Model::AllocateLayers() {
-  ERROR_UNLESS(layers_.size() > 2, "At least an input and output layer should be defined");
+  ERROR_UNLESS(layers_.size() >= 2, "At least an input and output layer should be defined");
   for(auto l = 0; l < layers_.size(); ++l) {
     // FIXME For now only support fully connected layer
     assert(layers_[l]->layer->Type() == FullyConnected);
