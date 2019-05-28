@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 300000;
+  uint32_t epoch = 20000;
   uint32_t batch = 1;
   double learning_rate = 0.01;
   model.Setup(epoch, batch, learning_rate, train, labels);
