@@ -1,5 +1,6 @@
 #include <src/apps/nn-builder/src/arch/model.h>
 #include <src/apps/nn-builder/src/snippet/matrix.h>
+#include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
 namespace arch {
@@ -155,7 +156,7 @@ void Model::MakeWeightData() {
 void Model::MakeBiasData() {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.2));
+    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.1));
     module_manager_.MakeData(memory_, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
@@ -239,16 +240,18 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
-void Model::Setup(uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
+void Model::Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
                   std::vector<std::vector<double>> labels) {
   ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
+  ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(input.size() > 0, "training input cannot be empty");
   ERROR_UNLESS(batch_size <= input.size(), "batch size must be at most equal to the input size");
   ERROR_UNLESS(input.size() % batch_size == 0, "batch size must be a multiple of the input size");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
 
   batch_size_ = batch_size;
+  epochs_ = epochs;
   learning_rate_ = learning_rate;
   AllocateLayers();
   AllocateInput(input, labels);
@@ -263,23 +266,24 @@ void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
 
-  std::vector<Type> locals_type = {Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
-    auto i32_1 = locals[0];
-    auto i32_2 = locals[1];
+    auto epoch = locals[0];
+    auto i32_1 = locals[1];
+    auto i32_2 = locals[2];
 
-    for(int e=0; e < 2000; e++) {
+    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
-        f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
-        f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
+        b->Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
+        b->Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
 
         // Apply neural network algorithms
-        f.Insert(MakeCall(feedforward, {}));
-        f.Insert(MakeCall(backpropagation, {}));
+        b->Insert(MakeCall(feedforward, {}));
+        b->Insert(MakeCall(backpropagation, {}));
       }
-    }
+    }));
 
     // Test on training data (for debugging)
     for(int t=0; t < training_.size(); ++t) {

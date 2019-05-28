@@ -73,14 +73,15 @@ int main(int argc, char *argv[]) {
   };
   // Try with one node
   std::vector<std::vector<double>> labels = {
-    { 0},
-    { 1},
-    { 1},
-    { 1}
+    {0},
+    {1},
+    {1},
+    {1}
   };
+  uint32_t epoch = 300000;
   uint32_t batch = 1;
-  double learning_rate = 0.1;
-  model.Setup(batch, learning_rate, train, labels);
+  double learning_rate = 0.01;
+  model.Setup(epoch, batch, learning_rate, train, labels);
   model.Train();
 
   assert(model.Validate());

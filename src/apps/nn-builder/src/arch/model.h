@@ -23,6 +23,7 @@ private:
   std::vector<LayerMeta*> layers_;
   std::vector<ds::NDArray*> training_;
   std::vector<ds::NDArray*> labels_;
+  uint32_t epochs_;
   uint32_t batch_size_;
   double learning_rate_;
 
@@ -54,7 +55,7 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  void Setup(uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
+  void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
              std::vector<std::vector<double>> labels);
   void Train();
   bool Validate();
