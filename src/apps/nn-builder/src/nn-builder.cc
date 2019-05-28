@@ -60,8 +60,8 @@ int main(int argc, char *argv[]) {
   Model model;
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
+     new FullyConnectedLayer(1, model.Builtins().activation.Sigmoid())
   });
 
   // Train
@@ -73,10 +73,10 @@ int main(int argc, char *argv[]) {
   };
   // Try with one node
   std::vector<std::vector<double>> labels = {
-    {1, 0},
-    {0, 1},
-    {0, 1},
-    {0, 1}
+    { 0},
+    { 1},
+    { 1},
+    { 1}
   };
   uint32_t batch = 1;
   double learning_rate = 0.1;

@@ -226,7 +226,7 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
   return e;
 }
 
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* target, ds::NDArray* prediction,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   MATRIX_CHECK(prediction);

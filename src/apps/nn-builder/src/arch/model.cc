@@ -77,17 +77,24 @@ void Model::InitDefinitions() {
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F64)), \
                             {rows, cols}, TypeSize(Type::F64));
 
+#define PRINT_TABLE(table)                              \
+  f.Insert(MakeCall(builtins_.system.PrintTableF64(), { \
+      MakeI32Const((table)->Memory()->Begin()),         \
+      MakeI32Const((table)->Shape()[0]),                \
+      MakeI32Const((table)->Shape()[1])                 \
+  }));
+
 void Model::AllocateLayers() {
   ERROR_UNLESS(layers_.size() > 2, "At least an input and output layer should be defined");
   for(auto l = 0; l < layers_.size(); ++l) {
     // FIXME For now only support fully connected layer
     assert(layers_[l]->layer->Type() == FullyConnected);
 
-    ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size_);
-    ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size_);
     ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size_);
-    ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size_);
     if(l > 0) {
+      ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size_);
       ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->B, layers_[l]->layer->Nodes(), batch_size_);
@@ -126,13 +133,13 @@ void Model::MakeInputData(std::vector<std::vector<double>> input, std::vector<st
   assert(training_.size() == labels_.size());
 
   for(uint32_t i=0; i < training_.size(); ++i) {
-    auto begin = input.begin() + (i * batch_size_);
-    auto end = input.begin() + ((i+1) * batch_size_);
     // Training data
-    std::vector<std::vector<double>> sub_input(begin, end);
+    auto training_begin = input.begin() + (i * batch_size_);
+    std::vector<std::vector<double>> sub_input(training_begin, training_begin + batch_size_);
     module_manager_.MakeData(memory_, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
     // Training labels
-    std::vector<std::vector<double>> sub_labels(begin, end);
+    auto labels_begin = labels.begin() + (i * batch_size_);
+    std::vector<std::vector<double>> sub_labels(labels_begin, labels_begin + batch_size_);
     module_manager_.MakeData(memory_, labels_[i]->Memory()->Begin(), MakeTransposeData(labels_[i], sub_labels));
   }
 }
@@ -165,9 +172,9 @@ Var Model::GenerateFeedForward() {
     auto vf64_1 = locals[5];
 
     for(int l=1; l < layers_.size(); ++l) {
-      // Z[l] = W . A + b
-      // 1) Z[l] = W . A
-      // 2_ Z[l] = Z[l] + b
+      // Z[l] = W[l] . A[l-1] + B[l]
+      // 1) Z[l] = W[l] . A[l-1]
+      // 2) Z[l] = Z[l] + B[l]
       f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
           {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
       f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
@@ -190,8 +197,8 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vi32_5 = locals[4];
     auto vf64_1 = locals[5];
 
-    // dA[L] = Loss(Target, Prediction)
-    f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->A, layers_.back()->T, builtins_.loss.MeanSquaredError(),
+    // dA[L] = Loss(T[L], A[L])
+    f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
                                  layers_.back()->dA, {vi32_1, vi32_2}));
 
     for(auto l = layers_.size()-1; l > 0; --l) {
@@ -212,6 +219,7 @@ wabt::Var Model::GenerateBackpropagation() {
                                      {vi32_1, vi32_2}));
 
       // dB[l] = (1/m) dZ[l]
+      // FIXME Sum dZ[l] horizontally, store it into first column of dB[l], then broadcast
       f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF64Const(1.0/batch_size_), layers_[l]->dB,
                                      {vi32_1, vi32_2}));
 
@@ -228,81 +236,6 @@ wabt::Var Model::GenerateBackpropagation() {
                                      {vi32_1, vi32_2}));
       f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
     }
-  });
-}
-
-wabt::Var Debug(ModuleManager* mm, Model* model) {
-  std::vector<Type> func_locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
-  return mm->MakeFunction(nullptr, {{}, {}}, func_locals, [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    auto i32_1 = locals[0];
-    auto i32_2 = locals[1];
-    auto i32_3 = locals[2];
-    auto i32_4 = locals[3];
-    auto i32_5 = locals[4];
-    auto i32_6 = locals[5];
-    auto f64_1 = locals[6];
-
-    uint32_t lhs_row = 3;
-    uint32_t lhs_col = 4;
-    uint32_t rhs_row = 3;
-    uint32_t rhs_col = 5;
-    uint32_t dst_row = lhs_col;
-    uint32_t dst_col = rhs_col;
-    ds::NDArray* A_ = nullptr;
-    ds::NDArray* B_ = nullptr;
-    ds::NDArray* C_ = nullptr;
-    auto &module_manager_ = *mm;
-    ALLOCATE_MEMORY(A_, lhs_row, lhs_col);
-    ALLOCATE_MEMORY(B_, rhs_row, rhs_col);
-    ALLOCATE_MEMORY(C_, dst_row, dst_col);
-
-    // Populate A
-    uint32_t val = 1;
-    for(int r=0; r < lhs_row; ++r) {
-      for(int c=0; c < lhs_col; ++c) {
-        f.Insert(MakeF64Store(MakeI32Const(A_->GetLinearIndex({r, c})), MakeF64Const(val++)));
-      }
-    }
-
-    // Print A
-    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
-        MakeI32Const(A_->Memory()->Begin()),
-        MakeI32Const(A_->Shape()[0]),
-        MakeI32Const(A_->Shape()[1])
-    }));
-
-    // Populate B
-    val = rhs_row * rhs_col;
-    for(int r=0; r < rhs_row; ++r) {
-      for(int c=0; c < rhs_col; ++c) {
-        f.Insert(MakeF64Store(MakeI32Const(B_->GetLinearIndex({r, c})), MakeF64Const(val--)));
-      }
-    }
-
-    // Print B
-    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
-        MakeI32Const(B_->Memory()->Begin()),
-        MakeI32Const(B_->Shape()[0]),
-        MakeI32Const(B_->Shape()[1])
-    }));
-
-//    f.Insert(snippet::MatrixDot(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
-//    f.Insert(snippet::MatrixActivation(f.Label(), A_, model->Builtins().activation.Sigmoid(), C_, {i32_1, i32_2},false));
-//    f.Insert(snippet::MatrixAddition(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixScalar(f.Label(), A_, MakeF64Const(0.01), C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixLoss(f.Label(), A_, B_, model->Builtins().loss.MeanSquaredError(), C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixCopy(f.Label(), B_, C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixBiasBroadcast(f.Label(), C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixMultiplication(f.Label(), A_, B_, C_, {i32_1, i32_2}));
-//    f.Insert(snippet::MatrixDotRT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
-    f.Insert(snippet::MatrixDotLT(f.Label(), A_, B_, C_, {i32_1, i32_2, i32_3, i32_4, i32_5, f64_1}));
-
-    // Print C
-    f.Insert(MakeCall(model->Builtins().system.PrintTableF64(), {
-        MakeI32Const(C_->Memory()->Begin()),
-        MakeI32Const(C_->Shape()[0]),
-        MakeI32Const(C_->Shape()[1])
-    }));
   });
 }
 
@@ -336,7 +269,7 @@ void Model::Train(){
     auto i32_1 = locals[0];
     auto i32_2 = locals[1];
 
-    for(int e=0; e < 100; e++) {
+    for(int e=0; e < 2000; e++) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
         f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
@@ -345,7 +278,6 @@ void Model::Train(){
         // Apply neural network algorithms
         f.Insert(MakeCall(feedforward, {}));
         f.Insert(MakeCall(backpropagation, {}));
-
       }
     }
 
@@ -358,17 +290,8 @@ void Model::Train(){
       // Apply neural network algorithms
       f.Insert(MakeCall(feedforward, {}));
 
-      // Print for debugging
-      auto matrix = layers_[2]->A;
-      f.Insert(MakeCall(builtins_.system.PrintTableF64(), {
-          MakeI32Const(matrix->Memory()->Begin()),
-          MakeI32Const(matrix->Shape()[0]),
-          MakeI32Const(matrix->Shape()[1])
-      }));
+      PRINT_TABLE(layers_.back()->A)
     }
-
-    // Debugging
-//    f.Insert(MakeCall(Debug(&module_manager_, this), {}));
   });
 }
 

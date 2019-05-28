@@ -27,12 +27,12 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     auto div = MakeBinary(Opcode::F64Div, MakeF64Const(1), denom);
     f.Insert(div);
   });
-  sigmoid_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {Type::F64}, [&](FuncBody f,
+  sigmoid_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
       std::vector<Var> params, std::vector<Var> locals) {
-    auto sig = MakeLocalSet(locals[0], MakeCall(sigmoid_.function, {MakeLocalGet(params[0])}));
+    auto sig = MakeLocalSet(params[0], MakeCall(sigmoid_.function, {MakeLocalGet(params[0])}));
     f.Insert(sig);
-    auto sub = MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(locals[0]));
-    auto mul = MakeBinary(Opcode::F64Mul, MakeLocalGet(locals[0]), sub);
+    auto sub = MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(params[0]));
+    auto mul = MakeBinary(Opcode::F64Mul, MakeLocalGet(params[0]), sub);
     f.Insert(mul);
   });
 }

@@ -52,7 +52,7 @@ wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, ds::NDArra
                                  std::vector<wabt::Var> locals, bool prime);
 
 // Apply matrix loss function
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* prediction, ds::NDArray* target,
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* target, ds::NDArray* prediction,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 // Copy matrix content from src to dst
