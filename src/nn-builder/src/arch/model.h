@@ -7,6 +7,7 @@
 #include <src/nn-builder/src/builtins/loss.h>
 #include <src/nn-builder/src/builtins/math.h>
 #include <src/nn-builder/src/builtins/system.h>
+#include <src/nn-builder/src/builtins/message.h>
 #include <src/nn-builder/src/data_structure/ndarray.h>
 #include <memory>
 #include <utility>
@@ -33,6 +34,7 @@ private:
     builtins::Loss loss;
     builtins::Math math;
     builtins::System system;
+    builtins::Message message;
   } builtins_;
 
   // Initalize functions

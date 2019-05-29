@@ -16,6 +16,7 @@ void System::InitImports(arch::Model* model, wasmpp::ModuleManager* module_manag
   print_f64_ = module_manager->MakeFuncImport(module_name, "print", {{Type::F64}, {}});
   print_table_f64_ = module_manager->MakeFuncImport(module_name, "print_table_f64",
       {{Type::I32, Type::I32, Type::I32}, {}});
+  time_f64_ = module_manager->MakeFuncImport(module_name, "time", {{}, {Type::F64}});
 }
 
 void System::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager) {

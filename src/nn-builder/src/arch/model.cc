@@ -65,6 +65,7 @@ void Model::InitImports() {
   builtins_.math.InitImports(this, &module_manager_, "Math");
   builtins_.activation.InitImports(this, &module_manager_, "Activation");
   builtins_.loss.InitImports(this, &module_manager_, "Loss");
+  builtins_.message.InitImports(this, &module_manager_, "Message");
 }
 
 void Model::InitDefinitions() {
@@ -72,6 +73,7 @@ void Model::InitDefinitions() {
   builtins_.math.InitDefinitions(this, &module_manager_);
   builtins_.activation.InitDefinitions(this, &module_manager_);
   builtins_.loss.InitDefinitions(this, &module_manager_);
+  builtins_.message.InitDefinitions(this, &module_manager_);
 }
 
 #define ALLOCATE_MEMORY(array, rows, cols) \
@@ -273,13 +275,15 @@ void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
 
-  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
-    auto epoch = locals[0];
-    auto i32_1 = locals[1];
-    auto i32_2 = locals[2];
+    auto time = locals[0];
+    auto epoch = locals[1];
+    auto i32_1 = locals[2];
+    auto i32_2 = locals[3];
 
+    f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
@@ -291,9 +295,11 @@ void Model::Train(){
         b->Insert(MakeCall(backpropagation, {}));
       }
     }));
+    f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
+    f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
 
     // Test on training data (for debugging)
-    for(int t=0; t < 10; ++t) {
+    for(int t=0; t < training_.size(); ++t) {
       // Copy training data into the first layer
       f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
       f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
