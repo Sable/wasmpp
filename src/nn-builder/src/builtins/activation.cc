@@ -29,8 +29,10 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
   });
   sigmoid_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
       std::vector<Var> params, std::vector<Var> locals) {
-    auto sig = MakeLocalSet(params[0], MakeCall(sigmoid_.function, {MakeLocalGet(params[0])}));
-    f.Insert(sig);
+    auto denom = MakeBinary(Opcode::F64Add, MakeF64Const(1),
+                            MakeCall(model->Builtins().math.Exp(), {MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0]))}));
+    auto div = MakeBinary(Opcode::F64Div, MakeF64Const(1), denom);
+    f.Insert(MakeLocalSet(params[0], div));
     auto sub = MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(params[0]));
     auto mul = MakeBinary(Opcode::F64Mul, MakeLocalGet(params[0]), sub);
     f.Insert(mul);
