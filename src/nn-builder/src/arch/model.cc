@@ -35,7 +35,8 @@ void Model::AddLayer(Layer* layer) {
   layers_.push_back(new LayerMeta(layer));
 }
 
-Model::Model(ModelOptions options) : module_manager_({MemoryType::WASM32}), options_(options) {
+Model::Model(ModelOptions options) : module_manager_({MemoryType::WASM32}),  options_(options),
+                                     builtins_(options.activation_options) {
   InitImports();
   InitDefinitions();
 }

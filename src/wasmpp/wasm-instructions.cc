@@ -42,8 +42,8 @@ wabt::ExprList* MakeBlock(LabelManager* label_manager, std::function<void(BlockB
   return e;
 }
 
-wabt::ExprList* MakeIf(LabelManager* label_manager, wabt::ExprList* cond, std::function<void(BlockBody, wabt::Var)> true_content,
-                       std::function<void(BlockBody)> false_content) {
+wabt::ExprList* MakeIf(LabelManager* label_manager, wabt::ExprList* cond, wabt::FuncSignature sig,
+                       std::function<void(BlockBody, wabt::Var)> true_content, std::function<void(BlockBody)> false_content) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   ERROR_UNLESS(cond != nullptr, "cond cannot be null");
   wabt::ExprList* e = new wabt::ExprList();
@@ -51,6 +51,7 @@ wabt::ExprList* MakeIf(LabelManager* label_manager, wabt::ExprList* cond, std::f
   auto if_block = wabt::MakeUnique<wabt::IfExpr>();
   BlockBody true_body(label_manager, &if_block->true_.exprs);
   if_block->true_.label = label_manager->Next();
+  if_block->true_.decl.sig = sig;
   BlockBody false_body(label_manager, &if_block->false_);
   true_content(true_body, wabt::Var(if_block->true_.label));
   if(false_content) {

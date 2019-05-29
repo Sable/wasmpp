@@ -35,6 +35,50 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     auto mul = MakeBinary(Opcode::F64Mul, MakeLocalGet(params[0]), sub);
     f.Insert(mul);
   });
+
+  // ReLU function
+  // -  f(x) = x > 0 ? x : 0
+  // - df(x) = x > 0 ? 1 : 0
+  relu_.function = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{}, {Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeLocalGet(params[0]));
+    }, [&](BlockBody false_block){
+      false_block.Insert(MakeF64Const(0));
+    }));
+  });
+  relu_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{},{Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeF64Const(1));
+    }, [&](BlockBody false_block){
+      false_block.Insert(MakeF64Const(0));
+    }));
+  });
+
+  // Leaky ReLU function
+  // -  f(x) = x > 0 ? x : alpha * x
+  // - df(x) = x > 0 ? 1 : alpha
+  leaky_relu_.function = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{}, {Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeLocalGet(params[0]));
+    }, [&](BlockBody false_block){
+      false_block.Insert(MakeBinary(Opcode::F64Mul, MakeF64Const(options_.leaky_relu_slope), MakeLocalGet(params[0])));
+    }));
+  });
+  leaky_relu_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{},{Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeF64Const(1));
+    }, [&](BlockBody false_block){
+      false_block.Insert(MakeF64Const(options_.leaky_relu_slope));
+    }));
+  });
 }
 
 } // namespace builtins

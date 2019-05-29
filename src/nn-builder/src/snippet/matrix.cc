@@ -302,7 +302,7 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
       auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
                                   MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
       auto cond = MakeBinary(Opcode::F64Ge, MakeF64Load(cur_index), MakeF64Load(max_index));
-      auto comp = MakeIf(label_manager, cond, [&](BlockBody t, Var label) {
+      auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
         t.Insert(MakeLocalSet(max, MakeLocalGet(row)));
       });
       b2->Insert(comp);
@@ -310,7 +310,7 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
 
     b1->Insert(GenerateRangeLoop(label_manager, row, 0, dst->Shape()[0], 1, [&](BlockBody* b2) {
       auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(max), MakeLocalGet(row));
-      auto comp = MakeIf(label_manager, cond, [&](BlockBody t, Var label) {
+      auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
         auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
                                   MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
                                              MakeI32Const(src->Shape()[1] * type_size)));

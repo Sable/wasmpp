@@ -20,6 +20,7 @@ struct ModelMeta;
 struct ModelOptions {
   bool log_training_error = false;
   bool log_training_time = false;
+  builtins::ActivationOptions activation_options;
 };
 class Model {
 private:
@@ -35,6 +36,7 @@ private:
 
   // Builtin functions
   struct Builtins {
+    Builtins(builtins::ActivationOptions activation_options) : activation(activation_options) {}
     builtins::Activation activation;
     builtins::Loss loss;
     builtins::Math math;
