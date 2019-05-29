@@ -120,6 +120,18 @@ void ModuleManager::CheckImportOrdering() {
   }
 }
 
+void ModuleManager::ResolveImplicitlyDefinedFunctionType(const wabt::FuncDeclaration& decl) {
+  // Resolve implicitly defined function types, e.g.: (func (param i32) ...)
+  if (!decl.has_func_type) {
+    wabt::Index func_type_index = module_.GetFuncTypeIndex(decl.sig);
+    if (func_type_index == wabt::kInvalidIndex) {
+      auto func_type_field = wabt::MakeUnique<wabt::FuncTypeModuleField>();
+      func_type_field->func_type.sig = decl.sig;
+      module_.AppendField(std::move(func_type_field));
+    }
+  }
+}
+
 wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                                    std::function<void(FuncBody, std::vector<wabt::Var>,
                                                       std::vector<wabt::Var>)> content) {
@@ -147,6 +159,7 @@ wabt::Var ModuleManager::MakeFunction(const char* name, wabt::FuncSignature sig,
   }
   field->func.local_types.Set(local_types);
   FuncBody func_body(&label_manager_, &field->func.exprs);
+  ResolveImplicitlyDefinedFunctionType(field->func.decl);
   module_.AppendField(std::move(field));
 
   // Create an export field
@@ -170,6 +183,7 @@ wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function
   wabt::Var import_name(label_manager_.Next());
   auto import = wabt::MakeUnique<wabt::FuncImport>(import_name.name());
   import->func.decl.sig = std::move(sig);
+  ResolveImplicitlyDefinedFunctionType(import->func.decl);
   auto field = wabt::MakeUnique<wabt::ImportModuleField>(std::move(import));
   field->import->module_name = std::move(module);
   field->import->field_name = std::move(function);

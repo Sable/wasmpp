@@ -103,6 +103,7 @@ private:
 
   // Function copied from WastParser::CheckImportOrdering
   void CheckImportOrdering();
+  void ResolveImplicitlyDefinedFunctionType(const wabt::FuncDeclaration& decl);
 
   // Helpers
   void MakeExport(std::string name, wabt::Var var, wabt::ExternalKind kind);
