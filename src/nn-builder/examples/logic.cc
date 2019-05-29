@@ -65,9 +65,9 @@ int main(int argc, char *argv[]) {
   options.log_training_time = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Tanh()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Tanh())
+     new FullyConnectedLayer(2, model.Builtins().activation.Linear()),
+     new FullyConnectedLayer(2, model.Builtins().activation.ELU()),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
 
   // Train
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 100000;
+  uint32_t epoch = 10000;
   uint32_t batch = 1;
   double learning_rate = 0.01;
   model.Setup(epoch, batch, learning_rate, train, labels);

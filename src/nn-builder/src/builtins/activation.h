@@ -11,7 +11,9 @@ struct ActivationFunction {
   wabt::Var derivative;
 };
 struct ActivationOptions {
+  double linear_slope = 1;
   double leaky_relu_slope = 0.01;
+  double elu_slope = 0.01;
 };
 class Activation : public Builtin {
 private:
@@ -20,7 +22,9 @@ private:
   ActivationFunction sigmoid_;
   ActivationFunction relu_;
   ActivationFunction leaky_relu_;
+  ActivationFunction elu_;
   ActivationFunction tanh_;
+  ActivationFunction linear_;
 public:
   Activation(ActivationOptions options) : options_(options) {}
   void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) override ;
@@ -30,6 +34,8 @@ public:
   const ActivationFunction& ReLU() const { return relu_; }
   const ActivationFunction& LeakyReLU() const { return leaky_relu_; }
   const ActivationFunction& Tanh() const { return tanh_; }
+  const ActivationFunction& Linear() const { return linear_; }
+  const ActivationFunction& ELU() const { return elu_; }
 };
 
 } // namespace builtins

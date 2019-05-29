@@ -106,6 +106,42 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     f.Insert(GenerateCompoundAssignment(locals[0], Opcode::F64Mul, MakeLocalGet(locals[0])));
     f.Insert(MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(locals[0])));
   });
+
+  // Linear function
+  // -  f(x) = alpha * x
+  // - df(x) = alpha
+  linear_.function = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeBinary(Opcode::F64Mul, MakeLocalGet(params[0]), MakeF64Const(options_.linear_slope)));
+  });
+  linear_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeLocalGet(params[0]));
+  });
+
+  // ELU function
+  // -  f(x) = x > 0 ? x : alpha * (e(x) - 1)
+  // - df(x) = x > 0 ? 1 : alpha * e(x)
+  elu_.function = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{}, {Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeLocalGet(params[0]));
+    }, [&](BlockBody false_block){
+      auto sub = MakeBinary(Opcode::F64Sub, MakeCall(model->Builtins().math.Exp(), {MakeLocalGet(params[0])}), MakeF64Const(1));
+      false_block.Insert(MakeBinary(Opcode::F64Mul, MakeF64Const(options_.elu_slope), sub));
+    }));
+  });
+  elu_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    auto cond = MakeBinary(Opcode::F64Gt, MakeLocalGet(params[0]), MakeF64Const(0));
+    f.Insert(MakeIf(f.Label(), cond, {{},{Type::F64}}, [&](BlockBody true_block, Var label){
+      true_block.Insert(MakeF64Const(1));
+    }, [&](BlockBody false_block){
+      false_block.Insert(MakeBinary(Opcode::F64Mul, MakeF64Const(options_.elu_slope),
+                                    MakeCall(model->Builtins().math.Exp(), {MakeLocalGet(params[0])})));
+    }));
+  });
 }
 
 } // namespace builtins
