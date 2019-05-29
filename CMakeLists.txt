@@ -21,6 +21,7 @@ set(WABT wabt)
 set(WASMPP wasmpp)
 set(NN_BUILDER nnb)
 set(LOGIC logic)
+set(MNIST mnist)
 
 # Create wasmpp library
 file(GLOB_RECURSE WASMPP_FILES src/wasmpp/*.cc)
@@ -37,3 +38,7 @@ file(GLOB_RECURSE LOGIC_FILES src/nn-builder/examples/logic.cc)
 add_executable(${LOGIC} ${LOGIC_FILES})
 target_link_libraries(${LOGIC} ${NN_BUILDER})
 
+# Create mnist example
+file(GLOB_RECURSE MNIST_FILES src/nn-builder/examples/mnist.cc)
+add_executable(${MNIST} ${MNIST_FILES})
+target_link_libraries(${MNIST} ${NN_BUILDER})

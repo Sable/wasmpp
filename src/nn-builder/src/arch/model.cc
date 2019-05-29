@@ -293,7 +293,7 @@ void Model::Train(){
     }));
 
     // Test on training data (for debugging)
-    for(int t=0; t < training_.size(); ++t) {
+    for(int t=0; t < 10; ++t) {
       // Copy training data into the first layer
       f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
       f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
@@ -301,6 +301,8 @@ void Model::Train(){
       // Apply neural network algorithms
       f.Insert(MakeCall(feedforward, {}));
 
+//      PRINT_TABLE(layers_.front()->A)
+      PRINT_TABLE(layers_.back()->T)
       PRINT_TABLE(layers_.back()->A)
     }
   });
