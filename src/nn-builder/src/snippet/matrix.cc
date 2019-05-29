@@ -243,24 +243,7 @@ wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* tar
 
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                            std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
-  MATRIX_CHECK(src);
-  MATRIX_CHECK(dst);
-  ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
-  assert(locals.size() == 2);
-
-  auto src_addr = locals[0];
-  auto dst_addr = locals[1];
-
-  uint32_t type_size = TypeSize(Type::F64);
-
-  wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, MakeLocalSet(src_addr, MakeI32Const(src->Memory()->Begin())));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
-    b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeF64Load(MakeLocalGet(src_addr))));
-    b->Insert(GenerateCompoundAssignment(src_addr, Opcode::I32Add, MakeI32Const(type_size)));
-  }));
-  return e;
+  return MatrixScalar(label_manager, src, MakeF64Const(1), dst, locals);
 }
 
 wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias, std::vector<Var> locals) {
