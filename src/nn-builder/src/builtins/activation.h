@@ -1,7 +1,7 @@
 #ifndef NN_BUILTINS_ACTIVATION_H_
 #define NN_BUILTINS_ACTIVATION_H_
 
-#include <src/apps/nn-builder/src/builtins/builtins.h>
+#include <src/nn-builder/src/builtins/builtins.h>
 
 namespace nn {
 namespace builtins {

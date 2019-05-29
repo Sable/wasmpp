@@ -1,5 +1,5 @@
-#include <src/apps/nn-builder/src/builtins/activation.h>
-#include <src/apps/nn-builder/src/arch/model.h>
+#include <src/nn-builder/src/builtins/activation.h>
+#include <src/nn-builder/src/arch/model.h>
 #include <cassert>
 
 namespace nn {

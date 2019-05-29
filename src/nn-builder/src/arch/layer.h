@@ -1,7 +1,7 @@
 #ifndef NN_ARCH_LAYER_H_
 #define NN_ARCH_LAYER_H_
 
-#include <src/apps/nn-builder/src/builtins/activation.h>
+#include <src/nn-builder/src/builtins/activation.h>
 
 namespace nn {
 namespace arch {

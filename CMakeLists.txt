@@ -1,5 +1,4 @@
 cmake_minimum_required(VERSION 3.5)
-project(wasmpp)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 option(BUILD_TESTS "Build GTest-based tests" OFF)
@@ -17,14 +16,24 @@ include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt)
 include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt/src)
 include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
 
-# Create wasmpp library
-file(GLOB_RECURSE SRC_FILES src/wasmpp/*.cc src/wasmpp/*/*.cc)
-add_library(${PROJECT_NAME} ${SRC_FILES})
-target_link_libraries(${PROJECT_NAME} wabt)
+# All targets
+set(WABT wabt)
+set(WASMPP wasmpp)
+set(NN_BUILDER nnb)
+set(LOGIC logic)
 
-# Create learn-or application
-set(NN_APP "nn")
-file(GLOB_RECURSE NN_SRC_FILES src/apps/nn-builder/*.cc src/apps/nn-builder/*/*.cc)
-add_executable(${NN_APP} ${NN_SRC_FILES})
-target_link_libraries(${NN_APP} wabt wasmpp)
+# Create wasmpp library
+file(GLOB_RECURSE WASMPP_FILES src/wasmpp/*.cc)
+add_library(${WASMPP} ${WASMPP_FILES})
+target_link_libraries(${WASMPP} ${WABT})
+
+# Create neural network library
+file(GLOB_RECURSE NN_BUILDER_FILES src/nn-builder/*/*.cc)
+add_library(${NN_BUILDER} ${NN_BUILDER_FILES})
+target_link_libraries(${NN_BUILDER} ${WASMPP})
+
+# Create logic example
+file(GLOB_RECURSE LOGIC_FILES src/nn-builder/examples/logic.cc)
+add_executable(${LOGIC} ${LOGIC_FILES})
+target_link_libraries(${LOGIC} ${NN_BUILDER})
 

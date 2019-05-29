@@ -2,12 +2,12 @@
 #define NN_ARCH_MODEL_H_
 
 #include <src/wasmpp/wasm-manager.h>
-#include <src/apps/nn-builder/src/arch/layer.h>
-#include <src/apps/nn-builder/src/builtins/activation.h>
-#include <src/apps/nn-builder/src/builtins/loss.h>
-#include <src/apps/nn-builder/src/builtins/math.h>
-#include <src/apps/nn-builder/src/builtins/system.h>
-#include <src/apps/nn-builder/src/data_structure/ndarray.h>
+#include <src/nn-builder/src/arch/layer.h>
+#include <src/nn-builder/src/builtins/activation.h>
+#include <src/nn-builder/src/builtins/loss.h>
+#include <src/nn-builder/src/builtins/math.h>
+#include <src/nn-builder/src/builtins/system.h>
+#include <src/nn-builder/src/data_structure/ndarray.h>
 #include <memory>
 #include <utility>
 

@@ -1,9 +1,9 @@
 #ifndef NN_SNIPPET_MATRIX_H_
 #define NN_SNIPPET_MATRIX_H_
 
-#include <src/apps/nn-builder/src/data_structure/ndarray.h>
-#include <src/apps/nn-builder/src/builtins/activation.h>
-#include <src/apps/nn-builder/src/builtins/loss.h>
+#include <src/nn-builder/src/data_structure/ndarray.h>
+#include <src/nn-builder/src/builtins/activation.h>
+#include <src/nn-builder/src/builtins/loss.h>
 #include <src/wasmpp/wasm-manager.h>
 
 namespace nn {

@@ -1,4 +1,4 @@
-#include <src/apps/nn-builder/src/data_structure/ndarray.h>
+#include <src/nn-builder/src/data_structure/ndarray.h>
 #include <src/wasmpp/wasm-manager.h>
 #include <cassert>
 

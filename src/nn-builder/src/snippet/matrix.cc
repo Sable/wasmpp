@@ -1,4 +1,4 @@
-#include <src/apps/nn-builder/src/snippet/matrix.h>
+#include <src/nn-builder/src/snippet/matrix.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {

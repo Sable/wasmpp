@@ -1,4 +1,4 @@
-#include <src/apps/nn-builder/src/arch/model.h>
+#include <src/nn-builder/src/arch/model.h>
 #include <iostream>
 #include <getopt.h>
 #include <fstream>

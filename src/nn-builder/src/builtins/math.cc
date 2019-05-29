@@ -1,4 +1,4 @@
-#include <src/apps/nn-builder/src/builtins/math.h>
+#include <src/nn-builder/src/builtins/math.h>
 #include <cassert>
 
 namespace nn {
