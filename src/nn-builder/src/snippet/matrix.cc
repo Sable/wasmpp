@@ -11,6 +11,12 @@ using namespace wabt;
   ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
   ERROR_UNLESS((x)->Shape().size() == 2, #x " is expected to be a 2D matrix");
 
+#define MATRIX_SAME_SHAPE(x, y) \
+  ERROR_UNLESS((x)->Shape() == (y)->Shape(), #x " and " #y " matrices are not compatible");
+
+#define LABEL_CHECK(l) \
+  ERROR_UNLESS((l) != nullptr, "label manager cannot be null");
+
 wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
@@ -246,8 +252,66 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
   return MatrixScalar(label_manager, src, MakeF64Const(1), dst, locals);
 }
 
+wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
+                                   std::vector<wabt::Var> locals) {
+  LABEL_CHECK(label_manager)
+  MATRIX_CHECK(src);
+  MATRIX_CHECK(dst);
+  MATRIX_SAME_SHAPE(src, dst);
+  assert(locals.size() == 3);
+
+  auto row = locals[0];
+  auto col = locals[1];
+  auto max = locals[2];
+
+  uint32_t type_size = TypeSize(Type::F64);
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, GenerateRangeLoop(label_manager, col, 0, dst->Shape()[1], 1, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(max, MakeI32Const(0)));
+    b1->Insert(GenerateRangeLoop(label_manager, row, 1, dst->Shape()[0], 1, [&](BlockBody* b2) {
+      auto max_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
+                                MakeBinary(Opcode::I32Mul, MakeLocalGet(max),
+                                           MakeI32Const(src->Shape()[1] * type_size)));
+      auto max_index = MakeBinary(Opcode::I32Add, max_row,
+                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
+      auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
+                                MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
+                                           MakeI32Const(src->Shape()[1] * type_size)));
+      auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
+                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
+      auto cond = MakeBinary(Opcode::F64Ge, MakeF64Load(cur_index), MakeF64Load(max_index));
+      auto comp = MakeIf(label_manager, cond, [&](BlockBody t, Var label) {
+        t.Insert(MakeLocalSet(max, MakeLocalGet(row)));
+      });
+      b2->Insert(comp);
+    }));
+
+    b1->Insert(GenerateRangeLoop(label_manager, row, 0, dst->Shape()[0], 1, [&](BlockBody* b2) {
+      auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(max), MakeLocalGet(row));
+      auto comp = MakeIf(label_manager, cond, [&](BlockBody t, Var label) {
+        auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
+                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
+                                             MakeI32Const(src->Shape()[1] * type_size)));
+        auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
+                                    MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
+        t.Insert(MakeF64Store(cur_index, MakeF64Const(1)));
+      }, [&](BlockBody f) {
+        auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
+                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
+                                             MakeI32Const(src->Shape()[1] * type_size)));
+        auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
+                                    MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
+        f.Insert(MakeF64Store(cur_index, MakeF64Const(0)));
+      });
+      b2->Insert(comp);
+    }));
+  }));
+  return e;
+}
+
 wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias, std::vector<Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(bias);
   assert(locals.size() == 2);
 

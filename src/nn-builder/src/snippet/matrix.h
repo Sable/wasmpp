@@ -63,6 +63,9 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
 wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias,
                                     std::vector<wabt::Var> locals);
 
+wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
+                                    std::vector<wabt::Var> locals);
+
 } // namespace snippet
 } // namespace nn
 
