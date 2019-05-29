@@ -20,6 +20,7 @@ private:
   ActivationFunction sigmoid_;
   ActivationFunction relu_;
   ActivationFunction leaky_relu_;
+  ActivationFunction tanh_;
 public:
   Activation(ActivationOptions options) : options_(options) {}
   void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) override ;
@@ -28,6 +29,7 @@ public:
   const ActivationFunction& Sigmoid() const { return sigmoid_; }
   const ActivationFunction& ReLU() const { return relu_; }
   const ActivationFunction& LeakyReLU() const { return leaky_relu_; }
+  const ActivationFunction& Tanh() const { return tanh_; }
 };
 
 } // namespace builtins

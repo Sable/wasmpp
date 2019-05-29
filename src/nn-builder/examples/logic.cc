@@ -66,8 +66,8 @@ int main(int argc, char *argv[]) {
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.ReLU()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
+     new FullyConnectedLayer(2, model.Builtins().activation.Tanh()),
+     new FullyConnectedLayer(2, model.Builtins().activation.Tanh())
   });
 
   // Train

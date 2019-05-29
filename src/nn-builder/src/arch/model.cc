@@ -36,7 +36,7 @@ void Model::AddLayer(Layer* layer) {
 }
 
 Model::Model(ModelOptions options) : module_manager_({MemoryType::WASM32}),  options_(options),
-                                     builtins_(options.activation_options) {
+                                     builtins_(options_.activation_options) {
   InitImports();
   InitDefinitions();
 }
@@ -337,7 +337,7 @@ void Model::Train(){
 
 //      PRINT_TABLE(layers_.front()->A)
 //      PRINT_TABLE(layers_.back()->T)
-//      PRINT_TABLE(layers_.back()->A)
+      PRINT_TABLE(layers_.back()->A)
     }
   });
 }

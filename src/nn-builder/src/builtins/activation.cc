@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/builtins/activation.h>
 #include <src/nn-builder/src/arch/model.h>
+#include <src/wasmpp/wasm-instructions-gen.h>
 #include <cassert>
 
 namespace nn {
@@ -80,6 +81,30 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     }, [&](BlockBody false_block){
       false_block.Insert(MakeF64Const(options_.leaky_relu_slope));
     }));
+  });
+
+  // Tanh function
+  // -  f(x) = (e(x) - e(-x)) / (e(x) + e(-x))
+  // - df(x) = 1 - tanh(x)^2
+  tanh_.function = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {Type::F64}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeLocalSet(locals[0], MakeCall(model->Builtins().math.Exp(), {MakeLocalGet(params[0])})));
+    f.Insert(MakeLocalSet(params[0], MakeCall(model->Builtins().math.Exp(),
+                                              { MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0])) })));
+    auto nom = MakeBinary(Opcode::F64Sub, MakeLocalGet(locals[0]), MakeLocalGet(params[0]));
+    auto den = MakeBinary(Opcode::F64Add, MakeLocalGet(locals[0]), MakeLocalGet(params[0]));
+    f.Insert(MakeBinary(Opcode::F64Div, nom, den));
+  });
+  tanh_.derivative = module_manager->MakeFunction(nullptr, {{Type::F64}, {Type::F64}}, {Type::F64}, [&](FuncBody f,
+      std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeLocalSet(locals[0], MakeCall(model->Builtins().math.Exp(), {MakeLocalGet(params[0])})));
+    f.Insert(MakeLocalSet(params[0], MakeCall(model->Builtins().math.Exp(),
+                                              { MakeUnary(Opcode::F64Neg, MakeLocalGet(params[0])) })));
+    auto nom = MakeBinary(Opcode::F64Sub, MakeLocalGet(locals[0]), MakeLocalGet(params[0]));
+    auto den = MakeBinary(Opcode::F64Add, MakeLocalGet(locals[0]), MakeLocalGet(params[0]));
+    f.Insert(MakeLocalSet(locals[0], MakeBinary(Opcode::F64Div, nom, den)));
+    f.Insert(GenerateCompoundAssignment(locals[0], Opcode::F64Mul, MakeLocalGet(locals[0])));
+    f.Insert(MakeBinary(Opcode::F64Sub, MakeF64Const(1), MakeLocalGet(locals[0])));
   });
 }
 
