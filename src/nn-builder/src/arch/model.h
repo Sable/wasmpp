@@ -3,6 +3,7 @@
 
 #include <src/wasmpp/wasm-manager.h>
 #include <src/nn-builder/src/arch/layer.h>
+#include <src/nn-builder/src/builtins/loss.h>
 #include <src/nn-builder/src/builtins/activation.h>
 #include <src/nn-builder/src/builtins/loss.h>
 #include <src/nn-builder/src/builtins/math.h>
@@ -33,6 +34,7 @@ private:
   uint32_t epochs_;
   uint32_t batch_size_;
   double learning_rate_;
+  builtins::LossFunction loss_;
 
   // Builtin functions
   struct Builtins {
@@ -64,8 +66,8 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
-             std::vector<std::vector<double>> labels);
+  void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
+             std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
   void Train();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }

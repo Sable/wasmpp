@@ -254,8 +254,8 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
-void Model::Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, std::vector<std::vector<double>> input,
-                  std::vector<std::vector<double>> labels) {
+void Model::Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
+                  std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
   ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
@@ -266,6 +266,7 @@ void Model::Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, st
 
   batch_size_ = batch_size;
   epochs_ = epochs;
+  loss_ = loss;
   learning_rate_ = learning_rate;
   AllocateLayers();
   AllocateInput(input, labels);
@@ -306,7 +307,7 @@ void Model::Train(){
 
         if(options_.log_training_error) {
           // Compute training error
-          b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
+          b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, loss_,
                                         layers_.back()->Cost, {vi32_1, vi32_2}, false));
           b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf64_1));
           b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Add, MakeLocalGet(vf64_1)));
