@@ -53,7 +53,7 @@ wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, ds::NDArra
 
 // Apply matrix loss function
 wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* target, ds::NDArray* prediction,
-                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals);
+                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime);
 
 // Copy matrix content from src to dst
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
@@ -62,9 +62,13 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
 // Broadcast bias array
 wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias,
                                     std::vector<wabt::Var> locals);
-
+// Apply argmax on each matrix column
 wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                                     std::vector<wabt::Var> locals);
+
+// Get the mean of all matrix cells
+wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src,
+                           std::vector<wabt::Var> locals, wabt::Var result);
 
 } // namespace snippet
 } // namespace nn

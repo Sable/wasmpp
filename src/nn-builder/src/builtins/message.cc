@@ -11,6 +11,7 @@ void Message::InitImports(arch::Model* model, wasmpp::ModuleManager* module_mana
   assert(model != nullptr);
   assert(module_manager != nullptr);
   log_training_time_ = module_manager->MakeFuncImport(module_name, "log_training_time", {{Type::F64}, {}});
+  log_training_error_ = module_manager->MakeFuncImport(module_name, "log_training_error", {{Type::F64}, {}});
 }
 
 void Message::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager) {

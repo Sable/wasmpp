@@ -19,7 +19,7 @@ using namespace wabt;
 
 wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
@@ -62,7 +62,7 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
 
 wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                             std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
@@ -104,7 +104,7 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
 wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
@@ -147,12 +147,12 @@ wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
 wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, LabelManager* label_manager, ds::NDArray* lhs,
                                            ds::NDArray* rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
-  ERROR_UNLESS(lhs->Shape() == rhs->Shape(), "lhs and rhs matrices are not compatible");
-  ERROR_UNLESS(rhs->Shape() == dst->Shape(), "rhs and dst matrices are not compatible");
+  MATRIX_SAME_SHAPE(lhs, rhs);
+  MATRIX_SAME_SHAPE(rhs, dst);
   assert(locals.size() == 2);
 
   auto dst_addr = locals[0];
@@ -188,10 +188,10 @@ wabt::ExprList* MatrixMultiplication(LabelManager* label_manager, ds::NDArray* l
 
 wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
                              std::vector<wabt::Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(src);
   MATRIX_CHECK(dst);
-  ERROR_UNLESS(src->Shape() == dst->Shape(), "src and dst matrices are not compatible");
+  MATRIX_SAME_SHAPE(src, dst);
   assert(locals.size() == 2);
 
   auto dst_addr = locals[0];
@@ -209,13 +209,33 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
   return e;
 }
 
+wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src,
+                           std::vector<wabt::Var> locals, wabt::Var result) {
+  LABEL_CHECK(label_manager);
+  MATRIX_CHECK(src);
+  assert(locals.size() == 1);
+
+  auto src_addr = locals[0];
+
+  uint32_t type_size = TypeSize(Type::F64);
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(result, MakeF64Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager, src_addr, src->Memory()->Begin(), src->Memory()->End(), type_size, [&](BlockBody* b) {
+    b->Insert(GenerateCompoundAssignment(result, Opcode::F64Add, MakeF64Load(MakeLocalGet(src_addr))));
+  }));
+  Merge(e, MakeLocalSet(result, MakeBinary(Opcode::F64Div, MakeLocalGet(result),
+                                           MakeF64Const(src->Shape()[0]*src->Shape()[1]))));
+  return e;
+}
+
 wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<ds::NDArray*> args, Var func, ds::NDArray* dst,
                                     std::vector<Var> locals) {
-  ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
+  LABEL_CHECK(label_manager);
   MATRIX_CHECK(dst);
   for(auto arg : args) {
     MATRIX_CHECK(arg);
-    ERROR_UNLESS(arg->Shape() == dst->Shape(), "arg and dst matrices are not compatible");
+    MATRIX_SAME_SHAPE(arg, dst);
   }
   assert(locals.size() == 2);
 
@@ -243,8 +263,8 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, 
 }
 
 wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* target, ds::NDArray* prediction,
-                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals) {
-  return ElementWiseFunction(label_manager, {target, prediction}, func.derivative, dst, locals);
+                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime) {
+  return ElementWiseFunction(label_manager, {target, prediction}, prime ? func.derivative : func.function, dst, locals);
 }
 
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
@@ -252,6 +272,7 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
   return MatrixScalar(label_manager, src, MakeF64Const(1), dst, locals);
 }
 
+// TODO Optimize this function
 wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                                    std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager)

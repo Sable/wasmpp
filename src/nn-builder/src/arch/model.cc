@@ -17,6 +17,7 @@ struct LayerMeta {
   ds::NDArray* A = nullptr;
   ds::NDArray* B = nullptr;
   ds::NDArray* T = nullptr;
+  ds::NDArray* Cost = nullptr;
   // Back-propagation arrays
   ds::NDArray* dW = nullptr;
   ds::NDArray* dZ = nullptr;
@@ -105,6 +106,7 @@ void Model::AllocateLayers() {
     }
     if(l == layers_.size() - 1) {
       ALLOCATE_MEMORY(layers_[l]->T, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
     }
   }
 }
@@ -202,7 +204,7 @@ wabt::Var Model::GenerateBackpropagation() {
 
     // dA[L] = Loss(T[L], A[L])
     f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
-                                 layers_.back()->dA, {vi32_1, vi32_2}));
+                                 layers_.back()->dA, {vi32_1, vi32_2}, true));
 
     for(auto l = layers_.size()-1; l > 0; --l) {
        // dZ[l] = dA[l] * g'(Z[l])
@@ -275,25 +277,37 @@ void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
 
-  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F64, Type::I32, Type::I32, Type::F64};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     auto time = locals[0];
     auto epoch = locals[1];
-    auto i32_1 = locals[2];
-    auto i32_2 = locals[3];
+    auto cost_mean = locals[2];
+    auto vi32_1 = locals[3];
+    auto vi32_2 = locals[4];
+    auto vf64_1 = locals[5];
 
     f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
-        b->Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
-        b->Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
+        b->Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
+        b->Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {vi32_1, vi32_2}));
 
         // Apply neural network algorithms
         b->Insert(MakeCall(feedforward, {}));
         b->Insert(MakeCall(backpropagation, {}));
+
+        // Compute training error
+        b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
+                                     layers_.back()->Cost, {vi32_1, vi32_2}, false));
+        b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf64_1));
+        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Add, MakeLocalGet(vf64_1)));
       }
+
+      // Log training error
+      b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Div, MakeF64Const(training_.size())));
+      b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf64_1)}));
     }));
     f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
     f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
@@ -301,15 +315,15 @@ void Model::Train(){
     // Test on training data (for debugging)
     for(int t=0; t < training_.size(); ++t) {
       // Copy training data into the first layer
-      f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {i32_1, i32_2}));
-      f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {i32_1, i32_2}));
+      f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
+      f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {vi32_1, vi32_2}));
 
       // Apply neural network algorithms
       f.Insert(MakeCall(feedforward, {}));
 
 //      PRINT_TABLE(layers_.front()->A)
-      PRINT_TABLE(layers_.back()->T)
-      PRINT_TABLE(layers_.back()->A)
+//      PRINT_TABLE(layers_.back()->T)
+//      PRINT_TABLE(layers_.back()->A)
     }
   });
 }
