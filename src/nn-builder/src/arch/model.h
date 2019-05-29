@@ -17,8 +17,13 @@ namespace arch {
 
 struct LayerMeta;
 struct ModelMeta;
+struct ModelOptions {
+  bool log_training_error = false;
+  bool log_training_time = false;
+};
 class Model {
 private:
+  ModelOptions options_;
   wasmpp::ModuleManager module_manager_;
   wabt::Var memory_;
   std::vector<LayerMeta*> layers_;
@@ -50,7 +55,7 @@ private:
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
 public:
-  Model();
+  Model(ModelOptions options);
   ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
   void SetLayers(std::vector<Layer*> layers);

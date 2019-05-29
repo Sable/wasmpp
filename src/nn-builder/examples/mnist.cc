@@ -107,7 +107,10 @@ int main(int argc, char *argv[]) {
     ERROR_EXIT("Error opening file: '%s'", mnist_train.c_str());
   }
 
-  Model model;
+  ModelOptions options;
+  options.log_training_error = true;
+  options.log_training_time = true;
+  Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid()),

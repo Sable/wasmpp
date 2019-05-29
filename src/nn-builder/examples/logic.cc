@@ -60,7 +60,10 @@ int main(int argc, char *argv[]) {
     exit(0);
   }
 
-  Model model;
+  ModelOptions options;
+  options.log_training_error = true;
+  options.log_training_time = true;
+  Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
@@ -81,7 +84,7 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 1000000;
+  uint32_t epoch = 10;
   uint32_t batch = 1;
   double learning_rate = 0.01;
   model.Setup(epoch, batch, learning_rate, train, labels);

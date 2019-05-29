@@ -35,7 +35,7 @@ void Model::AddLayer(Layer* layer) {
   layers_.push_back(new LayerMeta(layer));
 }
 
-Model::Model() : module_manager_({MemoryType::WASM32}) {
+Model::Model(ModelOptions options) : module_manager_({MemoryType::WASM32}), options_(options) {
   InitImports();
   InitDefinitions();
 }
@@ -106,7 +106,9 @@ void Model::AllocateLayers() {
     }
     if(l == layers_.size() - 1) {
       ALLOCATE_MEMORY(layers_[l]->T, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
+      if(options_.log_training_error) {
+        ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
+      }
     }
   }
 }
@@ -287,7 +289,10 @@ void Model::Train(){
     auto vi32_2 = locals[4];
     auto vf64_1 = locals[5];
 
-    f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
+    if(options_.log_training_time) {
+      // Start training timer
+      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
+    }
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
@@ -298,19 +303,27 @@ void Model::Train(){
         b->Insert(MakeCall(feedforward, {}));
         b->Insert(MakeCall(backpropagation, {}));
 
-        // Compute training error
-        b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
-                                     layers_.back()->Cost, {vi32_1, vi32_2}, false));
-        b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf64_1));
-        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Add, MakeLocalGet(vf64_1)));
+        if(options_.log_training_error) {
+          // Compute training error
+          b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
+                                        layers_.back()->Cost, {vi32_1, vi32_2}, false));
+          b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf64_1));
+          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Add, MakeLocalGet(vf64_1)));
+        }
       }
 
-      // Log training error
-      b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Div, MakeF64Const(training_.size())));
-      b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf64_1)}));
+      if(options_.log_training_error) {
+        // Log training error
+        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Div, MakeF64Const(training_.size())));
+        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf64_1)}));
+      }
     }));
-    f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
-    f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
+
+    if(options_.log_training_time) {
+      // Log training time
+      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
+      f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
+    }
 
     // Test on training data (for debugging)
     for(int t=0; t < training_.size(); ++t) {
