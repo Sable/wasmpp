@@ -32,7 +32,7 @@ private:
   std::vector<ds::NDArray*> labels_;
   uint32_t epochs_;
   uint32_t batch_size_;
-  double learning_rate_;
+  float learning_rate_;
   builtins::LossFunction loss_;
   wabt::Type value_type_;
 
@@ -51,8 +51,8 @@ private:
   void InitDefinitions();
   // Model functions
   void AllocateLayers();
-  void AllocateInput(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
-  void MakeInputData(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void AllocateInput(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
+  void MakeInputData(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
   void MakeWeightData();
   void MakeBiasData();
   // Generate neural network algorithms
@@ -67,8 +67,8 @@ public:
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
 
-  void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
-             std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
+  void Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, builtins::LossFunction loss,
+             std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
   void Train();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }

@@ -78,11 +78,11 @@ void Model::InitDefinitions() {
 }
 
 #define ALLOCATE_MEMORY(array, rows, cols) \
-    array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F64)), \
-                            {rows, cols}, TypeSize(Type::F64));
+    array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \
+                            {rows, cols}, TypeSize(Type::F32));
 
 #define PRINT_TABLE(table)                              \
-  f.Insert(MakeCall(builtins_.system.PrintTableF64(), { \
+  f.Insert(MakeCall(builtins_.system.PrintTableF32(), { \
       MakeI32Const((table)->Memory()->Begin()),         \
       MakeI32Const((table)->Shape()[0]),                \
       MakeI32Const((table)->Shape()[1])                 \
@@ -113,7 +113,7 @@ void Model::AllocateLayers() {
   }
 }
 
-void Model::AllocateInput(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+void Model::AllocateInput(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
   for(uint32_t b=0; b < input.size(); b += batch_size_) {
     // Training data
     ds::NDArray* training_array = nullptr;
@@ -126,27 +126,27 @@ void Model::AllocateInput(std::vector<std::vector<double>> input, std::vector<st
   }
 }
 
-std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector<std::vector<double>> input) {
+std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector<std::vector<float>> input) {
   std::vector<DataEntry> entries;
   for (uint32_t col = 0; col < array->Shape()[0]; ++col) {
     for (uint32_t row = 0; row < array->Shape()[1]; ++row) {
-      entries.push_back(DataEntry::MakeF64(input[row][col]));
+      entries.push_back(DataEntry::MakeF32(input[row][col]));
     }
   }
   return entries;
 }
 
-void Model::MakeInputData(std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+void Model::MakeInputData(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
   assert(training_.size() == labels_.size());
 
   for(uint32_t i=0; i < training_.size(); ++i) {
     // Training data
     auto training_begin = input.begin() + (i * batch_size_);
-    std::vector<std::vector<double>> sub_input(training_begin, training_begin + batch_size_);
+    std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size_);
     module_manager_.MakeData(memory_, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
     // Training labels
     auto labels_begin = labels.begin() + (i * batch_size_);
-    std::vector<std::vector<double>> sub_labels(labels_begin, labels_begin + batch_size_);
+    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
     module_manager_.MakeData(memory_, labels_[i]->Memory()->Begin(), MakeTransposeData(labels_[i], sub_labels));
   }
 }
@@ -154,7 +154,7 @@ void Model::MakeInputData(std::vector<std::vector<double>> input, std::vector<st
 void Model::MakeWeightData() {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.1));
+    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
     module_manager_.MakeData(memory_, layers_[l]->W->Memory()->Begin(), entries);
   }
 }
@@ -162,13 +162,13 @@ void Model::MakeWeightData() {
 void Model::MakeBiasData() {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF64(0.2));
+    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.2));
     module_manager_.MakeData(memory_, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
 
 Var Model::GenerateFeedForward() {
-  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
+  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("feedforward", {}, locals_types, [&](FuncBody f, std::vector<Var> params,
                                                                            std::vector<Var> locals) {
     auto vi32_1 = locals[0];
@@ -176,14 +176,14 @@ Var Model::GenerateFeedForward() {
     auto vi32_3 = locals[2];
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
-    auto vf64_1 = locals[5];
+    auto vf32_1 = locals[5];
 
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W[l] . A[l-1] + B[l]
       // 1) Z[l] = W[l] . A[l-1]
       // 2) Z[l] = Z[l] + B[l]
       f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
+          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
 
       // A[l] = g(Z[l])
@@ -194,7 +194,7 @@ Var Model::GenerateFeedForward() {
 }
 
 wabt::Var Model::GenerateBackpropagation() {
-  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F64};
+  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("backpropagation", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                                               std::vector<Var> locals) {
     auto vi32_1 = locals[0];
@@ -202,7 +202,7 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vi32_3 = locals[2];
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
-    auto vf64_1 = locals[5];
+    auto vf32_1 = locals[5];
 
     // dA[L] = Loss(T[L], A[L])
     f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
@@ -221,40 +221,40 @@ wabt::Var Model::GenerateBackpropagation() {
       // 1) dW[l] = dZ[l] . A[l-1]^T
       // 2) dW[l] = (1/m) dW[l]
       f.Insert(snippet::MatrixDotRT(f.Label(), layers_[l]->dZ, layers_[l-1]->A, layers_[l]->dW,
-                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF64Const(1.0/batch_size_), layers_[l]->dW,
+                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
                                      {vi32_1, vi32_2}));
 
       // dB[l] = (1/m) dZ[l]
       // FIXME Sum dZ[l] horizontally, store it into first column of dB[l], then broadcast
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF64Const(1.0/batch_size_), layers_[l]->dB,
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
                                      {vi32_1, vi32_2}));
 
       if(l-1 > 0) {
         // dA[l-1] = W[l]^T . dZ[l]
         f.Insert(snippet::MatrixDotLT(f.Label(), layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
-                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf64_1}));
+                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       }
 
       // W[l] = W[l] - alpha * dW[l]
       // 1) dW[l] = alpha * dW[l]
       // 2) W[l] = W[l] - dW[l]
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF64Const(learning_rate_), layers_[l]->dW,
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF32Const(learning_rate_), layers_[l]->dW,
                                      {vi32_1, vi32_2}));
       f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
 
       // B[l] = B[l] - alpha * dB[l]
       // 1) dB[l] = alpha * dB[l]
       // 2) B[l] = B[l] - dB[l]
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dB, MakeF64Const(learning_rate_), layers_[l]->dB,
+      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dB, MakeF32Const(learning_rate_), layers_[l]->dB,
                                      {vi32_1, vi32_2}));
       f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
     }
   });
 }
 
-void Model::Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
-                  std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels) {
+void Model::Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, builtins::LossFunction loss,
+                  std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
   ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
@@ -280,7 +280,7 @@ void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
 
-  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F64, Type::I32, Type::I32, Type::F64};
+  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F32, Type::I32, Type::I32, Type::F32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     auto time = locals[0];
@@ -288,7 +288,7 @@ void Model::Train(){
     auto cost_mean = locals[2];
     auto vi32_1 = locals[3];
     auto vi32_2 = locals[4];
-    auto vf64_1 = locals[5];
+    auto vf32_1 = locals[5];
 
     if(options_.log_training_time) {
       // Start training timer
@@ -308,15 +308,15 @@ void Model::Train(){
           // Compute training error
           b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, loss_,
                                         layers_.back()->Cost, {vi32_1, vi32_2}, false));
-          b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf64_1));
-          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Add, MakeLocalGet(vf64_1)));
+          b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf32_1));
+          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeLocalGet(vf32_1)));
         }
       }
 
       if(options_.log_training_error) {
         // Log training error
-        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F64Div, MakeF64Const(training_.size())));
-        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf64_1)}));
+        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
+        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf32_1)}));
       }
     }));
 
@@ -327,7 +327,7 @@ void Model::Train(){
     }
 
     // Test on training data (for debugging)
-    for(int t=0; t < training_.size(); ++t) {
+    for(int t=0; t < 10; ++t) {
       // Copy training data into the first layer
       f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
       f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {vi32_1, vi32_2}));

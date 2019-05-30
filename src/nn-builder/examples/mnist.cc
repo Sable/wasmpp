@@ -69,22 +69,22 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  int LIMIT = 10;
-  std::vector<std::vector<double>> train_data;
-  std::vector<std::vector<double>> train_labels;
+  int LIMIT = 1000;
+  std::vector<std::vector<float>> train_data;
+  std::vector<std::vector<float>> train_labels;
   std::ifstream mnist_train_file(mnist_train);
   if (mnist_train_file.is_open()) {
     std::string line;
     uint32_t line_num = 0;
     while (getline(mnist_train_file, line) && train_data.size() < LIMIT) {
-      std::vector<double> data;
-      std::vector<double> label(10, 0);
+      std::vector<float> data;
+      std::vector<float> label(10, 0);
       // Skip label line
       if(line_num++ > 0) {
         // Read label
         label[line[0] - '0'] = 1;
         // Read data
-        double number = 0;
+        float number = 0;
         for(size_t i=2; i < line.size(); i++) {
           if(line[i] >= '0' && line[i] <= '9') {
             number *= 10;
@@ -117,9 +117,9 @@ int main(int argc, char *argv[]) {
      new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid())
   });
 
-  uint32_t epoch = 100;
+  uint32_t epoch = 1;
   uint32_t batch = 1;
-  double learning_rate = 0.1;
+  float learning_rate = 0.1;
   model.Setup(epoch, batch, learning_rate, model.Builtins().loss.MeanSquaredError(), train_data, train_labels);
   model.Train();
 

@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   }
 
   ModelOptions options;
-  options.log_training_error = true;
+  options.log_training_error = false;
   options.log_training_time = true;
   Model model(options);
   model.SetLayers({
@@ -71,23 +71,23 @@ int main(int argc, char *argv[]) {
   });
 
   // Train
-  std::vector<std::vector<double>> train = {
+  std::vector<std::vector<float>> train = {
     {0, 0},
     {0, 1},
     {1, 0},
     {1, 1}
   };
   // Try with one node
-  std::vector<std::vector<double>> labels = {
+  std::vector<std::vector<float>> labels = {
     {1, 0},
     {0, 1},
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 10;
+  uint32_t epoch = 1000000;
   uint32_t batch = 1;
-  double learning_rate = 0.01;
-  model.Setup(epoch, batch, learning_rate, model.Builtins().loss.MeanSquaredError(), train, labels);
+  float learning_rate = 0.01;
+  model.Setup(epoch, batch, learning_rate, model.Builtins().loss.CrossEntropy(), train, labels);
   model.Train();
 
   assert(model.Validate());

@@ -22,8 +22,8 @@ do {                            \
 
 // Wasm type sizes in bytes
 const uint32_t WASMPP_I32_SIZE = 4;
-const uint32_t WASMPP_I64_SIZE = 4;
-const uint32_t WASMPP_F32_SIZE = 8;
+const uint32_t WASMPP_F32_SIZE = 4;
+const uint32_t WASMPP_I64_SIZE = 8;
 const uint32_t WASMPP_F64_SIZE = 8;
 const uint32_t WASMPP_V128_SIZE = 16;
 
