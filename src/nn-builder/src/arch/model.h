@@ -58,6 +58,7 @@ private:
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
+  wabt::Var GenerateCostFunction();
 public:
   Model(ModelOptions options);
   ~Model();

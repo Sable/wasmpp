@@ -260,6 +260,24 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
+wabt::Var Model::GenerateCostFunction() {
+  std::vector<Type> locals = {Type::I32, Type::I32, Type::F32};
+  return module_manager_.MakeFunction("cost_function", {{Type::I32},{Type::F32}}, locals,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    auto vi32_1 = locals[0];
+    auto vi32_2 = locals[1];
+    auto vf32_1 = locals[2];
+
+    auto target_begin = params[0];
+
+    // Compute training error
+    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
+                                 snippet::Mat(layers_.back()->A), loss_, layers_.back()->Cost, {vi32_1, vi32_2}, false));
+    f.Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf32_1));
+    f.Insert(MakeLocalGet(vf32_1));
+  });
+}
+
 void Model::Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, builtins::LossFunction loss,
                   std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
   ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
@@ -284,21 +302,18 @@ void Model::Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, bui
 }
 
 void Model::Train(){
-  auto feedforward = GenerateFeedForward();
-  auto backpropagation = GenerateBackpropagation();
+  auto forward = GenerateFeedForward();
+  auto backword = GenerateBackpropagation();
+  auto cost = GenerateCostFunction();
 
-  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F32, Type::I32, Type::I32, Type::F32
-
-                                   ,Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32
-  };
+  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     auto time = locals[0];
-    auto epoch = locals[1];
-    auto cost_mean = locals[2];
+    auto cost_mean = locals[1];
+    auto epoch = locals[2];
     auto vi32_1 = locals[3];
     auto vi32_2 = locals[4];
-    auto vf32_1 = locals[5];
 
     if(options_.log_training_time) {
       // Start training timer
@@ -307,23 +322,21 @@ void Model::Train(){
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Apply neural network algorithms
-        b->Insert(MakeCall(feedforward, { MakeI32Const(training_[t]->Memory()->Begin())}));
-        b->Insert(MakeCall(backpropagation, {MakeI32Const(training_[t]->Memory()->Begin()),
+        b->Insert(MakeCall(forward, { MakeI32Const(training_[t]->Memory()->Begin())}));
+        b->Insert(MakeCall(backword, {MakeI32Const(training_[t]->Memory()->Begin()),
                                              MakeI32Const(labels_[t]->Memory()->Begin())}));
 
         if(options_.log_training_error) {
           // Compute training error
-          b->Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(labels_[t]), snippet::Mat(layers_.back()->A),
-                                        loss_, layers_.back()->Cost, {vi32_1, vi32_2}, false));
-          b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf32_1));
-          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeLocalGet(vf32_1)));
+          auto call_cost = MakeCall(cost, {MakeI32Const(labels_[t]->Memory()->Begin())});
+          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
         }
       }
 
       if(options_.log_training_error) {
         // Log training error
         b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
-        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(vf32_1)}));
+        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(cost_mean)}));
       }
     }));
 
@@ -334,8 +347,8 @@ void Model::Train(){
     }
 
     // Test on training data (for debugging)
-    for(int t=0; t < 1; ++t) {
-      f.Insert(MakeCall(feedforward, {MakeI32Const(training_[t]->Memory()->Begin())}));
+    for(int t=0; t < training_.size(); ++t) {
+      f.Insert(MakeCall(forward, {MakeI32Const(training_[t]->Memory()->Begin())}));
       PRINT_TABLE(layers_.back()->A)
     }
   });
