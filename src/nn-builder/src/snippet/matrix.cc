@@ -17,15 +17,15 @@ using namespace wabt;
 #define LABEL_CHECK(l) \
   ERROR_UNLESS((l) != nullptr, "label manager cannot be null");
 
-wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, Mat rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
-  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(rhs.Array());
   MATRIX_CHECK(dst);
-  ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[0], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(lhs->Shape()[1] == rhs.Array()->Shape()[0], "lhs and rhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
-  ERROR_UNLESS(dst->Shape()[1] == rhs->Shape()[1], "dst and rhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[1] == rhs.Array()->Shape()[1], "dst and rhs matrices are not compatible");
   assert(locals.size() == 6);
 
   auto rhs_col = locals[0];
@@ -37,15 +37,19 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
 
   uint32_t type_size = TypeSize(Type::F32);
   uint32_t lhs_width_bytes = lhs->Shape()[1] * type_size;
-  uint32_t rhs_height_bytes = rhs->Shape()[0] * type_size;
-  uint32_t rhs_width_bytes = rhs->Shape()[1] * type_size;
+  uint32_t rhs_height_bytes = rhs.Array()->Shape()[0] * type_size;
+  uint32_t rhs_width_bytes = rhs.Array()->Shape()[1] * type_size;
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
   Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
     b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF32Const(0)));
-      b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
+      if(rhs.HasBeginVar()) {
+        b2->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
+      } else {
+        b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Memory()->Begin())));
+      }
       b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
@@ -102,15 +106,15 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
   return e;
 }
 
-wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, Mat rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
-  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(rhs.Array());
   MATRIX_CHECK(dst);
-  ERROR_UNLESS(lhs->Shape()[1] == rhs->Shape()[1], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(lhs->Shape()[1] == rhs.Array()->Shape()[1], "lhs and rhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
-  ERROR_UNLESS(dst->Shape()[1] == rhs->Shape()[0], "dst and rhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[1] == rhs.Array()->Shape()[0], "dst and rhs matrices are not compatible");
   assert(locals.size() == 6);
 
   auto rhs_rows = locals[0];
@@ -122,13 +126,17 @@ wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
   uint32_t type_size = TypeSize(Type::F32);
   uint32_t lhs_width_bytes = lhs->Shape()[1] * type_size;
-  uint32_t rhs_height_bytes = rhs->Shape()[0] * type_size;
-  uint32_t rhs_width_bytes = rhs->Shape()[1] * type_size;
+  uint32_t rhs_height_bytes = rhs.Array()->Shape()[0] * type_size;
+  uint32_t rhs_width_bytes = rhs.Array()->Shape()[1] * type_size;
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
   Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
-    b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
+    if(rhs.HasBeginVar()) {
+      b1->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
+    } else {
+      b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Memory()->Begin())));
+    }
     b1->Insert(GenerateRangeLoop(label_manager, rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF32Const(0)));
       b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b3) {
@@ -229,13 +237,13 @@ wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src
   return e;
 }
 
-wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<ds::NDArray*> args, Var func, ds::NDArray* dst,
+wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<Mat> args, Var func, ds::NDArray* dst,
                                     std::vector<Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(dst);
   for(auto arg : args) {
-    MATRIX_CHECK(arg);
-    MATRIX_SAME_SHAPE(arg, dst);
+    MATRIX_CHECK(arg.Array());
+    MATRIX_SAME_SHAPE(arg.Array(), dst);
   }
   assert(locals.size() == 2);
 
@@ -247,9 +255,16 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<ds:
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {},
+                             [&](BlockBody* b) {
     for(auto arg : args) {
-      args_expr.push_back(MakeF32Load(MakeBinary(Opcode::I32Add, MakeI32Const(arg->Memory()->Begin()), MakeLocalGet(addr))));
+      ExprList* arg_addr = nullptr;
+      if(arg.HasBeginVar()) {
+        arg_addr = MakeLocalGet(arg.Var());
+      } else {
+        arg_addr = MakeI32Const(arg.Array()->Memory()->Begin());
+      }
+      args_expr.push_back(MakeF32Load(MakeBinary(Opcode::I32Add, arg_addr, MakeLocalGet(addr))));
     }
     b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeCall(func, args_expr)));
     b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
@@ -257,12 +272,12 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<ds:
   return e;
 }
 
-wabt::ExprList* MatrixActivation(LabelManager* label_manager, ds::NDArray* src, builtins::ActivationFunction func,
+wabt::ExprList* MatrixActivation(LabelManager* label_manager, Mat src, builtins::ActivationFunction func,
                                  ds::NDArray* dst, std::vector<Var> locals, bool prime) {
   return ElementWiseFunction(label_manager, {src}, prime ? func.derivative : func.function, dst, locals);
 }
 
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, ds::NDArray* target, ds::NDArray* prediction,
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, Mat target, Mat prediction,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime) {
   return ElementWiseFunction(label_manager, {target, prediction}, prime ? func.derivative : func.function, dst, locals);
 }

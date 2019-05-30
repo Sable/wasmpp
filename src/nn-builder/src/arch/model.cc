@@ -169,7 +169,7 @@ void Model::MakeBiasData() {
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("feedforward", {}, locals_types, [&](FuncBody f, std::vector<Var> params,
+  return module_manager_.MakeFunction("feedforward", {{Type::I32},{}}, locals_types, [&](FuncBody f, std::vector<Var> params,
                                                                            std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
@@ -178,16 +178,19 @@ Var Model::GenerateFeedForward() {
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
 
+    auto input_begin = params[0];
+
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W[l] . A[l-1] + B[l]
       // 1) Z[l] = W[l] . A[l-1]
       // 2) Z[l] = Z[l] + B[l]
-      f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W, layers_[l-1]->A, layers_[l]->Z,
-          {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+      f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W,
+                                  (l == 1) ? snippet::Mat(layers_[0]->A, input_begin) : snippet::Mat(layers_[l-1]->A),
+                                  layers_[l]->Z, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
 
       // A[l] = g(Z[l])
-      f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
+      f.Insert(snippet::MatrixActivation(f.Label(), snippet::Mat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
           layers_[l]->A, {vi32_1, vi32_2}, false));
     }
   });
@@ -195,8 +198,8 @@ Var Model::GenerateFeedForward() {
 
 wabt::Var Model::GenerateBackpropagation() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("backpropagation", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
-                                                                              std::vector<Var> locals) {
+  return module_manager_.MakeFunction("backpropagation", {{Type::I32, Type::I32},{}}, locals_type,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -204,15 +207,18 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
 
+    auto input_begin = params[0];
+    auto target_begin = params[1];
+
     // dA[L] = Loss(T[L], A[L])
-    f.Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, builtins_.loss.MeanSquaredError(),
-                                 layers_.back()->dA, {vi32_1, vi32_2}, true));
+    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
+                                 snippet::Mat(layers_.back()->A), loss_, layers_.back()->dA, {vi32_1, vi32_2}, true));
 
     for(auto l = layers_.size()-1; l > 0; --l) {
        // dZ[l] = dA[l] * g'(Z[l])
        // 1) dZ[l] = g'(Z[l])
        // 2) dZ[l] = dA[l] * dZ[l]
-      f.Insert(snippet::MatrixActivation(f.Label(), layers_[l]->Z, layers_[l]->layer->ActivationFunction(),
+      f.Insert(snippet::MatrixActivation(f.Label(), snippet::Mat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
           layers_[l]->dZ, {vi32_1, vi32_2}, true));
       f.Insert(snippet::MatrixMultiplication(f.Label(), layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
           {vi32_1, vi32_2}));
@@ -220,8 +226,9 @@ wabt::Var Model::GenerateBackpropagation() {
       // dW[l] = (1/m) dZ[l] . A[l-1]^T
       // 1) dW[l] = dZ[l] . A[l-1]^T
       // 2) dW[l] = (1/m) dW[l]
-      f.Insert(snippet::MatrixDotRT(f.Label(), layers_[l]->dZ, layers_[l-1]->A, layers_[l]->dW,
-                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+      f.Insert(snippet::MatrixDotRT(f.Label(), layers_[l]->dZ,
+                                    (l == 1) ? snippet::Mat(layers_[0]->A, input_begin) : snippet::Mat(layers_[l-1]->A),
+                                    layers_[l]->dW, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
                                      {vi32_1, vi32_2}));
 
@@ -230,7 +237,7 @@ wabt::Var Model::GenerateBackpropagation() {
       f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
                                      {vi32_1, vi32_2}));
 
-      if(l-1 > 0) {
+      if(l > 1) {
         // dA[l-1] = W[l]^T . dZ[l]
         f.Insert(snippet::MatrixDotLT(f.Label(), layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
                                       {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
@@ -280,7 +287,10 @@ void Model::Train(){
   auto feedforward = GenerateFeedForward();
   auto backpropagation = GenerateBackpropagation();
 
-  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F32, Type::I32, Type::I32, Type::F32};
+  std::vector<Type> locals_type = {Type::F64, Type::I32, Type::F32, Type::I32, Type::I32, Type::F32
+
+                                   ,Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32
+  };
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     auto time = locals[0];
@@ -296,18 +306,15 @@ void Model::Train(){
     }
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
-        // Copy training data into the first layer
-        b->Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
-        b->Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {vi32_1, vi32_2}));
-
         // Apply neural network algorithms
-        b->Insert(MakeCall(feedforward, {}));
-        b->Insert(MakeCall(backpropagation, {}));
+        b->Insert(MakeCall(feedforward, { MakeI32Const(training_[t]->Memory()->Begin())}));
+        b->Insert(MakeCall(backpropagation, {MakeI32Const(training_[t]->Memory()->Begin()),
+                                             MakeI32Const(labels_[t]->Memory()->Begin())}));
 
         if(options_.log_training_error) {
           // Compute training error
-          b->Insert(snippet::MatrixLoss(f.Label(), layers_.back()->T, layers_.back()->A, loss_,
-                                        layers_.back()->Cost, {vi32_1, vi32_2}, false));
+          b->Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(labels_[t]), snippet::Mat(layers_.back()->A),
+                                        loss_, layers_.back()->Cost, {vi32_1, vi32_2}, false));
           b->Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf32_1));
           b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeLocalGet(vf32_1)));
         }
@@ -327,16 +334,8 @@ void Model::Train(){
     }
 
     // Test on training data (for debugging)
-    for(int t=0; t < 10; ++t) {
-      // Copy training data into the first layer
-      f.Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
-      f.Insert(snippet::MatrixCopy(f.Label(), labels_[t], layers_.back()->T, {vi32_1, vi32_2}));
-
-      // Apply neural network algorithms
-      f.Insert(MakeCall(feedforward, {}));
-
-//      PRINT_TABLE(layers_.front()->A)
-//      PRINT_TABLE(layers_.back()->T)
+    for(int t=0; t < 1; ++t) {
+      f.Insert(MakeCall(feedforward, {MakeI32Const(training_[t]->Memory()->Begin())}));
       PRINT_TABLE(layers_.back()->A)
     }
   });
