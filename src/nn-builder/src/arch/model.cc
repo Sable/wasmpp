@@ -114,11 +114,17 @@ void Model::AllocateLayers() {
 }
 
 void Model::AllocateInput(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
+  // Do not merge loops so that all
+  // training data are consecutive in memory
+
   for(uint32_t b=0; b < input.size(); b += batch_size_) {
     // Training data
     ds::NDArray* training_array = nullptr;
     ALLOCATE_MEMORY(training_array, (uint32_t) input[0].size(), batch_size_);
     training_.push_back(training_array);
+  }
+
+  for(uint32_t b=0; b < input.size(); b += batch_size_) {
     // Training labels
     ds::NDArray* labels_array = nullptr;
     ALLOCATE_MEMORY(labels_array, (uint32_t) labels[0].size(), batch_size_);
@@ -304,39 +310,52 @@ void Model::Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, bui
 void Model::Train(){
   auto forward = GenerateFeedForward();
   auto backword = GenerateBackpropagation();
-  auto cost = GenerateCostFunction();
+  Var cost_func;
 
-  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     auto time = locals[0];
     auto cost_mean = locals[1];
     auto epoch = locals[2];
-    auto vi32_1 = locals[3];
-    auto vi32_2 = locals[4];
+    auto train_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
+    auto train_begin = training_.front()->Memory()->Begin();
+    auto train_end = training_.back()->Memory()->End();
+    auto train_size = training_.front()->Memory()->Bytes();
+    auto label_begin = labels_.front()->Memory()->Begin();
+    auto label_size = labels_.front()->Memory()->Bytes();
+
+    if(options_.log_training_error) {
+      cost_func = GenerateCostFunction();
+    }
     if(options_.log_training_time) {
       // Start training timer
       f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     }
-    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b) {
-      for(int t=0; t < training_.size(); ++t) {
+    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b1) {
+      b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
+      b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Apply neural network algorithms
-        b->Insert(MakeCall(forward, { MakeI32Const(training_[t]->Memory()->Begin())}));
-        b->Insert(MakeCall(backword, {MakeI32Const(training_[t]->Memory()->Begin()),
-                                             MakeI32Const(labels_[t]->Memory()->Begin())}));
+        b2->Insert(MakeCall(forward, { MakeLocalGet(train_addr)}));
+        b2->Insert(MakeCall(backword, {MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
 
         if(options_.log_training_error) {
           // Compute training error
-          auto call_cost = MakeCall(cost, {MakeI32Const(labels_[t]->Memory()->Begin())});
-          b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
+          auto call_cost = MakeCall(cost_func, {MakeLocalGet(label_addr)});
+          b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
         }
-      }
+
+        b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
+      }));
 
       if(options_.log_training_error) {
         // Log training error
-        b->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
-        b->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(cost_mean)}));
+        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
+        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(cost_mean)}));
       }
     }));
 
