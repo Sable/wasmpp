@@ -20,23 +20,26 @@ void Merge(wabt::ExprList* e1, wabt::ExprList* e2) {
   }
 }
 
-wabt::ExprList* MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+wabt::ExprList* MakeLoop(LabelManager* label_manager, wabt::FuncSignature sig,
+                         std::function<void(BlockBody, wabt::Var)> content) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   wabt::ExprList* e = new wabt::ExprList();
   auto loop = wabt::MakeUnique<wabt::LoopExpr>();
   BlockBody block_body(label_manager, &loop->block.exprs);
   loop->block.label = label_manager->Next();
+  loop->block.decl.sig = sig;
   content(block_body, wabt::Var(loop->block.label));
   e->push_back(std::move(loop));
   return e;
 }
 
-wabt::ExprList* MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content) {
+wabt::ExprList* MakeBlock(LabelManager* label_manager, wabt::FuncSignature sig, std::function<void(BlockBody, wabt::Var)> content) {
   ERROR_UNLESS(label_manager != nullptr, "label manager cannot be null");
   wabt::ExprList* e = new wabt::ExprList();
   auto block = wabt::MakeUnique<wabt::BlockExpr>();
   BlockBody block_body(label_manager, &block->block.exprs);
   block->block.label = label_manager->Next();
+  block->block.decl.sig = sig;
   content(block_body, wabt::Var(block->block.label));
   e->push_back(std::move(block));
   return e;

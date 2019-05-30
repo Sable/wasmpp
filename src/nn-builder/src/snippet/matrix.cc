@@ -42,11 +42,11 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, ds::NDA
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, [&](BlockBody* b1) {
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, [&](BlockBody* b2) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
       b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
-      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
@@ -84,11 +84,11 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_col, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, [&](BlockBody* b1) {
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, [&](BlockBody* b2) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
       b2->Insert(MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-      b2->Insert(GenerateRangeLoop(label_manager, rhs_row_offset, rhs->Memory()->Begin(), rhs->Memory()->End(), rhs_width_bytes, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager, rhs_row_offset, rhs->Memory()->Begin(), rhs->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col)));
         auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
@@ -127,11 +127,11 @@ wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, [&](BlockBody* b1) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
     b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs->Memory()->Begin())));
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_rows, 0, rhs_height_bytes, type_size, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager, rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF64Const(0)));
-      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF64Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F64Add, MakeBinary(Opcode::F64Mul, lhs_cell, rhs_cell)));
@@ -162,7 +162,7 @@ wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, LabelManager* label_
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeBinary(op, MakeF64Load(lhs_addr), MakeF64Load(rhs_addr))));
@@ -201,7 +201,7 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeF64Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F64Mul, MakeF64Load(src_addr), scalar)));
     b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
@@ -221,7 +221,7 @@ wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(result, MakeF64Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, src_addr, src->Memory()->Begin(), src->Memory()->End(), type_size, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, src_addr, src->Memory()->Begin(), src->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     b->Insert(GenerateCompoundAssignment(result, Opcode::F64Add, MakeF64Load(MakeLocalGet(src_addr))));
   }));
   Merge(e, MakeLocalSet(result, MakeBinary(Opcode::F64Div, MakeLocalGet(result),
@@ -247,7 +247,7 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<ds:
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     for(auto arg : args) {
       args_expr.push_back(MakeF64Load(MakeBinary(Opcode::I32Add, MakeI32Const(arg->Memory()->Begin()), MakeLocalGet(addr))));
     }
@@ -288,9 +288,9 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
   uint32_t type_size = TypeSize(Type::F64);
 
   wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, GenerateRangeLoop(label_manager, col, 0, dst->Shape()[1], 1, [&](BlockBody* b1) {
+  Merge(e, GenerateRangeLoop(label_manager, col, 0, dst->Shape()[1], 1, {}, [&](BlockBody* b1) {
     b1->Insert(MakeLocalSet(max, MakeI32Const(0)));
-    b1->Insert(GenerateRangeLoop(label_manager, row, 1, dst->Shape()[0], 1, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager, row, 1, dst->Shape()[0], 1, {}, [&](BlockBody* b2) {
       auto max_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
                                 MakeBinary(Opcode::I32Mul, MakeLocalGet(max),
                                            MakeI32Const(src->Shape()[1] * type_size)));
@@ -308,7 +308,7 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
       b2->Insert(comp);
     }));
 
-    b1->Insert(GenerateRangeLoop(label_manager, row, 0, dst->Shape()[0], 1, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager, row, 0, dst->Shape()[0], 1, {}, [&](BlockBody* b2) {
       auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(max), MakeLocalGet(row));
       auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
         auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
@@ -344,7 +344,7 @@ wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDA
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto src_rel_addr = MakeBinary(Opcode::I32Mul,
         MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(bias_width_bytes)), MakeI32Const(bias_width_bytes));
     auto src_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), src_rel_addr);

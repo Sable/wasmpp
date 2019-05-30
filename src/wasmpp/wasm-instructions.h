@@ -14,8 +14,10 @@ wabt::ExprList* ExprToExprList(std::unique_ptr<wabt::Expr> expr);
 void Merge(wabt::ExprList* e1, wabt::ExprList* e2);
 
 // Make block expressions
-wabt::ExprList* MakeLoop(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
-wabt::ExprList* MakeBlock(LabelManager* label_manager, std::function<void(BlockBody, wabt::Var)> content);
+wabt::ExprList* MakeLoop(LabelManager* label_manager, wabt::FuncSignature sig,
+                         std::function<void(BlockBody, wabt::Var)> content);
+wabt::ExprList* MakeBlock(LabelManager* label_manager, wabt::FuncSignature sig,
+                          std::function<void(BlockBody, wabt::Var)> content);
 wabt::ExprList* MakeIf(LabelManager* label_manager, wabt::ExprList* cond, wabt::FuncSignature sig,
                        std::function<void(BlockBody, wabt::Var)> true_content,
                        std::function<void(BlockBody)> false_content = {});

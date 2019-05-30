@@ -20,7 +20,7 @@ namespace wasmpp {
 //   br_if {label}
 //   end
 wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, uint32_t end, uint32_t inc,
-                             std::function<void(BlockBody*)> content);
+                                  wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
 
 // Generate
 //   get_local {var}

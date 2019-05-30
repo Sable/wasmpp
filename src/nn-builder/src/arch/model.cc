@@ -295,7 +295,7 @@ void Model::Train(){
       // Start training timer
       f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     }
-    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, [&](BlockBody* b) {
+    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b) {
       for(int t=0; t < training_.size(); ++t) {
         // Copy training data into the first layer
         b->Insert(snippet::MatrixCopy(f.Label(), training_[t], layers_.front()->A, {vi32_1, vi32_2}));
