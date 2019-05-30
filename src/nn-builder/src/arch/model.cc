@@ -38,11 +38,6 @@ void Model::AddLayer(Layer* layer) {
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
   InitImports();
   InitDefinitions();
-  if(options.use_f32) {
-    value_type_ = Type::F32;
-  } else {
-    value_type_ = Type::F64;
-  }
 }
 
 Model::~Model() {

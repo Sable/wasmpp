@@ -63,7 +63,6 @@ int main(int argc, char *argv[]) {
   ModelOptions options;
   options.log_training_error = true;
   options.log_training_time = true;
-  options.use_f32 = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Linear()),

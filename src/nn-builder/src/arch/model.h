@@ -20,7 +20,6 @@ struct LayerMeta;
 struct ModelOptions {
   bool log_training_error = false;
   bool log_training_time = false;
-  bool use_f32 = false;
   builtins::ActivationOptions activation_options;
 };
 class Model {
@@ -67,7 +66,6 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
-  wabt::Type ValueType() const { return value_type_; }
 
   void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
              std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);

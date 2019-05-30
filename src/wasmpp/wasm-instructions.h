@@ -28,8 +28,6 @@ wabt::ExprList* MakeUnary(wabt::Opcode opcode, wabt::ExprList* op);
 wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprList* op2);
 
 // Make constants
-
-wabt::ExprList* MakeFloatConst(wabt::Type type, double val);
 wabt::ExprList* MakeI32Const(uint32_t val);
 wabt::ExprList* MakeI64Const(uint64_t val);
 wabt::ExprList* MakeF32Const(float val);
