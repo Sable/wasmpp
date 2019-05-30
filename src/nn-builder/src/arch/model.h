@@ -17,10 +17,10 @@ namespace nn {
 namespace arch {
 
 struct LayerMeta;
-struct ModelMeta;
 struct ModelOptions {
   bool log_training_error = false;
   bool log_training_time = false;
+  bool use_f32 = false;
   builtins::ActivationOptions activation_options;
 };
 class Model {
@@ -35,6 +35,7 @@ private:
   uint32_t batch_size_;
   double learning_rate_;
   builtins::LossFunction loss_;
+  wabt::Type value_type_;
 
   // Builtin functions
   struct Builtins {
@@ -66,6 +67,8 @@ public:
   void AddLayer(Layer* layer);
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
+  wabt::Type ValueType() const { return value_type_; }
+
   void Setup(uint32_t epochs, uint32_t batch_size, double learning_rate, builtins::LossFunction loss,
              std::vector<std::vector<double>> input, std::vector<std::vector<double>> labels);
   void Train();

@@ -82,6 +82,30 @@ wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprL
   return e;
 }
 
+wabt::ExprList* MakeFloatConst(wabt::Type type, double val) {
+  if(type == wabt::Type::F32) {
+    // check for overflow
+    float f_val = (float) val;
+    assert(f_val == val);
+    return MakeF32Const(f_val);
+  } else if(type == wabt::Type::F64) {
+    return MakeF64Const(val);
+  }
+  assert(!"Wrong use of MakeFloatConst");
+}
+
+wabt::ExprList* MakeIntegerConst(wabt::Type type, uint64_t val) {
+  if(type == wabt::Type::F32) {
+    // check for overflow
+    float f_val = (float) val;
+    assert(f_val == val);
+    return MakeF32Const(f_val);
+  } else if(type == wabt::Type::F64) {
+    return MakeF64Const(val);
+  }
+  assert(!"Wrong use of MakeFloatConst");
+}
+
 wabt::ExprList* MakeI32Const(uint32_t val) {
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::I32(val)));
 }

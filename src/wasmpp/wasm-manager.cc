@@ -24,8 +24,7 @@ ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr
   expr_list_ = expr_list;
 }
 
-Memory::Memory(uint64_t begin, uint64_t end, MemoryType type) {
-  type_ = type;
+Memory::Memory(uint64_t begin, uint64_t end) {
   begin_ = begin;
   end_ = end;
 
@@ -54,7 +53,7 @@ Memory* MemoryManager::Allocate(uint64_t k) {
     }
     start = memories_[i]->End();
   }
-  auto memory = new Memory{start, start + k, type_};
+  auto memory = new Memory{start, start + k};
   memories_.insert(memories_.begin() + i, memory);
   return memory;
 }

@@ -2,6 +2,7 @@
 #define WASM_WASM_INSTRUCTIONS_H_
 
 #include <src/ir.h>
+#include <src/wasmpp/common.h>
 
 namespace wasmpp {
 
@@ -28,6 +29,7 @@ wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprL
 
 // Make constants
 
+wabt::ExprList* MakeFloatConst(wabt::Type type, double val);
 wabt::ExprList* MakeI32Const(uint32_t val);
 wabt::ExprList* MakeI64Const(uint64_t val);
 wabt::ExprList* MakeF32Const(float val);

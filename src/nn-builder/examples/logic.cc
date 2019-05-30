@@ -63,6 +63,7 @@ int main(int argc, char *argv[]) {
   ModelOptions options;
   options.log_training_error = true;
   options.log_training_time = true;
+  options.use_f32 = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Linear()),
@@ -84,7 +85,7 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 100000;
+  uint32_t epoch = 10;
   uint32_t batch = 1;
   double learning_rate = 0.01;
   model.Setup(epoch, batch, learning_rate, model.Builtins().loss.MeanSquaredError(), train, labels);

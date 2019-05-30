@@ -35,10 +35,14 @@ void Model::AddLayer(Layer* layer) {
   layers_.push_back(new LayerMeta(layer));
 }
 
-Model::Model(ModelOptions options) : module_manager_({MemoryType::WASM32}),  options_(options),
-                                     builtins_(options_.activation_options) {
+Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
   InitImports();
   InitDefinitions();
+  if(options.use_f32) {
+    value_type_ = Type::F32;
+  } else {
+    value_type_ = Type::F64;
+  }
 }
 
 Model::~Model() {
