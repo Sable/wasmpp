@@ -10,13 +10,13 @@ namespace wasmpp {
 
 class Memory {
 public:
-  Memory(uint64_t begin, uint64_t end);
-  uint64_t Bytes() const { return end_ - begin_; }
-  uint64_t Begin() const { return begin_; }
-  uint64_t End() const { return end_; }
+  Memory(uint32_t begin, uint32_t end);
+  uint32_t Bytes() const { return end_ - begin_; }
+  uint32_t Begin() const { return begin_; }
+  uint32_t End() const { return end_; }
 private:
-  uint64_t begin_;
-  uint64_t end_;
+  uint32_t begin_;
+  uint32_t end_;
 };
 
 class MemoryManager {
@@ -25,9 +25,9 @@ private:
 public:
   ~MemoryManager();
   // Allocate memory
-  Memory* Allocate(uint64_t k);
+  Memory* Allocate(uint32_t k);
   bool Free(const Memory* m);
-  uint64_t Pages();
+  uint32_t Pages();
 };
 
 class ContentManager {
@@ -109,7 +109,7 @@ public:
   wabt::Var MakeFunction(const char* name, wabt::FuncSignature sig, wabt::TypeVector locals,
                            std::function<void(FuncBody, std::vector<wabt::Var>, std::vector<wabt::Var>)> content);
   wabt::Var MakeFuncImport(std::string module, std::string function, wabt::FuncSignature sig);
-  wabt::Var MakeMemory(uint64_t init_page, uint64_t max = 0, bool shared = false);
+  wabt::Var MakeMemory(uint32_t init_page, uint32_t max = 0, bool shared = false);
   void MakeData(wabt::Var var, uint32_t index, std::vector<DataEntry> entries);
   void MakeMemoryExport(std::string name, wabt::Var var);
 };

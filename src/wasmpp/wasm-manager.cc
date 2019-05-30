@@ -24,7 +24,7 @@ ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr
   expr_list_ = expr_list;
 }
 
-Memory::Memory(uint64_t begin, uint64_t end) {
+Memory::Memory(uint32_t begin, uint32_t end) {
   begin_ = begin;
   end_ = end;
 
@@ -37,15 +37,15 @@ MemoryManager::~MemoryManager() {
   }
 }
 
-uint64_t MemoryManager::Pages() {
+uint32_t MemoryManager::Pages() {
   if(memories_.empty()) return 0;
-  uint64_t val = memories_.back()->End() / WABT_PAGE_SIZE;
+  uint32_t val = memories_.back()->End() / WABT_PAGE_SIZE;
   return val * WABT_PAGE_SIZE == memories_.back()->End() ? val : val + 1;
 }
 
-Memory* MemoryManager::Allocate(uint64_t k) {
+Memory* MemoryManager::Allocate(uint32_t k) {
   ERROR_UNLESS(k > 0, "k must be positive");
-  uint64_t start = 0;
+  uint32_t start = 0;
   size_t i;
   for(i=0; i < memories_.size(); i++) {
     if(memories_[i]->Begin() - start >= k) {
@@ -190,7 +190,7 @@ wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function
   return import_name;
 }
 
-wabt::Var ModuleManager::MakeMemory(uint64_t init_page, uint64_t max, bool shared) {
+wabt::Var ModuleManager::MakeMemory(uint32_t init_page, uint32_t max, bool shared) {
   wabt::Var memory_name(label_manager_.Next());
   auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());
   field->memory.page_limits.initial = init_page;

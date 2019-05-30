@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
   }
 
   ModelOptions options;
-  options.log_training_error = false;
+  options.log_training_error = true;
   options.log_training_time = true;
   Model model(options);
   model.SetLayers({
@@ -84,10 +84,10 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 1000000;
+  uint32_t epoch = 100000;
   uint32_t batch = 1;
   float learning_rate = 0.01;
-  model.Setup(epoch, batch, learning_rate, model.Builtins().loss.CrossEntropy(), train, labels);
+  model.Setup(epoch, batch, learning_rate, model.Builtins().loss.MeanSquaredError(), train, labels);
   model.Train();
 
   assert(model.Validate());

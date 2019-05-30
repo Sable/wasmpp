@@ -5,7 +5,7 @@
 namespace nn {
 namespace ds {
 
-NDArray::NDArray(wasmpp::Memory *memory, std::vector<uint64_t> shape, uint64_t unit_size) {
+NDArray::NDArray(wasmpp::Memory *memory, std::vector<uint32_t> shape, uint32_t unit_size) {
   ERROR_UNLESS(memory != nullptr, "memory cannot be null");
   ERROR_UNLESS(unit_size > 0, "unit size cannot be null");
   ERROR_UNLESS(unit_size <= memory->Bytes(), "unit size cannot be greater than the number of bytes");
@@ -15,9 +15,9 @@ NDArray::NDArray(wasmpp::Memory *memory, std::vector<uint64_t> shape, uint64_t u
   Reshape(shape);
 }
 
-uint64_t NDArray::GetLinearIndex(std::vector<uint64_t> index) const {
+uint32_t NDArray::GetLinearIndex(std::vector<uint32_t> index) const {
   ERROR_UNLESS(index.size() == shape_.size(), "wrong index shape");
-  uint64_t lindex = memory_->Begin();
+  uint32_t lindex = memory_->Begin();
   for(int i = 0; i < index.size(); i++) {
     ERROR_UNLESS(index[i] < shape_[i], "index out of bound in shape at position %d", i);
     lindex += index[i] * shape_mul_[i];
@@ -27,10 +27,10 @@ uint64_t NDArray::GetLinearIndex(std::vector<uint64_t> index) const {
   return lindex;
 }
 
-void NDArray::Reshape(std::vector<uint64_t> shape) {
+void NDArray::Reshape(std::vector<uint32_t> shape) {
   ERROR_UNLESS(!shape.empty(), "shape cannot be empty");
   ERROR_UNLESS(memory_ != nullptr, "memory cannot be null");
-  uint64_t total = unit_size_;
+  uint32_t total = unit_size_;
   for(auto val : shape) {
     total *= val;
   }

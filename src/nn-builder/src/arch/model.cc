@@ -117,11 +117,11 @@ void Model::AllocateInput(std::vector<std::vector<float>> input, std::vector<std
   for(uint32_t b=0; b < input.size(); b += batch_size_) {
     // Training data
     ds::NDArray* training_array = nullptr;
-    ALLOCATE_MEMORY(training_array, input[0].size(), batch_size_);
+    ALLOCATE_MEMORY(training_array, (uint32_t) input[0].size(), batch_size_);
     training_.push_back(training_array);
     // Training labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MEMORY(labels_array, labels[0].size(), batch_size_);
+    ALLOCATE_MEMORY(labels_array, (uint32_t) labels[0].size(), batch_size_);
     labels_.push_back(labels_array);
   }
 }

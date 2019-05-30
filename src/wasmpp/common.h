@@ -29,12 +29,6 @@ const uint32_t WASMPP_V128_SIZE = 16;
 
 // Size of types
 uint32_t TypeSize(wabt::Type type);
-
-enum MemoryType {
-  WASM32,
-  WASM64
-};
-
 }
 
 #endif
