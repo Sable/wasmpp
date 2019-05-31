@@ -205,7 +205,7 @@ void Model::MakeBiasData(wabt::Var memory) {
   // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.2));
+    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
     module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
@@ -446,7 +446,7 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
       if(options_.log_training_error) {
         // Log training error
         b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
-        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(cost_mean)}));
+        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(epoch), MakeLocalGet(cost_mean)}));
       }
     }));
 
