@@ -60,21 +60,9 @@ void InitParams(int argc, char *argv[]) {
   }
 }
 
-int main(int argc, char *argv[]) {
-  InitParams(argc, argv);
-
-  if((!FLAG_to_wat && !FLAG_to_wasm) || output_file.empty() || mnist_train.empty()) {
-    PrintUsage();
-    exit(0);
-  }
-
-  // Load csv file
-  int training_limit = 1000;
-  int testing_limit = 100;
-  std::vector<std::vector<float>> train_data;
-  std::vector<std::vector<float>> train_labels;
-  std::vector<std::vector<float>> test_data;
-  std::vector<std::vector<float>> test_labels;
+void LoadValues(std::vector<std::vector<float>> &train_data, std::vector<std::vector<float>> &train_labels,
+                std::vector<std::vector<float>> &test_data, std::vector<std::vector<float>> &test_labels,
+                uint32_t training_limit, uint32_t testing_limit) {
   std::ifstream mnist_train_file(mnist_train);
   if (mnist_train_file.is_open()) {
     std::string line;
@@ -112,12 +100,31 @@ int main(int argc, char *argv[]) {
   } else {
     ERROR_EXIT("Error opening file: '%s'", mnist_train.c_str());
   }
+}
+
+int main(int argc, char *argv[]) {
+  InitParams(argc, argv);
+
+  if((!FLAG_to_wat && !FLAG_to_wasm) || output_file.empty() || mnist_train.empty()) {
+    PrintUsage();
+    exit(0);
+  }
+
+  // Load csv file
+  uint32_t training_limit = 100;
+  uint32_t testing_limit = 10;
+  std::vector<std::vector<float>> train_data;
+  std::vector<std::vector<float>> train_labels;
+  std::vector<std::vector<float>> test_data;
+  std::vector<std::vector<float>> test_labels;
+  LoadValues(train_data, train_labels, test_data, test_labels, training_limit, testing_limit);
 
   ModelOptions options;
   options.log_training_error = true;
   options.log_training_time = true;
   options.log_testing_error = true;
   options.log_testing_time = true;
+  options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid()),
@@ -127,7 +134,7 @@ int main(int argc, char *argv[]) {
 
   uint32_t epoch = 1;
   uint32_t batch = 1;
-  float learning_rate = 0.1;
+  float learning_rate = 0.01;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train_data, train_labels);
