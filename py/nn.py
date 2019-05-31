@@ -12,6 +12,8 @@ class Model:
     dB = []
     T = 0
     alpha = 0.01
+    Cost = 0
+    Conf_matrix = 0
 
     def sigmoid(self, x, prime):
         if prime:
@@ -19,18 +21,27 @@ class Model:
             return s * (1 - s)
         return 1 / (1 + np.exp(-x))
 
-    activation = sigmoid
 
     def mse(self, t, p, prime):
         if prime:
             return p - t
         return 0.5 * (t - p)**2
 
-    loss = mse
+    def cost_function(self):
+        cost = self.loss(self.T, self.A[-1], False)
+        return cost.mean()
 
-    def build(self, model, alpha):
+    def confusion_matrix(self):
+        pred = np.argmax(self.A[-1], axis=0)[0]
+        real = np.argmax(self.T, axis=0)[0]
+        self.Conf_matrix[real][pred] += 1
+
+    def build(self, model, acts, loss, alpha):
         self.model = model
         self.alpha = alpha
+        self.acts = acts
+        self.loss = loss
+        self.Conf_matrix = np.zeros(shape=(model[-1], model[-1]))
         prev = 1
         for i in range(0, len(model)):
             self.A.append(np.zeros(shape=(model[i],1)))
@@ -52,14 +63,14 @@ class Model:
             # Z[l] = W[l] . A[l-1] + B[l]
             self.Z[l] = self.W[l].dot(self.A[l-1]) + self.B[l]
             # A[l] = g(Z[l])
-            self.A[l] = self.activation(self.Z[l], False)
+            self.A[l] = self.acts[l](self.Z[l], False)
         # dA[L] = Loss(T, A[L])
-        self.dA[len(self.model)-1] = self.loss(self.T, self.A[len(self.model)-1], True)
+        self.dA[-1] = self.loss(self.T, self.A[-1], True)
 
     def backward(self):
         for l in range(len(self.model)-1, 0, -1):
             # dZ[l] = dA[l] * g'(Z[l])
-            self.dZ[l] = self.dA[l] * self.activation(self.Z[l], True)
+            self.dZ[l] = self.dA[l] * self.acts[l](self.Z[l], True)
             # dW[l] = (1/m) dZ[l] . A[l-1]^T
             self.dW[l] = (1/1) * (self.dZ[l].dot(self.A[l-1].T))
             # dB[l] = (1/m) dZ[l]
@@ -70,30 +81,3 @@ class Model:
             self.W[l] = self.W[l] - (self.alpha * self.dW[l])
             # B[l] = B[l] - alpha * dB[l]
             self.B[l] = self.B[l] - (self.alpha * self.dB[l])
-
-train = [[0,0],
-        [0,1],
-        [1,0],
-        [1,1]]
-
-train_label = [[1,0],
-        [0,1],
-        [0,1],
-        [0,1]]
-
-m = Model()
-model = [2, 2, 2]
-alpha = 0.01
-epoch = 10000
-
-m.build(model, alpha)
-for e in range(0, epoch):
-    for i in range(0, len(train)):
-        m.copy_input(train[i], train_label[i])
-        m.forward()
-        m.backward()
-
-for i in range(0, len(train)):
-    m.copy_input(train[i], train_label[i])
-    m.forward()
-    print tabulate(m.A[len(m.A)-1])
