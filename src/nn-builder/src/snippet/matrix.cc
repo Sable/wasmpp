@@ -288,57 +288,44 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
 }
 
 // TODO Optimize this function
-wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
+wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src,
                                    std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager)
   MATRIX_CHECK(src);
-  MATRIX_CHECK(dst);
-  MATRIX_SAME_SHAPE(src, dst);
-  assert(locals.size() == 3);
+  assert(locals.size() == 4);
 
   auto row = locals[0];
-  auto col = locals[1];
+  auto src_col_offset = locals[1];
   auto max = locals[2];
+  auto curr = locals[3];
 
   uint32_t type_size = TypeSize(Type::F32);
+  uint32_t width = src->Shape()[1] * type_size;
+  uint32_t height = src->Shape()[0] * width;
+  uint32_t col_begin = src->Memory()->Begin();
+  uint32_t col_end = col_begin + width;
 
   wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, GenerateRangeLoop(label_manager, col, 0, dst->Shape()[1], 1, {}, [&](BlockBody* b1) {
-    b1->Insert(MakeLocalSet(max, MakeI32Const(0)));
-    b1->Insert(GenerateRangeLoop(label_manager, row, 1, dst->Shape()[0], 1, {}, [&](BlockBody* b2) {
-      auto max_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
-                                MakeBinary(Opcode::I32Mul, MakeLocalGet(max),
-                                           MakeI32Const(src->Shape()[1] * type_size)));
-      auto max_index = MakeBinary(Opcode::I32Add, max_row,
-                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
-      auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
-                                MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
-                                           MakeI32Const(src->Shape()[1] * type_size)));
-      auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
-                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
-      auto cond = MakeBinary(Opcode::F32Ge, MakeF32Load(cur_index), MakeF32Load(max_index));
+  Merge(e, GenerateRangeLoop(label_manager, src_col_offset, col_begin, col_end, type_size, {}, [&](BlockBody* b1) {
+    // Find max
+    b1->Insert(MakeLocalSet(max, MakeLocalGet(src_col_offset)));
+    b1->Insert(GenerateRangeLoop(label_manager, row, width, height, width, {}, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
+      auto cond = MakeBinary(Opcode::F32Ge, MakeF32Load(MakeLocalGet(curr)), MakeF32Load(MakeLocalGet(max)));
       auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
-        t.Insert(MakeLocalSet(max, MakeLocalGet(row)));
+        t.Insert(MakeLocalSet(max, MakeLocalGet(curr)));
       });
       b2->Insert(comp);
     }));
 
-    b1->Insert(GenerateRangeLoop(label_manager, row, 0, dst->Shape()[0], 1, {}, [&](BlockBody* b2) {
-      auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(max), MakeLocalGet(row));
+    // Place 1 in max and 0 in rest
+    b1->Insert(GenerateRangeLoop(label_manager, row, 0, height, width, {}, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
+      auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(curr), MakeLocalGet(max));
       auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
-        auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
-                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
-                                             MakeI32Const(src->Shape()[1] * type_size)));
-        auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
-                                    MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
-        t.Insert(MakeF32Store(cur_index, MakeF32Const(1)));
+        t.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(1)));
       }, [&](BlockBody f) {
-        auto cur_row = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()),
-                                  MakeBinary(Opcode::I32Mul, MakeLocalGet(row),
-                                             MakeI32Const(src->Shape()[1] * type_size)));
-        auto cur_index = MakeBinary(Opcode::I32Add, cur_row,
-                                    MakeBinary(Opcode::I32Mul, MakeLocalGet(col), MakeI32Const(type_size)));
-        f.Insert(MakeF32Store(cur_index, MakeF32Const(0)));
+        f.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(0)));
       });
       b2->Insert(comp);
     }));

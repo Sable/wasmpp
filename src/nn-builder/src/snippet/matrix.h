@@ -75,7 +75,7 @@ wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src
 wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias,
                                     std::vector<wabt::Var> locals);
 // Apply argmax on each matrix column
-wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
+wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src,
                                     std::vector<wabt::Var> locals);
 
 // Get the mean of all matrix cells

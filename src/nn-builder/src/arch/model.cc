@@ -79,8 +79,8 @@ void Model::InitDefinitions() {
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \
                             {rows, cols}, TypeSize(Type::F32));
 
-#define PRINT_TABLE(table)                              \
-  f.Insert(MakeCall(builtins_.system.PrintTableF32(), { \
+#define PRINT_TABLE(f, table)                              \
+  (f).Insert(MakeCall(builtins_.system.PrintTableF32(), { \
       MakeI32Const((table)->Memory()->Begin()),         \
       MakeI32Const((table)->Shape()[0]),                \
       MakeI32Const((table)->Shape()[1])                 \
@@ -303,6 +303,58 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
+wabt::Var Model::GenerateConfusionMatrixFunction() {
+  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  return module_manager_.MakeFunction("confusion_matrix_function", {{Type::I32}, {}}, locals,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    auto col = locals[0];
+    auto row = locals[1];
+    auto rel_row = locals[2];
+    auto vi32_1 = locals[3];
+    auto vi32_2 = locals[4];
+    auto vi32_3 = locals[5];
+    auto vi32_4 = locals[6];
+    auto x = vi32_1;
+    auto y = vi32_2;
+    auto offset = vi32_3;
+
+    auto label_begin = params[0];
+
+    auto A = layers_.back()->A;
+    uint32_t type_size = TypeSize(Type::F32);
+    uint32_t A_width = A->Shape()[1] * type_size;
+    uint32_t A_height = A->Shape()[0] * A_width;
+
+    f.Insert(snippet::MatrixColumnArgmax(f.Label(), A, {vi32_1, vi32_2, vi32_3, vi32_4}));
+    f.Insert(GenerateRangeLoop(f.Label(), col, 0, A_width, type_size, {}, [&](BlockBody* b1) {
+      // Find 1 in both A and target
+      b1->Insert(MakeLocalSet(rel_row, MakeI32Const(0)));
+      b1->Insert(GenerateRangeLoop(f.Label(), row, 0, A_height, A_width, {}, [&](BlockBody* b2) {
+        b2->Insert(MakeLocalSet(offset, MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeLocalGet(row))));
+        auto label_cur = MakeBinary(Opcode::I32Add, MakeLocalGet(offset), MakeLocalGet(label_begin));
+        auto A_cur = MakeBinary(Opcode::I32Add, MakeLocalGet(offset), MakeI32Const(A->Memory()->Begin()));
+        b2->Insert(MakeIf(f.Label(), MakeBinary(Opcode::F32Eq, MakeF32Load(label_cur), MakeF32Const(1)), {},
+                          [&](BlockBody t, Var label) {
+          t.Insert(MakeLocalSet(y, MakeLocalGet(rel_row)));
+        }));
+        b2->Insert(MakeIf(f.Label(), MakeBinary(Opcode::F32Eq, MakeF32Load(A_cur), MakeF32Const(1)), {},
+                          [&](BlockBody t, Var label) {
+          t.Insert(MakeLocalSet(x, MakeLocalGet(rel_row)));
+        }));
+        b2->Insert(GenerateCompoundAssignment(rel_row, Opcode::I32Add, MakeI32Const(type_size)));
+      }));
+
+      // Add 1 in confusion matrix
+      auto cm_y = MakeBinary(Opcode::I32Mul, MakeLocalGet(y), MakeI32Const(confusion_matrix_->Shape()[0]));
+      b1->Insert(MakeLocalSet(offset, MakeBinary(Opcode::I32Add, MakeLocalGet(x), cm_y)));
+      b1->Insert(GenerateCompoundAssignment(offset, Opcode::I32Add, MakeI32Const(confusion_matrix_->Memory()->Begin())));
+      b1->Insert(MakeF32Store(MakeLocalGet(offset), MakeBinary(Opcode::F32Add, MakeF32Load(MakeLocalGet(offset)),
+                                                             MakeF32Const(1))));
+    }));
+    PRINT_TABLE(f, layers_.back()->A);
+  });
+}
+
 wabt::Var Model::GenerateCostFunction() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("cost_function", {{Type::I32},{Type::F32}}, locals,
@@ -339,6 +391,7 @@ void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins
   forward_ = GenerateFeedForward();
   backward_ = GenerateBackpropagation();
   cost_func_ = GenerateCostFunction();
+  confusion_matrix_func_ = GenerateConfusionMatrixFunction();
 }
 
 void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float>> &input,
@@ -403,13 +456,6 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
       f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
       f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
     }
-
-    // Test on training data (for debugging)
-    for(int t=0; t < training_.size(); ++t) {
-      f.Insert(MakeCall(forward_, {MakeI32Const(training_[t]->Memory()->Begin()),
-                                   MakeI32Const(training_labels_[t]->Memory()->Begin())}));
-      PRINT_TABLE(layers_.back()->A)
-    }
   });
 }
 
@@ -455,6 +501,11 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
         b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
       }
 
+      if(options_.log_testing_confusion_matrix) {
+        // Update confusion matrix
+        b1->Insert(MakeCall(confusion_matrix_func_, {MakeLocalGet(label_addr)}));
+      }
+
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
     }));
 
@@ -472,7 +523,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
     if(options_.log_testing_confusion_matrix) {
       // Log confusion matrix
-      PRINT_TABLE(confusion_matrix_);
+      PRINT_TABLE(f, confusion_matrix_);
     }
   });
 }

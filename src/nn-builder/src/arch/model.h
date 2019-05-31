@@ -38,6 +38,7 @@ private:
   wabt::Var forward_;
   wabt::Var backward_;
   wabt::Var cost_func_;
+  wabt::Var confusion_matrix_func_;
 
   // Model feature arrays
   ds::NDArray* true_matrix_ = nullptr;
@@ -81,6 +82,7 @@ private:
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
   wabt::Var GenerateCostFunction();
+  wabt::Var GenerateConfusionMatrixFunction();
 public:
   Model(ModelOptions options);
   ~Model();
