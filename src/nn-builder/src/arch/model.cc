@@ -502,6 +502,8 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
       if(options_.log_testing_confusion_matrix) {
         // Update confusion matrix
+        // Note: Call Confusion matrix function
+        // will alter the values of A[L]
         b1->Insert(MakeCall(confusion_matrix_func_, {MakeLocalGet(label_addr)}));
       }
 

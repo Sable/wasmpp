@@ -68,8 +68,8 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(2, model.Builtins().activation.Linear()),
-     new FullyConnectedLayer(2, model.Builtins().activation.ELU()),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
   });
 
