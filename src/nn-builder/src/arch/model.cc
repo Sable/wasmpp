@@ -106,9 +106,7 @@ void Model::AllocateLayers() {
     }
     if(l == layers_.size() - 1) {
       ALLOCATE_MEMORY(layers_[l]->T, layers_[l]->layer->Nodes(), batch_size_);
-      if(options_.log_training_error) {
-        ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
-      }
+      ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
     }
   }
 }
@@ -129,6 +127,25 @@ void Model::AllocateTraining() {
     ds::NDArray* labels_array = nullptr;
     ALLOCATE_MEMORY(labels_array, (uint32_t) training_labels_vals_[0].size(), batch_size_);
     training_labels_.push_back(labels_array);
+  }
+}
+
+void Model::AllocateTest() {
+  // Do not merge loops so that all
+  // test data are consecutive in memory
+
+  for(uint32_t b=0; b < testing_vals_.size(); b += batch_size_) {
+    // Testing data
+    ds::NDArray* testing_array = nullptr;
+    ALLOCATE_MEMORY(testing_array, (uint32_t) testing_vals_[0].size(), batch_size_);
+    testing_.push_back(testing_array);
+  }
+
+  for(uint32_t b=0; b < testing_labels_vals_.size(); b += batch_size_) {
+    // Testing labels
+    ds::NDArray* labels_array = nullptr;
+    ALLOCATE_MEMORY(labels_array, (uint32_t) testing_labels_vals_[0].size(), batch_size_);
+    testing_labels_.push_back(labels_array);
   }
 }
 
@@ -159,7 +176,25 @@ void Model::MakeTrainingData(wabt::Var memory) {
   }
 }
 
+void Model::MakeTestingData(wabt::Var memory) {
+  for(uint32_t i=0; i < testing_vals_.size(); ++i) {
+    // Testing data
+    auto testing_begin = testing_vals_.begin() + (i * batch_size_);
+    std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + batch_size_);
+    module_manager_.MakeData(memory, testing_[i]->Memory()->Begin(), MakeTransposeData(testing_[i], sub_input));
+  }
+
+  for(uint32_t i=0; i < testing_labels_vals_.size(); ++i) {
+    // Testing labels
+    auto labels_begin = testing_labels_vals_.begin() + (i * batch_size_);
+    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
+    module_manager_.MakeData(memory, testing_labels_[i]->Memory()->Begin(),
+                             MakeTransposeData(testing_labels_[i], sub_labels));
+  }
+}
+
 void Model::MakeWeightData(wabt::Var memory) {
+  // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
     std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
@@ -168,6 +203,7 @@ void Model::MakeWeightData(wabt::Var memory) {
 }
 
 void Model::MakeBiasData(wabt::Var memory) {
+  // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
     std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.2));
@@ -177,8 +213,8 @@ void Model::MakeBiasData(wabt::Var memory) {
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("forward", {{Type::I32},{}}, locals_types, [&](FuncBody f, std::vector<Var> params,
-                                                                           std::vector<Var> locals) {
+  return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32},{}}, locals_types,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -187,6 +223,7 @@ Var Model::GenerateFeedForward() {
     auto vf32_1 = locals[5];
 
     auto input_begin = params[0];
+    auto target_begin = params[1];
 
     for(int l=1; l < layers_.size(); ++l) {
       // Z[l] = W[l] . A[l-1] + B[l]
@@ -201,12 +238,16 @@ Var Model::GenerateFeedForward() {
       f.Insert(snippet::MatrixActivation(f.Label(), snippet::Mat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
           layers_[l]->A, {vi32_1, vi32_2}, false));
     }
+
+    // dA[L] = Loss(T[L], A[L])
+    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
+                                 snippet::Mat(layers_.back()->A), loss_, layers_.back()->dA, {vi32_1, vi32_2}, true));
   });
 }
 
 wabt::Var Model::GenerateBackpropagation() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("backward", {{Type::I32, Type::I32},{}}, locals_type,
+  return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
@@ -216,11 +257,6 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vf32_1 = locals[5];
 
     auto input_begin = params[0];
-    auto target_begin = params[1];
-
-    // dA[L] = Loss(T[L], A[L])
-    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
-                                 snippet::Mat(layers_.back()->A), loss_, layers_.back()->dA, {vi32_1, vi32_2}, true));
 
     for(auto l = layers_.size()-1; l > 0; --l) {
        // dZ[l] = dA[l] * g'(Z[l])
@@ -290,6 +326,7 @@ void Model::CompileDone() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
   MakeTrainingData(memory);
+  MakeTestingData(memory);
   MakeWeightData(memory);
   MakeBiasData(memory);
 }
@@ -302,18 +339,17 @@ void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins
   AllocateLayers();
   forward_ = GenerateFeedForward();
   backward_ = GenerateBackpropagation();
-  if(options_.log_training_error) {
-    cost_func_ = GenerateCostFunction();
-  }
+  cost_func_ = GenerateCostFunction();
 }
 
 void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float>> &input,
                             const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
-  ERROR_UNLESS(batch_size_ <= input.size(), "batch size must be at most equal to the input size");
-  ERROR_UNLESS(input.size() % batch_size_ == 0, "batch size must be a multiple of the input size");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
+
+  // FIXME Add zero padding for unaligned batches
+  assert(batch_size_ == 1);
 
   training_vals_ = input;
   training_labels_vals_ = labels;
@@ -344,8 +380,8 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Apply neural network algorithms
-        b2->Insert(MakeCall(forward_, { MakeLocalGet(train_addr)}));
-        b2->Insert(MakeCall(backward_, {MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
+        b2->Insert(MakeCall(forward_, { MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
+        b2->Insert(MakeCall(backward_, {MakeLocalGet(train_addr)}));
 
         if(options_.log_training_error) {
           // Compute training error
@@ -371,8 +407,68 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
 
     // Test on training data (for debugging)
     for(int t=0; t < training_.size(); ++t) {
-      f.Insert(MakeCall(forward_, {MakeI32Const(training_[t]->Memory()->Begin())}));
+      f.Insert(MakeCall(forward_, {MakeI32Const(training_[t]->Memory()->Begin()),
+                                   MakeI32Const(training_labels_[t]->Memory()->Begin())}));
       PRINT_TABLE(layers_.back()->A)
+    }
+  });
+}
+
+void Model::CompileTesting(const std::vector<std::vector<float>> &input,
+                           const std::vector<std::vector<float>> &labels) {
+  ERROR_UNLESS(!input.empty(), "test input cannot be empty");
+  ERROR_UNLESS(input.size() == labels.size(), "testing and labels size should match");
+
+  // FIXME Add zero padding for unaligned batches
+  assert(batch_size_ == 1);
+
+  testing_vals_ = input;
+  testing_labels_vals_ = labels;
+  AllocateTest();
+
+  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
+  module_manager_.MakeFunction("test", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
+                                                             std::vector<Var> locals) {
+    auto time = locals[0];
+    auto cost_mean = locals[1];
+    auto test_addr = locals[2];
+    auto label_addr = locals[3];
+    auto vi32_1 = locals[4];
+    auto vi32_2 = locals[5];
+
+    auto test_begin = testing_.front()->Memory()->Begin();
+    auto test_end = testing_.back()->Memory()->End();
+    auto test_size = testing_.front()->Memory()->Bytes();
+    auto label_begin = testing_labels_.front()->Memory()->Begin();
+    auto label_size = testing_labels_.front()->Memory()->Bytes();
+
+    if(options_.log_testing_time) {
+      // Start testing timer
+      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
+    }
+    f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
+    f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
+      b1->Insert(MakeCall(forward_, { MakeLocalGet(test_addr), MakeLocalGet(label_addr)}));
+
+      if(options_.log_testing_error) {
+        // Compute testing error
+        auto call_cost = MakeCall(cost_func_, {MakeLocalGet(label_addr)});
+        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
+      }
+
+      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
+    }));
+
+    if(options_.log_testing_error) {
+      // Log testing error
+      f.Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(testing_.size())));
+      f.Insert(MakeCall(builtins_.message.LogTestingError(), {MakeLocalGet(cost_mean)}));
+    }
+
+    if(options_.log_testing_time) {
+      // Log testing time
+      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
+      f.Insert(MakeCall(builtins_.message.LogTestingTime(), {MakeLocalGet(time)}));
     }
   });
 }

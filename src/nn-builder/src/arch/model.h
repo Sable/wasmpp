@@ -20,6 +20,8 @@ struct LayerMeta;
 struct ModelOptions {
   bool log_training_error = false;
   bool log_training_time = false;
+  bool log_testing_error = false;
+  bool log_testing_time = false;
   builtins::ActivationOptions activation_options;
 };
 class Model {
@@ -43,10 +45,10 @@ private:
   std::vector<std::vector<float>> training_labels_vals_;
 
   // Test data
-  std::vector<ds::NDArray*> test_;
-  std::vector<ds::NDArray*> test_labels_;
+  std::vector<ds::NDArray*> testing_;
+  std::vector<ds::NDArray*> testing_labels_;
   std::vector<std::vector<float>> testing_vals_;
-  std::vector<std::vector<float>> tests_labels_vals_;
+  std::vector<std::vector<float>> testing_labels_vals_;
 
   // Builtin functions
   struct Builtins {
@@ -64,7 +66,9 @@ private:
   // Model functions
   void AllocateLayers();
   void AllocateTraining();
+  void AllocateTest();
   void MakeTrainingData(wabt::Var memory);
+  void MakeTestingData(wabt::Var memory);
   void MakeWeightData(wabt::Var memory);
   void MakeBiasData(wabt::Var memory);
   // Generate neural network algorithms
@@ -83,8 +87,7 @@ public:
   void CompileLayers(uint32_t batch_size, float learning_rate, builtins::LossFunction loss);
   void CompileTraining(uint32_t epoch, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
-  void CompileTesting(const std::vector<std::vector<float>> &input,
-                      const std::vector<std::vector<float>> &labels);
+  void CompileTesting(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompileDone();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }

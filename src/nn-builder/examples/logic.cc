@@ -63,6 +63,8 @@ int main(int argc, char *argv[]) {
   ModelOptions options;
   options.log_training_error = true;
   options.log_training_time = true;
+  options.log_testing_error = true;
+  options.log_testing_time = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Linear()),
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train, labels);
-//  model.CompileTesting()
+  model.CompileTesting(train, labels);
   model.CompileDone();
 
   assert(model.Validate());

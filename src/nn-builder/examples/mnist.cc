@@ -69,14 +69,17 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  int LIMIT = 1000;
+  int training_limit = 1000;
+  int testing_limit = 100;
   std::vector<std::vector<float>> train_data;
   std::vector<std::vector<float>> train_labels;
+  std::vector<std::vector<float>> test_data;
+  std::vector<std::vector<float>> test_labels;
   std::ifstream mnist_train_file(mnist_train);
   if (mnist_train_file.is_open()) {
     std::string line;
     uint32_t line_num = 0;
-    while (getline(mnist_train_file, line) && train_data.size() < LIMIT) {
+    while (getline(mnist_train_file, line)) {
       std::vector<float> data;
       std::vector<float> label(10, 0);
       // Skip label line
@@ -94,15 +97,18 @@ int main(int argc, char *argv[]) {
             number = 0;
           }
         }
-        train_data.push_back(std::move(data));
-        train_labels.push_back(std::move(label));
+        if(train_data.size() < training_limit) {
+          train_data.push_back(std::move(data));
+          train_labels.push_back(std::move(label));
+        } else if(test_data.size() < testing_limit) {
+          test_data.push_back(std::move(data));
+          test_labels.push_back(std::move(label));
+        } else {
+          break;
+        }
       }
     }
     mnist_train_file.close();
-//    for(int i=0; i < train_data[0].size(); i++) {
-//      printf("%lf ", train_data[0][i]);
-//    }
-//    printf("\n");
   } else {
     ERROR_EXIT("Error opening file: '%s'", mnist_train.c_str());
   }
@@ -110,6 +116,8 @@ int main(int argc, char *argv[]) {
   ModelOptions options;
   options.log_training_error = true;
   options.log_training_time = true;
+  options.log_testing_error = true;
+  options.log_testing_time = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid()),
@@ -123,6 +131,7 @@ int main(int argc, char *argv[]) {
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train_data, train_labels);
+  model.CompileTesting(test_data, test_labels);
   model.CompileDone();
 
   assert(model.Validate());
