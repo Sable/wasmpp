@@ -351,7 +351,6 @@ wabt::Var Model::GenerateConfusionMatrixFunction() {
       b1->Insert(MakeF32Store(MakeLocalGet(offset), MakeBinary(Opcode::F32Add, MakeF32Load(MakeLocalGet(offset)),
                                                              MakeF32Const(1))));
     }));
-    PRINT_TABLE(f, layers_.back()->A);
   });
 }
 
