@@ -22,6 +22,7 @@ struct ModelOptions {
   bool log_training_time = false;
   bool log_testing_error = false;
   bool log_testing_time = false;
+  bool log_testing_confusion_matrix = false;
   builtins::ActivationOptions activation_options;
 };
 class Model {
@@ -37,6 +38,11 @@ private:
   wabt::Var forward_;
   wabt::Var backward_;
   wabt::Var cost_func_;
+
+  // Model feature arrays
+  ds::NDArray* true_matrix_ = nullptr;
+  ds::NDArray* cost_matrix_ = nullptr;
+  ds::NDArray* confusion_matrix_ = nullptr;
 
   // Training data
   std::vector<ds::NDArray*> training_;

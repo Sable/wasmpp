@@ -16,8 +16,6 @@ struct LayerMeta {
   ds::NDArray* Z = nullptr;
   ds::NDArray* A = nullptr;
   ds::NDArray* B = nullptr;
-  ds::NDArray* T = nullptr;
-  ds::NDArray* Cost = nullptr;
   // Back-propagation arrays
   ds::NDArray* dW = nullptr;
   ds::NDArray* dZ = nullptr;
@@ -105,8 +103,9 @@ void Model::AllocateLayers() {
       ALLOCATE_MEMORY(layers_[l]->dB, layers_[l]->layer->Nodes(), batch_size_);
     }
     if(l == layers_.size() - 1) {
-      ALLOCATE_MEMORY(layers_[l]->T, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->Cost, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(true_matrix_, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(cost_matrix_, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(confusion_matrix_, layers_[l]->layer->Nodes(), layers_[l]->layer->Nodes());
     }
   }
 }
@@ -240,7 +239,7 @@ Var Model::GenerateFeedForward() {
     }
 
     // dA[L] = Loss(T[L], A[L])
-    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
+    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(true_matrix_, target_begin),
                                  snippet::Mat(layers_.back()->A), loss_, layers_.back()->dA, {vi32_1, vi32_2}, true));
   });
 }
@@ -315,9 +314,9 @@ wabt::Var Model::GenerateCostFunction() {
     auto target_begin = params[0];
 
     // Compute training error
-    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(layers_.back()->T, target_begin),
-                                 snippet::Mat(layers_.back()->A), loss_, layers_.back()->Cost, {vi32_1, vi32_2}, false));
-    f.Insert(snippet::MatrixMean(f.Label(), layers_.back()->Cost, {vi32_1}, vf32_1));
+    f.Insert(snippet::MatrixLoss(f.Label(), snippet::Mat(true_matrix_, target_begin),
+                                 snippet::Mat(layers_.back()->A), loss_, cost_matrix_, {vi32_1, vi32_2}, false));
+    f.Insert(snippet::MatrixMean(f.Label(), cost_matrix_, {vi32_1}, vf32_1));
     f.Insert(MakeLocalGet(vf32_1));
   });
 }
@@ -469,6 +468,11 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
       // Log testing time
       f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
       f.Insert(MakeCall(builtins_.message.LogTestingTime(), {MakeLocalGet(time)}));
+    }
+
+    if(options_.log_testing_confusion_matrix) {
+      // Log confusion matrix
+      PRINT_TABLE(confusion_matrix_);
     }
   });
 }

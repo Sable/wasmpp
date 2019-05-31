@@ -65,6 +65,7 @@ int main(int argc, char *argv[]) {
   options.log_training_time = true;
   options.log_testing_error = true;
   options.log_testing_time = true;
+  options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(2, model.Builtins().activation.Linear()),
@@ -86,7 +87,7 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 100000;
+  uint32_t epoch = 10000;
   uint32_t batch = 1;
   float learning_rate = 0.01;
   auto loss = model.Builtins().loss.MeanSquaredError();
