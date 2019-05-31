@@ -113,22 +113,22 @@ void Model::AllocateLayers() {
   }
 }
 
-void Model::AllocateInput(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
+void Model::AllocateTraining() {
   // Do not merge loops so that all
   // training data are consecutive in memory
 
-  for(uint32_t b=0; b < input.size(); b += batch_size_) {
+  for(uint32_t b=0; b < training_vals_.size(); b += batch_size_) {
     // Training data
     ds::NDArray* training_array = nullptr;
-    ALLOCATE_MEMORY(training_array, (uint32_t) input[0].size(), batch_size_);
+    ALLOCATE_MEMORY(training_array, (uint32_t) training_vals_[0].size(), batch_size_);
     training_.push_back(training_array);
   }
 
-  for(uint32_t b=0; b < input.size(); b += batch_size_) {
+  for(uint32_t b=0; b < training_labels_vals_.size(); b += batch_size_) {
     // Training labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MEMORY(labels_array, (uint32_t) labels[0].size(), batch_size_);
-    labels_.push_back(labels_array);
+    ALLOCATE_MEMORY(labels_array, (uint32_t) training_labels_vals_[0].size(), batch_size_);
+    training_labels_.push_back(labels_array);
   }
 }
 
@@ -142,40 +142,42 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
   return entries;
 }
 
-void Model::MakeInputData(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
-  assert(training_.size() == labels_.size());
-
-  for(uint32_t i=0; i < training_.size(); ++i) {
+void Model::MakeTrainingData(wabt::Var memory) {
+  for(uint32_t i=0; i < training_vals_.size(); ++i) {
     // Training data
-    auto training_begin = input.begin() + (i * batch_size_);
+    auto training_begin = training_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size_);
-    module_manager_.MakeData(memory_, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
+    module_manager_.MakeData(memory, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
+  }
+
+  for(uint32_t i=0; i < training_labels_vals_.size(); ++i) {
     // Training labels
-    auto labels_begin = labels.begin() + (i * batch_size_);
+    auto labels_begin = training_labels_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
-    module_manager_.MakeData(memory_, labels_[i]->Memory()->Begin(), MakeTransposeData(labels_[i], sub_labels));
+    module_manager_.MakeData(memory, training_labels_[i]->Memory()->Begin(),
+                             MakeTransposeData(training_labels_[i], sub_labels));
   }
 }
 
-void Model::MakeWeightData() {
+void Model::MakeWeightData(wabt::Var memory) {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
     std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
-    module_manager_.MakeData(memory_, layers_[l]->W->Memory()->Begin(), entries);
+    module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), entries);
   }
 }
 
-void Model::MakeBiasData() {
+void Model::MakeBiasData(wabt::Var memory) {
   for(int l=1; l < layers_.size(); ++l) {
     auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
     std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.2));
-    module_manager_.MakeData(memory_, layers_[l]->B->Memory()->Begin(), entries);
+    module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), entries);
   }
 }
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("feedforward", {{Type::I32},{}}, locals_types, [&](FuncBody f, std::vector<Var> params,
+  return module_manager_.MakeFunction("forward", {{Type::I32},{}}, locals_types, [&](FuncBody f, std::vector<Var> params,
                                                                            std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
@@ -204,7 +206,7 @@ Var Model::GenerateFeedForward() {
 
 wabt::Var Model::GenerateBackpropagation() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("backpropagation", {{Type::I32, Type::I32},{}}, locals_type,
+  return module_manager_.MakeFunction("backward", {{Type::I32, Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
@@ -284,33 +286,38 @@ wabt::Var Model::GenerateCostFunction() {
   });
 }
 
-void Model::Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, builtins::LossFunction loss,
-                  std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
-  ERROR_UNLESS(training_.empty(), "cannot setup again the same model");
-  ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
-  ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
-  ERROR_UNLESS(input.size() > 0, "training input cannot be empty");
-  ERROR_UNLESS(batch_size <= input.size(), "batch size must be at most equal to the input size");
-  ERROR_UNLESS(input.size() % batch_size == 0, "batch size must be a multiple of the input size");
-  ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
+void Model::CompileDone() {
+  Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
+  module_manager_.MakeMemoryExport("memory", memory);
+  MakeTrainingData(memory);
+  MakeWeightData(memory);
+  MakeBiasData(memory);
+}
 
+void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins::LossFunction loss) {
+  ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   batch_size_ = batch_size;
-  epochs_ = epochs;
   loss_ = loss;
   learning_rate_ = learning_rate;
   AllocateLayers();
-  AllocateInput(input, labels);
-  memory_ = module_manager_.MakeMemory(module_manager_.Memory().Pages());
-  module_manager_.MakeMemoryExport("memory", memory_);
-  MakeInputData(input, labels);
-  MakeWeightData();
-  MakeBiasData();
+  forward_ = GenerateFeedForward();
+  backward_ = GenerateBackpropagation();
+  if(options_.log_training_error) {
+    cost_func_ = GenerateCostFunction();
+  }
 }
 
-void Model::Train(){
-  auto forward = GenerateFeedForward();
-  auto backword = GenerateBackpropagation();
-  Var cost_func;
+void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float>> &input,
+                            const std::vector<std::vector<float>> &labels) {
+  ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
+  ERROR_UNLESS(!input.empty(), "training input cannot be empty");
+  ERROR_UNLESS(batch_size_ <= input.size(), "batch size must be at most equal to the input size");
+  ERROR_UNLESS(input.size() % batch_size_ == 0, "batch size must be a multiple of the input size");
+  ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
+
+  training_vals_ = input;
+  training_labels_vals_ = labels;
+  AllocateTraining();
 
   std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
@@ -326,26 +333,23 @@ void Model::Train(){
     auto train_begin = training_.front()->Memory()->Begin();
     auto train_end = training_.back()->Memory()->End();
     auto train_size = training_.front()->Memory()->Bytes();
-    auto label_begin = labels_.front()->Memory()->Begin();
-    auto label_size = labels_.front()->Memory()->Bytes();
+    auto label_begin = training_labels_.front()->Memory()->Begin();
+    auto label_size = training_labels_.front()->Memory()->Bytes();
 
-    if(options_.log_training_error) {
-      cost_func = GenerateCostFunction();
-    }
     if(options_.log_training_time) {
       // Start training timer
       f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     }
-    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs_, 1, {}, [&](BlockBody* b1) {
+    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Apply neural network algorithms
-        b2->Insert(MakeCall(forward, { MakeLocalGet(train_addr)}));
-        b2->Insert(MakeCall(backword, {MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
+        b2->Insert(MakeCall(forward_, { MakeLocalGet(train_addr)}));
+        b2->Insert(MakeCall(backward_, {MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
 
         if(options_.log_training_error) {
           // Compute training error
-          auto call_cost = MakeCall(cost_func, {MakeLocalGet(label_addr)});
+          auto call_cost = MakeCall(cost_func_, {MakeLocalGet(label_addr)});
           b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
         }
 
@@ -367,7 +371,7 @@ void Model::Train(){
 
     // Test on training data (for debugging)
     for(int t=0; t < training_.size(); ++t) {
-      f.Insert(MakeCall(forward, {MakeI32Const(training_[t]->Memory()->Begin())}));
+      f.Insert(MakeCall(forward_, {MakeI32Const(training_[t]->Memory()->Begin())}));
       PRINT_TABLE(layers_.back()->A)
     }
   });

@@ -26,15 +26,27 @@ class Model {
 private:
   ModelOptions options_;
   wasmpp::ModuleManager module_manager_;
-  wabt::Var memory_;
   std::vector<LayerMeta*> layers_;
-  std::vector<ds::NDArray*> training_;
-  std::vector<ds::NDArray*> labels_;
-  uint32_t epochs_;
   uint32_t batch_size_;
   float learning_rate_;
   builtins::LossFunction loss_;
-  wabt::Type value_type_;
+
+  // Model components variables
+  wabt::Var forward_;
+  wabt::Var backward_;
+  wabt::Var cost_func_;
+
+  // Training data
+  std::vector<ds::NDArray*> training_;
+  std::vector<ds::NDArray*> training_labels_;
+  std::vector<std::vector<float>> training_vals_;
+  std::vector<std::vector<float>> training_labels_vals_;
+
+  // Test data
+  std::vector<ds::NDArray*> test_;
+  std::vector<ds::NDArray*> test_labels_;
+  std::vector<std::vector<float>> testing_vals_;
+  std::vector<std::vector<float>> tests_labels_vals_;
 
   // Builtin functions
   struct Builtins {
@@ -51,10 +63,10 @@ private:
   void InitDefinitions();
   // Model functions
   void AllocateLayers();
-  void AllocateInput(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
-  void MakeInputData(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
-  void MakeWeightData();
-  void MakeBiasData();
+  void AllocateTraining();
+  void MakeTrainingData(wabt::Var memory);
+  void MakeWeightData(wabt::Var memory);
+  void MakeBiasData(wabt::Var memory);
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
@@ -68,9 +80,12 @@ public:
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
 
-  void Setup(uint32_t epochs, uint32_t batch_size, float learning_rate, builtins::LossFunction loss,
-             std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels);
-  void Train();
+  void CompileLayers(uint32_t batch_size, float learning_rate, builtins::LossFunction loss);
+  void CompileTraining(uint32_t epoch, const std::vector<std::vector<float>> &input,
+                       const std::vector<std::vector<float>> &labels);
+  void CompileTesting(const std::vector<std::vector<float>> &input,
+                      const std::vector<std::vector<float>> &labels);
+  void CompileDone();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
 };

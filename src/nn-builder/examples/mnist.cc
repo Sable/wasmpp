@@ -120,8 +120,10 @@ int main(int argc, char *argv[]) {
   uint32_t epoch = 1;
   uint32_t batch = 1;
   float learning_rate = 0.1;
-  model.Setup(epoch, batch, learning_rate, model.Builtins().loss.MeanSquaredError(), train_data, train_labels);
-  model.Train();
+  auto loss = model.Builtins().loss.MeanSquaredError();
+  model.CompileLayers(batch, learning_rate, loss);
+  model.CompileTraining(epoch, train_data, train_labels);
+  model.CompileDone();
 
   assert(model.Validate());
   if(!output_file.empty()) {
