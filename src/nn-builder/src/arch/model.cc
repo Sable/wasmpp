@@ -429,6 +429,7 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
     }
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
+      b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Apply neural network algorithms
         b2->Insert(MakeCall(forward_, { MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
