@@ -81,7 +81,7 @@ void LoadValues(std::vector<std::vector<float>> &train_data, std::vector<std::ve
             number *= 10;
             number += line[i] - '0';
           } else {
-            data.push_back(number);
+            data.push_back(number / 255.0);
             number = 0;
           }
         }
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
 
   uint32_t epoch = 100;
   uint32_t batch = 1;
-  float learning_rate = 0.1;
+  float learning_rate = 0.01;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train_data, train_labels);
