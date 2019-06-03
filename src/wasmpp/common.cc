@@ -14,8 +14,16 @@ uint32_t TypeSize(wabt::Type type) {
       return WASMPP_F64_SIZE;
     case wabt::Type::V128:
       return WASMPP_V128_SIZE;
+    default:
+      assert(!"type not supported");
   }
-  assert(!"type not supported");
+}
+
+uint32_t TypeShiftLeft(wabt::Type type) {
+  uint32_t type_size = TypeSize(type);
+  uint32_t shift = 0;
+  while (type_size >>= 1) ++shift;
+  return shift;
 }
 
 } // namespace wasmpp

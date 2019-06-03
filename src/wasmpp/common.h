@@ -29,6 +29,7 @@ const uint32_t WASMPP_V128_SIZE = 16;
 
 // Size of types
 uint32_t TypeSize(wabt::Type type);
+uint32_t TypeShiftLeft(wabt::Type type);
 }
 
 #endif

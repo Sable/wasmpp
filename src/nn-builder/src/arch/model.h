@@ -39,7 +39,6 @@ private:
   // Model components variables
   wabt::Var forward_;
   wabt::Var backward_;
-  wabt::Var cost_func_;
   wabt::Var confusion_matrix_func_;
 
   // Model feature arrays
@@ -82,7 +81,6 @@ private:
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
-  wabt::Var GenerateCostFunction();
   wabt::Var GenerateConfusionMatrixFunction();
 public:
   Model(ModelOptions options);

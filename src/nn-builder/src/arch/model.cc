@@ -273,8 +273,13 @@ Var Model::GenerateFeedForward() {
     }
 
     // dA[L] = Loss(T[L], A[L])
-    f.Insert(snippet::MatrixLoss(f.Label(), snippet::RelocMat(true_matrix_, target_begin),
-                                 snippet::RelocMat(layers_.back()->A), loss_, layers_.back()->dA, {vi32_1, vi32_2}, true));
+    f.Insert(MakeCall(loss_.loss, {
+      MakeLocalGet(target_begin),
+      MakeI32Const(layers_.back()->A->Memory()->Begin()),
+      MakeI32Const(layers_.back()->dA->Memory()->Begin()),
+      MakeI32Const(layers_.back()->A->Shape()[0]),
+      MakeI32Const(layers_.back()->A->Shape()[1])
+    }));
   });
 }
 
@@ -389,24 +394,6 @@ wabt::Var Model::GenerateConfusionMatrixFunction() {
   });
 }
 
-wabt::Var Model::GenerateCostFunction() {
-  std::vector<Type> locals = {Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("cost_function", {{Type::I32},{Type::F32}}, locals,
-                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    auto vi32_1 = locals[0];
-    auto vi32_2 = locals[1];
-    auto vf32_1 = locals[2];
-
-    auto target_begin = params[0];
-
-    // Compute training error
-    f.Insert(snippet::MatrixLoss(f.Label(), snippet::RelocMat(true_matrix_, target_begin),
-                                 snippet::RelocMat(layers_.back()->A), loss_, cost_matrix_, {vi32_1, vi32_2}, false));
-    f.Insert(snippet::MatrixMean(f.Label(), cost_matrix_, {vi32_1}, vf32_1));
-    f.Insert(MakeLocalGet(vf32_1));
-  });
-}
-
 void Model::CompileInitialization() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
@@ -423,7 +410,6 @@ void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins
   AllocateLayers();
   forward_ = GenerateFeedForward();
   backward_ = GenerateBackpropagation();
-  cost_func_ = GenerateCostFunction();
   confusion_matrix_func_ = GenerateConfusionMatrixFunction();
 }
 
@@ -471,8 +457,12 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
 
         if(options_.log_training_error) {
           // Compute training error
-          auto call_cost = MakeCall(cost_func_, {MakeLocalGet(label_addr)});
-          b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
+          b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
+              MakeLocalGet(label_addr),
+              MakeI32Const(layers_.back()->A->Memory()->Begin()),
+              MakeI32Const(layers_.back()->A->Shape()[0]),
+              MakeI32Const(layers_.back()->A->Shape()[1])
+          })));
         }
 
         b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
@@ -531,8 +521,12 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
       if(options_.log_testing_error) {
         // Compute testing error
-        auto call_cost = MakeCall(cost_func_, {MakeLocalGet(label_addr)});
-        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, call_cost));
+        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
+            MakeLocalGet(label_addr),
+            MakeI32Const(layers_.back()->A->Memory()->Begin()),
+            MakeI32Const(layers_.back()->A->Shape()[0]),
+            MakeI32Const(layers_.back()->A->Shape()[1])
+        })));
       }
 
       if(options_.log_testing_confusion_matrix) {

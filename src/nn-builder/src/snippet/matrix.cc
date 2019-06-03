@@ -277,11 +277,6 @@ wabt::ExprList* MatrixActivation(LabelManager* label_manager, RelocMat src, buil
   return ElementWiseFunction(label_manager, {src}, prime ? func.derivative : func.function, dst, locals);
 }
 
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, RelocMat target, RelocMat prediction,
-                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime) {
-  return ElementWiseFunction(label_manager, {target, prediction}, prime ? func.derivative : func.function, dst, locals);
-}
-
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                            std::vector<wabt::Var> locals) {
   return MatrixScalar(label_manager, src, MakeF32Const(1), dst, locals);

@@ -7,8 +7,8 @@ namespace nn {
 namespace builtins {
 
 struct LossFunction {
-  wabt::Var function;
-  wabt::Var derivative;
+  wabt::Var cost;
+  wabt::Var loss;
 };
 
 class Loss : public Builtin {

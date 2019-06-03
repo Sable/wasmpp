@@ -68,10 +68,6 @@ wabt::ExprList* MatrixScalar(wasmpp::LabelManager* label_manager, ds::NDArray* s
 wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, RelocMat src, builtins::ActivationFunction func,
                                  ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime);
 
-// Apply matrix loss function
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, RelocMat target, RelocMat prediction,
-                           builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime);
-
 // Copy matrix content from src to dst
 wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
                            std::vector<wabt::Var> locals);
