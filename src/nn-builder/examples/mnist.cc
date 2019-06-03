@@ -111,8 +111,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  uint32_t training_limit = 1000;
-  uint32_t testing_limit = 10;
+  uint32_t training_limit = 6000;
+  uint32_t testing_limit = 1000;
   std::vector<std::vector<float>> train_data;
   std::vector<std::vector<float>> train_labels;
   std::vector<std::vector<float>> test_data;
@@ -128,17 +128,17 @@ int main(int argc, char *argv[]) {
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(20, model.Builtins().activation.ReLU()),
+     new FullyConnectedLayer(20, model.Builtins().activation.Sigmoid()),
      new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid())
   });
 
-  uint32_t epoch = 100;
+  uint32_t epoch = 20;
   uint32_t batch = 1;
-  float learning_rate = 0.01;
+  float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train_data, train_labels);
-  model.CompileTesting(test_data, test_labels);
+  model.CompileTesting(train_data, train_labels);
   model.CompileDone();
 
   assert(model.Validate());

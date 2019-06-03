@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/arch/model.h>
 #include <src/nn-builder/src/snippet/matrix.h>
+#include <src/nn-builder/src/arch/algorithms.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
@@ -195,18 +196,26 @@ void Model::MakeTestingData(wabt::Var memory) {
 void Model::MakeWeightData(wabt::Var memory) {
   // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
-    auto total = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
-    module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), entries);
+    auto size = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
+    if(l < layers_.size()-1) {
+      module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), Xavier(size, layers_[l-1]->A->Shape()[0],
+                                                                                layers_[l+1]->A->Shape()[0], true));
+    } else {
+      module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), LeCun(size, layers_[l-1]->A->Shape()[0], true));
+    }
   }
 }
 
 void Model::MakeBiasData(wabt::Var memory) {
   // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
-    auto total = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    std::vector<DataEntry> entries(total, DataEntry::MakeF32(0.1));
-    module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), entries);
+    auto size = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
+    if(l < layers_.size()-1) {
+      module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), Xavier(size, layers_[l-1]->A->Shape()[0],
+                                                                                layers_[l+1]->A->Shape()[0], true));
+    } else {
+      module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), LeCun(size, layers_[l-1]->A->Shape()[0], true));
+    }
   }
 }
 
