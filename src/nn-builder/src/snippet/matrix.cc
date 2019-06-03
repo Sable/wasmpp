@@ -17,7 +17,7 @@ using namespace wabt;
 #define LABEL_CHECK(l) \
   ERROR_UNLESS((l) != nullptr, "label manager cannot be null");
 
-wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, Mat rhs, ds::NDArray* dst,
+wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
@@ -106,7 +106,7 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
   return e;
 }
 
-wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, Mat rhs, ds::NDArray* dst,
+wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(lhs);
@@ -237,7 +237,7 @@ wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src
   return e;
 }
 
-wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<Mat> args, Var func, ds::NDArray* dst,
+wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<RelocMat> args, Var func, ds::NDArray* dst,
                                     std::vector<Var> locals) {
   LABEL_CHECK(label_manager);
   MATRIX_CHECK(dst);
@@ -272,12 +272,12 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<Mat
   return e;
 }
 
-wabt::ExprList* MatrixActivation(LabelManager* label_manager, Mat src, builtins::ActivationFunction func,
+wabt::ExprList* MatrixActivation(LabelManager* label_manager, RelocMat src, builtins::ActivationFunction func,
                                  ds::NDArray* dst, std::vector<Var> locals, bool prime) {
   return ElementWiseFunction(label_manager, {src}, prime ? func.derivative : func.function, dst, locals);
 }
 
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, Mat target, Mat prediction,
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, RelocMat target, RelocMat prediction,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime) {
   return ElementWiseFunction(label_manager, {target, prediction}, prime ? func.derivative : func.function, dst, locals);
 }

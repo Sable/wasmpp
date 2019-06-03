@@ -9,10 +9,15 @@
 namespace nn {
 namespace snippet {
 
-class Mat {
+// RelocMat is useful for a matrix which can have a hybrid starting address.
+// A matrix wrapped in this class should be used carefully because
+// a begin address should point to a matrix with the exact shape
+// as the passed array, otherwise the program will result in an undefined
+// behaviour
+class RelocMat {
 public:
-  Mat(ds::NDArray* array) : array_(array), has_begin_var(false) {}
-  Mat(ds::NDArray* array, wabt::Var var) : array_(array), var_(var), has_begin_var(true) {}
+  RelocMat(ds::NDArray* array) : array_(array), has_begin_var(false) {}
+  RelocMat(ds::NDArray* array, wabt::Var var) : array_(array), var_(var), has_begin_var(true) {}
   ds::NDArray* Array() const { return array_; }
   wabt::Var Var() const { assert(has_begin_var); return var_; }
   bool HasBeginVar() const { return has_begin_var; }
@@ -33,7 +38,7 @@ private:
 // (m,n) and (n,p)
 
 // Dot product of two matrices
-wabt::ExprList* MatrixDot(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, Mat rhs, ds::NDArray* dst,
+wabt::ExprList* MatrixDot(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst,
                           std::vector<wabt::Var> locals);
 
 // Dot product of two matrices where the left one is treated as transposed
@@ -41,8 +46,8 @@ wabt::ExprList* MatrixDotLT(wasmpp::LabelManager* label_manager, ds::NDArray* lh
                             std::vector<wabt::Var> locals);
 
 // Dot product of two matrices where the right one is treated as transposed
-wabt::ExprList* MatrixDotRT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, snippet::Mat rhs, ds::NDArray* dst,
-                            std::vector<wabt::Var> locals);
+wabt::ExprList* MatrixDotRT(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs,
+                            ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 // Add two matrices
 wabt::ExprList* MatrixAddition(wasmpp::LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
@@ -60,11 +65,11 @@ wabt::ExprList* MatrixScalar(wasmpp::LabelManager* label_manager, ds::NDArray* s
                              ds::NDArray* dst, std::vector<wabt::Var> locals);
 
 // Apply activation function to matrixa
-wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, Mat src, builtins::ActivationFunction func,
+wabt::ExprList* MatrixActivation(wasmpp::LabelManager* label_manager, RelocMat src, builtins::ActivationFunction func,
                                  ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime);
 
 // Apply matrix loss function
-wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, Mat target, Mat prediction,
+wabt::ExprList* MatrixLoss(wasmpp::LabelManager* label_manager, RelocMat target, RelocMat prediction,
                            builtins::LossFunction func, ds::NDArray* dst, std::vector<wabt::Var> locals, bool prime);
 
 // Copy matrix content from src to dst
