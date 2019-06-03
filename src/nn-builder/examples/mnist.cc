@@ -127,9 +127,9 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform),
-     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform),
-     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid(), LeCunUniform)
+     new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),
+     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform, 0.5),
+     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid(), LeCunUniform, 1)
   });
 
   uint32_t epoch = 10;

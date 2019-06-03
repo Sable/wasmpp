@@ -68,9 +68,9 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), LeCunNormal)
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal, 1),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal, 1),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), LeCunNormal, 1)
   });
 
   // Train

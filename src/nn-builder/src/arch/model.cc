@@ -22,6 +22,8 @@ struct LayerMeta {
   ds::NDArray* dZ = nullptr;
   ds::NDArray* dA = nullptr;
   ds::NDArray* dB = nullptr;
+  // Regularization
+  ds::NDArray* inverted_dropout = nullptr;
 };
 
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
@@ -94,6 +96,7 @@ void Model::AllocateLayers() {
     assert(layers_[l]->layer->Type() == FullyConnected);
 
     ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size_);
+    ALLOCATE_MEMORY(layers_[l]->inverted_dropout, layers_[l]->layer->Nodes(), batch_size_);
     if(l > 0) {
       ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size_);
       ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size_);
@@ -245,7 +248,7 @@ void Model::MakeWeightData(wabt::Var memory) {
 
 Var Model::GenerateFeedForward() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32},{}}, locals_types,
+  return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32, Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
@@ -256,8 +259,32 @@ Var Model::GenerateFeedForward() {
 
     auto input_begin = params[0];
     auto target_begin = params[1];
+    auto is_training = params[2];
 
     for(int l=1; l < layers_.size(); ++l) {
+
+      // Check for dropout regularization
+      if(layers_[l-1]->layer->KeepProb() != 1.0) {
+        // Only dropout on training
+        f.Insert(MakeIf(f.Label(), MakeBinary(Opcode::I32Eq, MakeLocalGet(is_training), MakeI32Const(1)), {},
+                        [&](BlockBody true_block, Var true_label){
+          // Generate a mask matrix
+          true_block.Insert(MakeCall(builtins_.math.MaskMatrix(), {
+              MakeI32Const(layers_[l-1]->inverted_dropout->Memory()->Begin()),
+              MakeI32Const(layers_[l-1]->inverted_dropout->Memory()->End()),
+              MakeF32Const(layers_[l-1]->layer->KeepProb())
+          }));
+          // A[l-1] = (1/keep_prob) * (A[l-1] * inverted_dropout[l-1])
+          // 1) A[l-1] = A[l-1] * inverted_dropout[l-1]
+          // 2) A[l-1] = A[l-1] * (1/keep_prob)
+          true_block.Insert(snippet::MatrixMultiplication(f.Label(), layers_[l-1]->A, layers_[l-1]->inverted_dropout,
+                                                 layers_[l-1]->A, {vi32_1, vi32_2}));
+          auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(layers_[l-1]->layer->KeepProb()));
+          true_block.Insert(snippet::MatrixScalar(f.Label(), layers_[l-1]->A, scalar, layers_[l-1]->A,
+                                                  {vi32_1, vi32_2}));
+        }));
+      }
+
       // Z[l] = W[l] . A[l-1] + B[l]
       // 1) Z[l] = W[l] . A[l-1]
       // 2) Z[l] = Z[l] + B[l]
@@ -452,8 +479,14 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
       b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Apply neural network algorithms
-        b2->Insert(MakeCall(forward_, { MakeLocalGet(train_addr), MakeLocalGet(label_addr)}));
-        b2->Insert(MakeCall(backward_, {MakeLocalGet(train_addr)}));
+        b2->Insert(MakeCall(forward_, {
+          MakeLocalGet(train_addr),
+          MakeLocalGet(label_addr),
+          MakeI32Const(1) // is_training = 1
+        }));
+        b2->Insert(MakeCall(backward_, {
+          MakeLocalGet(train_addr)
+        }));
 
         if(options_.log_training_error) {
           // Compute training error
@@ -519,7 +552,11 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     }
     f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
     f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
-      b1->Insert(MakeCall(forward_, { MakeLocalGet(test_addr), MakeLocalGet(label_addr)}));
+      b1->Insert(MakeCall(forward_, {
+        MakeLocalGet(test_addr),
+        MakeLocalGet(label_addr),
+        MakeI32Const(0) // is_training = 0
+      }));
 
       if(options_.log_testing_error) {
         // Compute testing error
