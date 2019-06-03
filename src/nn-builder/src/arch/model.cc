@@ -470,8 +470,10 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
 
       if(options_.log_training_error) {
         // Log training error
-        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(training_.size())));
-        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {MakeLocalGet(epoch), MakeLocalGet(cost_mean)}));
+        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {
+          MakeLocalGet(epoch),
+          MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(training_.size()))
+        }));
       }
     }));
 
