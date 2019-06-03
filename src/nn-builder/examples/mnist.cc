@@ -127,19 +127,19 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(20, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid())
+     new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform),
+     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform),
+     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid(), LeCunUniform)
   });
 
-  uint32_t epoch = 20;
+  uint32_t epoch = 10;
   uint32_t batch = 1;
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train_data, train_labels);
-  model.CompileTesting(train_data, train_labels);
-  model.CompileDone();
+  model.CompileTesting(test_data, test_labels);
+  model.CompileInitialization();
 
   assert(model.Validate());
   if(!output_file.empty()) {

@@ -12,6 +12,7 @@
 #include <src/nn-builder/src/data_structure/ndarray.h>
 #include <memory>
 #include <utility>
+#include "initializers.h"
 
 namespace nn {
 namespace arch {
@@ -24,6 +25,7 @@ struct ModelOptions {
   bool log_testing_time = false;
   bool log_testing_confusion_matrix = false;
   builtins::ActivationOptions activation_options;
+  WeightDistributionOptions weights_options;
 };
 class Model {
 private:
@@ -77,7 +79,6 @@ private:
   void MakeTrainingData(wabt::Var memory);
   void MakeTestingData(wabt::Var memory);
   void MakeWeightData(wabt::Var memory);
-  void MakeBiasData(wabt::Var memory);
   // Generate neural network algorithms
   wabt::Var GenerateFeedForward();
   wabt::Var GenerateBackpropagation();
@@ -96,7 +97,7 @@ public:
   void CompileTraining(uint32_t epoch, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
   void CompileTesting(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
-  void CompileDone();
+  void CompileInitialization();
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
 };

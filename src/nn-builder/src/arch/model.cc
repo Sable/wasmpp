@@ -1,6 +1,6 @@
 #include <src/nn-builder/src/arch/model.h>
 #include <src/nn-builder/src/snippet/matrix.h>
-#include <src/nn-builder/src/arch/algorithms.h>
+#include <src/nn-builder/src/arch/initializers.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
@@ -194,28 +194,52 @@ void Model::MakeTestingData(wabt::Var memory) {
 }
 
 void Model::MakeWeightData(wabt::Var memory) {
-  // TODO Assign random weights
   for(int l=1; l < layers_.size(); ++l) {
-    auto size = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
-    if(l < layers_.size()-1) {
-      module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), Xavier(size, layers_[l-1]->A->Shape()[0],
-                                                                                layers_[l+1]->A->Shape()[0], true));
-    } else {
-      module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), LeCun(size, layers_[l-1]->A->Shape()[0], true));
+    auto weight_type = layers_[l]->layer->WeightType();
+    if(l == layers_.size() - 1) {
+      ERROR_UNLESS(weight_type >= FIRST_HIDDEN_OUTPUT && weight_type <= LAST_HIDDEN_OUTPUT,
+                   "Wrong weight distribution for the output layer");
     }
-  }
-}
-
-void Model::MakeBiasData(wabt::Var memory) {
-  // TODO Assign random weights
-  for(int l=1; l < layers_.size(); ++l) {
-    auto size = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
-    if(l < layers_.size()-1) {
-      module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), Xavier(size, layers_[l-1]->A->Shape()[0],
-                                                                                layers_[l+1]->A->Shape()[0], true));
-    } else {
-      module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), LeCun(size, layers_[l-1]->A->Shape()[0], true));
+    auto weight_size = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
+    auto bias_size = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
+    std::vector<DataEntry> weight_entries;
+    std::vector<DataEntry> bias_entries;
+    switch (weight_type) {
+      case XavierUniform:
+      case XavierNormal:
+        weight_entries = XavierDistribution(weight_size, layers_[l-1]->A->Shape()[0], layers_[l+1]->A->Shape()[0],
+            weight_type == XavierUniform, options_.weights_options.seed);
+        bias_entries = XavierDistribution(bias_size, layers_[l-1]->A->Shape()[0], layers_[l+1]->A->Shape()[0],
+            weight_type == XavierUniform, options_.weights_options.seed);
+        break;
+      case LeCunUniform:
+      case LeCunNormal:
+        weight_entries = LeCunDistribution(weight_size, layers_[l - 1]->A->Shape()[0], weight_type == LeCunUniform,
+            options_.weights_options.seed);
+        bias_entries = LeCunDistribution(bias_size, layers_[l - 1]->A->Shape()[0], weight_type == LeCunUniform,
+            options_.weights_options.seed);
+        break;
+      case Gaussian:
+        weight_entries = GaussianDistribution(weight_size, options_.weights_options.gaussian_mean,
+            options_.weights_options.gaussian_std_dev, options_.weights_options.seed);
+        bias_entries = GaussianDistribution(bias_size, options_.weights_options.gaussian_mean,
+            options_.weights_options.gaussian_std_dev, options_.weights_options.seed);
+        break;
+      case Uniform:
+        weight_entries = UniformDistribution(weight_size, options_.weights_options.uniform_low,
+            options_.weights_options.uniform_high, options_.weights_options.seed);
+        bias_entries = UniformDistribution(bias_size, options_.weights_options.uniform_low,
+            options_.weights_options.uniform_high, options_.weights_options.seed);
+        break;
+      case Constant:
+        weight_entries = ConstantDistribution(weight_size, options_.weights_options.constant_value);
+        bias_entries = ConstantDistribution(bias_size, options_.weights_options.constant_value);
+        break;
+      default:
+        assert(!"Weight distribution not implemented");
     }
+    module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), weight_entries);
+    module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), bias_entries);
   }
 }
 
@@ -381,13 +405,12 @@ wabt::Var Model::GenerateCostFunction() {
   });
 }
 
-void Model::CompileDone() {
+void Model::CompileInitialization() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
   MakeTrainingData(memory);
   MakeTestingData(memory);
   MakeWeightData(memory);
-  MakeBiasData(memory);
 }
 
 void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins::LossFunction loss) {

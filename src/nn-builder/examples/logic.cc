@@ -68,9 +68,9 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid()),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid())
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal),
+     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), LeCunNormal)
   });
 
   // Train
@@ -87,14 +87,14 @@ int main(int argc, char *argv[]) {
     {0, 1},
     {0, 1}
   };
-  uint32_t epoch = 10000;
+  uint32_t epoch = 3000;
   uint32_t batch = 1;
-  float learning_rate = 0.01;
+  float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(batch, learning_rate, loss);
   model.CompileTraining(epoch, train, labels);
   model.CompileTesting(train, labels);
-  model.CompileDone();
+  model.CompileInitialization();
 
   assert(model.Validate());
   if(!output_file.empty()) {
