@@ -3,12 +3,16 @@ from nn import Model
 import sys
 import csv
 
+# Variables
+train_limit = 1
+test_limit = 1
+epoch = 1
+alpha = 0.01
+
 train = []
 train_label = []
 test = []
 test_label = []
-train_limit = 1000
-test_limit = 10
 with open(sys.argv[1]) as csvfile:
     readCSV = csv.reader(csvfile, delimiter=',')
     r = 0
@@ -19,17 +23,15 @@ with open(sys.argv[1]) as csvfile:
             if len(train) < train_limit:
                 train_label.append(label)
                 train.append(row[1:])
-                train[-1] = map(lambda x: float(x), train[-1])
+                train[-1] = map(lambda x: float(x)/255.0, train[-1])
             elif len(test) < test_limit:
                 test_label.append(label)
                 test.append(row[1:])
-                test[-1] = map(lambda x: float(x), test[-1])
+                test[-1] = map(lambda x: float(x)/255.0, test[-1])
         r += 1
 
 m = Model()
-epoch = 100
-alpha = 0.1
-model = [784, 100, 10]
+model = [784, 20, 10]
 acts = [m.sigmoid, m.sigmoid, m.sigmoid]
 
 m.build(model, acts, m.mse, alpha)
