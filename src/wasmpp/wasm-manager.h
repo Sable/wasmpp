@@ -20,14 +20,18 @@ private:
 };
 
 class MemoryManager {
-private:
+protected:
   std::vector<Memory*> memories_;
 public:
   ~MemoryManager();
   // Allocate memory
-  Memory* Allocate(uint32_t k);
-  bool Free(const Memory* m);
-  uint32_t Pages();
+  virtual Memory* Allocate(uint32_t k) = 0;
+  virtual bool Free(const Memory* m);
+  virtual uint32_t Pages();
+};
+
+class FirstFit : public MemoryManager {
+  Memory* Allocate(uint32_t k) override;
 };
 
 class ContentManager {
@@ -84,7 +88,7 @@ public:
 class ModuleManager {
 private:
   wabt::Module module_;
-  MemoryManager memory_manager_;
+  FirstFit memory_manager_;
   LabelManager label_manager_;
 
   // Function copied from WastParser::CheckImportOrdering

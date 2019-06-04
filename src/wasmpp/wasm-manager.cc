@@ -43,7 +43,7 @@ uint32_t MemoryManager::Pages() {
   return val * WABT_PAGE_SIZE == memories_.back()->End() ? val : val + 1;
 }
 
-Memory* MemoryManager::Allocate(uint32_t k) {
+Memory* FirstFit::Allocate(uint32_t k) {
   ERROR_UNLESS(k > 0, "k must be positive");
   uint32_t start = 0;
   size_t i;
