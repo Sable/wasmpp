@@ -144,6 +144,12 @@ wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args) {
   return e;
 }
 
+wabt::ExprList* MakeDrop() {
+  wabt::ExprList* e = new wabt::ExprList();
+  e->push_back(wabt::MakeUnique<wabt::DropExpr>());
+  return e;
+}
+
 #define DEFINE_LOAD(opcode) \
 wabt::ExprList* Make##opcode(wabt::ExprList* index, wabt::Address align, uint32_t offset) { \
   ERROR_UNLESS(index != nullptr, "index cannot be null");                                   \

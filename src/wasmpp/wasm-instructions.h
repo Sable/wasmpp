@@ -48,7 +48,8 @@ wabt::ExprList* MakeF64Const(double val);
   V(I64Load16S) \
   V(I64Load16U) \
   V(I64Load32S) \
-  V(I64Load32U)
+  V(I64Load32U) \
+  V(V128Load)
 
 #define DECLARE_LOAD(opcode) \
   wabt::ExprList* Make##opcode(wabt::ExprList* index,  \
@@ -66,7 +67,8 @@ wabt::ExprList* MakeF64Const(double val);
   V(I32Store16) \
   V(I64Store8)  \
   V(I64Store16) \
-  V(I64Store32)
+  V(I64Store32) \
+  V(V128Store)
 
 #define DECLARE_STORE(opcode) \
   wabt::ExprList* Make##opcode(wabt::ExprList* index, \
@@ -86,6 +88,9 @@ wabt::ExprList* MakeLocalTree(wabt::Var var, wabt::ExprList* val);
 
 // Make calls
 wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args);
+
+// Misc
+wabt::ExprList* MakeDrop();
 
 }
 
