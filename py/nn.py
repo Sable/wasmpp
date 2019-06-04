@@ -17,7 +17,7 @@ class Model:
 
     def sigmoid(self, x, prime):
         if prime:
-            s = self.sigmoid(x, False)
+            s = 1 / (1 + np.exp(-x))
             return s * (1 - s)
         return 1 / (1 + np.exp(-x))
 
@@ -54,9 +54,9 @@ class Model:
             self.dB.append(np.zeros(shape=(model[i],1)))
             prev = model[i]
 
-    def copy_input(self, data, label):
-        self.A[0] = np.array(data).reshape(len(data), 1)
-        self.T = np.array(label).reshape(len(label), 1)
+    # def copy_input(self, data, label):
+    #     self.A[0] = np.array(data).reshape(len(data), 1)
+    #     self.T = np.array(label).reshape(len(label), 1)
 
     def forward(self):
         for l in range(1, len(self.model)):
