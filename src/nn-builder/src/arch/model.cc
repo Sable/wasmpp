@@ -39,6 +39,14 @@ void Model::AddLayer(Layer* layer) {
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
   InitImports();
   InitDefinitions();
+
+  // Init snippets
+  if(options.use_simd) {
+    snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
+  } else {
+    snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
+
+  }
 }
 
 Model::~Model() {
@@ -277,10 +285,10 @@ Var Model::GenerateFeedForward() {
           // A[l-1] = (1/keep_prob) * (A[l-1] * inverted_dropout[l-1])
           // 1) A[l-1] = A[l-1] * inverted_dropout[l-1]
           // 2) A[l-1] = A[l-1] * (1/keep_prob)
-          true_block.Insert(snippet::MatrixMultiplication(f.Label(), layers_[l-1]->A, layers_[l-1]->inverted_dropout,
+          true_block.Insert(snippets_.matrix->MatrixMultiplication(layers_[l-1]->A, layers_[l-1]->inverted_dropout,
                                                  layers_[l-1]->A, {vi32_1, vi32_2}));
           auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(layers_[l-1]->layer->KeepProb()));
-          true_block.Insert(snippet::MatrixScalar(f.Label(), layers_[l-1]->A, scalar, layers_[l-1]->A,
+          true_block.Insert(snippets_.matrix->MatrixScalar(layers_[l-1]->A, scalar, layers_[l-1]->A,
                                                   {vi32_1, vi32_2}));
         }));
       }
@@ -288,14 +296,14 @@ Var Model::GenerateFeedForward() {
       // Z[l] = W[l] . A[l-1] + B[l]
       // 1) Z[l] = W[l] . A[l-1]
       // 2) Z[l] = Z[l] + B[l]
-      f.Insert(snippet::MatrixDot(f.Label(), layers_[l]->W,
+      f.Insert(snippets_.matrix->MatrixDot(layers_[l]->W,
                                   (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
                                   snippet::RelocMat(layers_[l-1]->A), layers_[l]->Z,
                                   {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      f.Insert(snippet::MatrixAddition(f.Label(), layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixAddition(layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
 
       // A[l] = g(Z[l])
-      f.Insert(snippet::MatrixActivation(f.Label(), snippet::RelocMat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
+      f.Insert(snippets_.matrix->MatrixActivation(snippet::RelocMat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
           layers_[l]->A, {vi32_1, vi32_2}, false));
     }
 
@@ -327,45 +335,46 @@ wabt::Var Model::GenerateBackpropagation() {
        // dZ[l] = dA[l] * g'(Z[l])
        // 1) dZ[l] = g'(Z[l])
        // 2) dZ[l] = dA[l] * dZ[l]
-      f.Insert(snippet::MatrixActivation(f.Label(), snippet::RelocMat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
-          layers_[l]->dZ, {vi32_1, vi32_2}, true));
-      f.Insert(snippet::MatrixMultiplication(f.Label(), layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
-          {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixActivation(snippet::RelocMat(layers_[l]->Z),
+                                                  layers_[l]->layer->ActivationFunction(), layers_[l]->dZ,
+                                                  {vi32_1, vi32_2}, true));
+      f.Insert(snippets_.matrix->MatrixMultiplication(layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
+                                                      {vi32_1, vi32_2}));
 
       // dW[l] = (1/m) dZ[l] . A[l-1]^T
       // 1) dW[l] = dZ[l] . A[l-1]^T
       // 2) dW[l] = (1/m) dW[l]
-      f.Insert(snippet::MatrixDotRT(f.Label(), layers_[l]->dZ,
-                                    (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
-                                    snippet::RelocMat(layers_[l-1]->A), layers_[l]->dW,
-                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
-                                     {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixDotRT(layers_[l]->dZ,
+                                             (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
+                                             snippet::RelocMat(layers_[l-1]->A), layers_[l]->dW,
+                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
+                                              {vi32_1, vi32_2}));
 
       // dB[l] = (1/m) dZ[l]
       // FIXME Sum dZ[l] horizontally, store it into first column of dB[l], then broadcast
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
-                                     {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
+                                              {vi32_1, vi32_2}));
 
       if(l > 1) {
         // dA[l-1] = W[l]^T . dZ[l]
-        f.Insert(snippet::MatrixDotLT(f.Label(), layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
-                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+        f.Insert(snippets_.matrix->MatrixDotLT(layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
+                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       }
 
       // W[l] = W[l] - alpha * dW[l]
       // 1) dW[l] = alpha * dW[l]
       // 2) W[l] = W[l] - dW[l]
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dW, MakeF32Const(learning_rate_), layers_[l]->dW,
-                                     {vi32_1, vi32_2}));
-      f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(learning_rate_), layers_[l]->dW,
+                                              {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
 
       // B[l] = B[l] - alpha * dB[l]
       // 1) dB[l] = alpha * dB[l]
       // 2) B[l] = B[l] - dB[l]
-      f.Insert(snippet::MatrixScalar(f.Label(), layers_[l]->dB, MakeF32Const(learning_rate_), layers_[l]->dB,
-                                     {vi32_1, vi32_2}));
-      f.Insert(snippet::MatrixSubtraction(f.Label(), layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dB, MakeF32Const(learning_rate_), layers_[l]->dB,
+                                              {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
     }
   });
 }
@@ -392,7 +401,7 @@ wabt::Var Model::GenerateConfusionMatrixFunction() {
     uint32_t A_width = A->Shape()[1] * type_size;
     uint32_t A_height = A->Shape()[0] * A_width;
 
-    f.Insert(snippet::MatrixColumnArgmax(f.Label(), A, {vi32_1, vi32_2, vi32_3, vi32_4}));
+    f.Insert(snippets_.matrix->MatrixColumnArgmax(A, {vi32_1, vi32_2, vi32_3, vi32_4}));
     f.Insert(GenerateRangeLoop(f.Label(), col, 0, A_width, type_size, {}, [&](BlockBody* b1) {
       // Find 1 in both A and target
       b1->Insert(MakeLocalSet(rel_row, MakeI32Const(0)));

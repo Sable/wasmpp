@@ -6,6 +6,7 @@ namespace snippet {
 
 using namespace wasmpp;
 using namespace wabt;
+using namespace ds;
 
 #define MATRIX_CHECK(x) \
   ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
@@ -14,12 +15,7 @@ using namespace wabt;
 #define MATRIX_SAME_SHAPE(x, y) \
   ERROR_UNLESS((x)->Shape() == (y)->Shape(), #x " and " #y " matrices are not compatible");
 
-#define LABEL_CHECK(l) \
-  ERROR_UNLESS((l) != nullptr, "label manager cannot be null");
-
-wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst,
-                          std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::MatrixDot(NDArray* lhs, RelocMat rhs, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs.Array());
   MATRIX_CHECK(dst);
@@ -42,15 +38,15 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, RelocMa
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager_, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF32Const(0)));
       if(rhs.HasBeginVar()) {
         b2->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
       } else {
         b2->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Memory()->Begin())));
       }
-      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager_, lhs_col_rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F32Add, MakeBinary(Opcode::F32Mul, lhs_cell, rhs_cell)));
@@ -64,9 +60,7 @@ wabt::ExprList* MatrixDot(LabelManager* label_manager, ds::NDArray* lhs, RelocMa
   return e;
 }
 
-wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
-                            std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::MatrixDotLT(NDArray* lhs, NDArray* rhs, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
@@ -88,11 +82,11 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_col, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager_, rhs_col, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF32Const(0)));
       b2->Insert(MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-      b2->Insert(GenerateRangeLoop(label_manager, rhs_row_offset, rhs->Memory()->Begin(), rhs->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager_, rhs_row_offset, rhs->Memory()->Begin(), rhs->Memory()->End(), rhs_width_bytes, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col)));
         auto rhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(rhs_col)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F32Add, MakeBinary(Opcode::F32Mul, lhs_cell, rhs_cell)));
@@ -106,9 +100,7 @@ wabt::ExprList* MatrixDotLT(LabelManager* label_manager, ds::NDArray* lhs, ds::N
   return e;
 }
 
-wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst,
-                          std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::MatrixDotRT(NDArray* lhs, RelocMat rhs, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs.Array());
   MATRIX_CHECK(dst);
@@ -131,15 +123,15 @@ wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, Reloc
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
-  Merge(e, GenerateRangeLoop(label_manager, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
     if(rhs.HasBeginVar()) {
       b1->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
     } else {
       b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Memory()->Begin())));
     }
-    b1->Insert(GenerateRangeLoop(label_manager, rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager_, rhs_rows, 0, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(res_cell, MakeF32Const(0)));
-      b2->Insert(GenerateRangeLoop(label_manager, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b3) {
+      b2->Insert(GenerateRangeLoop(label_manager_, lhs_col_rhs_rows, 0, rhs_width_bytes, type_size, {}, [&](BlockBody* b3) {
         auto lhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(lhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         auto rhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
         b3->Insert(GenerateCompoundAssignment(res_cell, Opcode::F32Add, MakeBinary(Opcode::F32Mul, lhs_cell, rhs_cell)));
@@ -153,9 +145,8 @@ wabt::ExprList* MatrixDotRT(LabelManager* label_manager, ds::NDArray* lhs, Reloc
   return e;
 }
 
-wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, LabelManager* label_manager, ds::NDArray* lhs,
-                                           ds::NDArray* rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::ElementWiseBinaryOperation(Opcode op, NDArray* lhs, NDArray* rhs, NDArray* dst,
+                                                          std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs);
   MATRIX_CHECK(dst);
@@ -170,7 +161,7 @@ wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, LabelManager* label_
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeBinary(op, MakeF32Load(lhs_addr), MakeF32Load(rhs_addr))));
@@ -179,24 +170,19 @@ wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, LabelManager* label_
   return e;
 }
 
-wabt::ExprList* MatrixAddition(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
-                               std::vector<wabt::Var> locals) {
-  return ElementWiseBinaryOperation(Opcode::F32Add, label_manager, lhs, rhs, dst, locals);
+wabt::ExprList* MatrixSnippet::MatrixAddition(NDArray* lhs, NDArray* rhs, NDArray* dst, std::vector<Var> locals) {
+  return ElementWiseBinaryOperation(Opcode::F32Add, lhs, rhs, dst, locals);
 }
 
-wabt::ExprList* MatrixSubtraction(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
-                                  std::vector<wabt::Var> locals) {
-  return ElementWiseBinaryOperation(Opcode::F32Sub, label_manager, lhs, rhs, dst, locals);
+wabt::ExprList* MatrixSnippet::MatrixSubtraction(NDArray* lhs, NDArray* rhs, NDArray* dst, std::vector<Var> locals) {
+  return ElementWiseBinaryOperation(Opcode::F32Sub, lhs, rhs, dst, locals);
 }
 
-wabt::ExprList* MatrixMultiplication(LabelManager* label_manager, ds::NDArray* lhs, ds::NDArray* rhs,
-                                     ds::NDArray* dst, std::vector<wabt::Var> locals) {
-  return ElementWiseBinaryOperation(Opcode::F32Mul, label_manager, lhs, rhs, dst, locals);
+wabt::ExprList* MatrixSnippet::MatrixMultiplication(NDArray* lhs, NDArray* rhs, NDArray* dst, std::vector<Var> locals) {
+  return ElementWiseBinaryOperation(Opcode::F32Mul, lhs, rhs, dst, locals);
 }
 
-wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
-                             std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::MatrixScalar(NDArray* src, ExprList* scalar, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(src);
   MATRIX_CHECK(dst);
   MATRIX_SAME_SHAPE(src, dst);
@@ -209,7 +195,7 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto src_addr = MakeBinary(Opcode::I32Add, MakeI32Const(src->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F32Mul, MakeF32Load(src_addr), scalar)));
     b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
@@ -217,29 +203,8 @@ wabt::ExprList* MatrixScalar(LabelManager* label_manager, ds::NDArray* src, wabt
   return e;
 }
 
-wabt::ExprList* MatrixMean(wasmpp::LabelManager* label_manager, ds::NDArray* src,
-                           std::vector<wabt::Var> locals, wabt::Var result) {
-  LABEL_CHECK(label_manager);
-  MATRIX_CHECK(src);
-  assert(locals.size() == 1);
-
-  auto src_addr = locals[0];
-
-  uint32_t type_size = TypeSize(Type::F32);
-
-  wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, MakeLocalSet(result, MakeF32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, src_addr, src->Memory()->Begin(), src->Memory()->End(), type_size, {}, [&](BlockBody* b) {
-    b->Insert(GenerateCompoundAssignment(result, Opcode::F32Add, MakeF32Load(MakeLocalGet(src_addr))));
-  }));
-  Merge(e, MakeLocalSet(result, MakeBinary(Opcode::F32Div, MakeLocalGet(result),
-                                           MakeF32Const(src->Shape()[0]*src->Shape()[1]))));
-  return e;
-}
-
-wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<RelocMat> args, Var func, ds::NDArray* dst,
-                                    std::vector<Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::ElementWiseFunction(std::vector<RelocMat> args, Var func, NDArray* dst,
+                                                   std::vector<Var> locals) {
   MATRIX_CHECK(dst);
   for(auto arg : args) {
     MATRIX_CHECK(arg.Array());
@@ -255,7 +220,7 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<Rel
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {},
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {},
                              [&](BlockBody* b) {
     for(auto arg : args) {
       ExprList* arg_addr = nullptr;
@@ -272,20 +237,12 @@ wabt::ExprList* ElementWiseFunction(LabelManager* label_manager, std::vector<Rel
   return e;
 }
 
-wabt::ExprList* MatrixActivation(LabelManager* label_manager, RelocMat src, builtins::ActivationFunction func,
-                                 ds::NDArray* dst, std::vector<Var> locals, bool prime) {
-  return ElementWiseFunction(label_manager, {src}, prime ? func.derivative : func.function, dst, locals);
+wabt::ExprList* MatrixSnippet::MatrixActivation(RelocMat src, builtins::ActivationFunction func, NDArray* dst,
+                                                std::vector<Var> locals, bool prime) {
+  return ElementWiseFunction({src}, prime ? func.derivative : func.function, dst, locals);
 }
 
-wabt::ExprList* MatrixCopy(wasmpp::LabelManager* label_manager, ds::NDArray* src, ds::NDArray* dst,
-                           std::vector<wabt::Var> locals) {
-  return MatrixScalar(label_manager, src, MakeF32Const(1), dst, locals);
-}
-
-// TODO Optimize this function
-wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDArray* src,
-                                   std::vector<wabt::Var> locals) {
-  LABEL_CHECK(label_manager)
+wabt::ExprList* MatrixSnippet::MatrixColumnArgmax(NDArray* src, std::vector<Var> locals) {
   MATRIX_CHECK(src);
   assert(locals.size() == 4);
 
@@ -301,23 +258,23 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
   uint32_t col_end = col_begin + width;
 
   wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, GenerateRangeLoop(label_manager, src_col_offset, col_begin, col_end, type_size, {}, [&](BlockBody* b1) {
+  Merge(e, GenerateRangeLoop(label_manager_, src_col_offset, col_begin, col_end, type_size, {}, [&](BlockBody* b1) {
     // Find max
     b1->Insert(MakeLocalSet(max, MakeLocalGet(src_col_offset)));
-    b1->Insert(GenerateRangeLoop(label_manager, row, width, height, width, {}, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager_, row, width, height, width, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
       auto cond = MakeBinary(Opcode::F32Ge, MakeF32Load(MakeLocalGet(curr)), MakeF32Load(MakeLocalGet(max)));
-      auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
+      auto comp = MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
         t.Insert(MakeLocalSet(max, MakeLocalGet(curr)));
       });
       b2->Insert(comp);
     }));
 
     // Place 1 in max and 0 in rest
-    b1->Insert(GenerateRangeLoop(label_manager, row, 0, height, width, {}, [&](BlockBody* b2) {
+    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height, width, {}, [&](BlockBody* b2) {
       b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
       auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(curr), MakeLocalGet(max));
-      auto comp = MakeIf(label_manager, cond, {}, [&](BlockBody t, Var label) {
+      auto comp = MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
         t.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(1)));
       }, [&](BlockBody f) {
         f.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(0)));
@@ -328,8 +285,7 @@ wabt::ExprList* MatrixColumnArgmax(wasmpp::LabelManager* label_manager, ds::NDAr
   return e;
 }
 
-wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDArray* bias, std::vector<Var> locals) {
-  LABEL_CHECK(label_manager);
+wabt::ExprList* MatrixSnippet::MatrixBiasBroadcast(NDArray* bias, std::vector<Var> locals) {
   MATRIX_CHECK(bias);
   assert(locals.size() == 2);
 
@@ -341,7 +297,7 @@ wabt::ExprList* MatrixBiasBroadcast(wasmpp::LabelManager* label_manager, ds::NDA
 
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, {}, [&](BlockBody* b) {
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, {}, [&](BlockBody* b) {
     auto src_rel_addr = MakeBinary(Opcode::I32Mul,
         MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(bias_width_bytes)), MakeI32Const(bias_width_bytes));
     auto src_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), src_rel_addr);

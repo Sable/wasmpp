@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),
-     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform, 0.5),
+     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),
      new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid(), LeCunUniform, 1)
   });
 

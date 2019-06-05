@@ -12,6 +12,7 @@
 #include <src/nn-builder/src/data_structure/ndarray.h>
 #include <memory>
 #include <utility>
+#include <src/nn-builder/src/snippet/matrix.h>
 #include "initializers.h"
 
 namespace nn {
@@ -24,6 +25,7 @@ struct ModelOptions {
   bool log_testing_error = false;
   bool log_testing_time = false;
   bool log_testing_confusion_matrix = false;
+  bool use_simd = false;
   builtins::ActivationOptions activation_options;
   WeightDistributionOptions weights_options;
 };
@@ -67,6 +69,11 @@ private:
     builtins::System system;
     builtins::Message message;
   } builtins_;
+
+  // Snippet codes
+  struct Snippets {
+    snippet::MatrixSnippet* matrix;
+  } snippets_;
 
   // Initalize functions
   void InitImports();
