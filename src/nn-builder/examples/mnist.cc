@@ -125,6 +125,7 @@ int main(int argc, char *argv[]) {
   options.log_testing_error = true;
   options.log_testing_time = true;
   options.log_testing_confusion_matrix = true;
+  options.use_simd = true;
   Model model(options);
   model.SetLayers({
      new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),

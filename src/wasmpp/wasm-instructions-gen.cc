@@ -34,6 +34,13 @@ wabt::ExprList* GenerateDoWhileLoop(LabelManager* label_manager, wabt::Var begin
   return e;
 }
 
+wabt::ExprList* GenerateDoWhileLoop(LabelManager* label_manager, wabt::Var begin, uint32_t end, uint32_t inc,
+                                    wabt::FuncSignature sig, std::function<void(BlockBody*)> content) {
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, GenerateGenericDoWhileLoop(label_manager, begin, MakeI32Const(end), inc, sig, content));
+  return e;
+}
+
 wabt::ExprList* GenerateCompoundAssignment(wabt::Var var, wabt::Opcode op, wabt::ExprList* operand) {
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(var, MakeBinary(op, MakeLocalGet(var), operand)));

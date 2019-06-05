@@ -289,7 +289,7 @@ Var Model::GenerateFeedForward() {
                                                  layers_[l-1]->A, {vi32_1, vi32_2}));
           auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(layers_[l-1]->layer->KeepProb()));
           true_block.Insert(snippets_.matrix->MatrixScalar(layers_[l-1]->A, scalar, layers_[l-1]->A,
-                                                  {vi32_1, vi32_2}));
+                                                  {vi32_1, vi32_2, vf32_1}));
         }));
       }
 
@@ -349,12 +349,12 @@ wabt::Var Model::GenerateBackpropagation() {
                                              snippet::RelocMat(layers_[l-1]->A), layers_[l]->dW,
                                              {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
-                                              {vi32_1, vi32_2}));
+                                              {vi32_1, vi32_2, vf32_1}));
 
       // dB[l] = (1/m) dZ[l]
       // FIXME Sum dZ[l] horizontally, store it into first column of dB[l], then broadcast
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
-                                              {vi32_1, vi32_2}));
+                                              {vi32_1, vi32_2, vf32_1}));
 
       if(l > 1) {
         // dA[l-1] = W[l]^T . dZ[l]
@@ -366,14 +366,14 @@ wabt::Var Model::GenerateBackpropagation() {
       // 1) dW[l] = alpha * dW[l]
       // 2) W[l] = W[l] - dW[l]
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(learning_rate_), layers_[l]->dW,
-                                              {vi32_1, vi32_2}));
+                                              {vi32_1, vi32_2, vf32_1}));
       f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
 
       // B[l] = B[l] - alpha * dB[l]
       // 1) dB[l] = alpha * dB[l]
       // 2) B[l] = B[l] - dB[l]
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dB, MakeF32Const(learning_rate_), layers_[l]->dB,
-                                              {vi32_1, vi32_2}));
+                                              {vi32_1, vi32_2, vf32_1}));
       f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
     }
   });

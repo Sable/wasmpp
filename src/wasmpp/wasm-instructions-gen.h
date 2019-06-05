@@ -37,6 +37,20 @@ wabt::ExprList* GenerateDoWhileLoop(LabelManager* label_manager, wabt::Var begin
                                   wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
 
 // Generate
+//   loop {label}
+//   {content}
+//   get_local {var}
+//   i32.const {inc}
+//   i32.add
+//   tee_local {var}
+//   i32.const {end}
+//   i32.ne
+//   br_if {label}
+//   end
+wabt::ExprList* GenerateDoWhileLoop(LabelManager* label_manager, wabt::Var begin, uint32_t end, uint32_t inc,
+                                    wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
+
+// Generate
 //   get_local {var}
 //   {operand}
 //   {op}

@@ -29,7 +29,7 @@ private:
 };
 
 class MatrixSnippet : public Snippet {
-private:
+protected:
   // Apply an element wise binary operation
   // e.g. dst[i] = lhs[i] + rhs[i]
   virtual wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray*
@@ -81,8 +81,15 @@ public:
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {
+protected:
+  wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                                             std::vector<wabt::Var> locals) override;
+
 public:
   MatrixSnippetSimd(wasmpp::LabelManager* label_manager) : MatrixSnippet(label_manager) {}
+
+  wabt::ExprList* MatrixScalar(ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
+                               std::vector<wabt::Var> locals) override ;
 };
 
 
