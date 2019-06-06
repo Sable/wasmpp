@@ -16,12 +16,12 @@ struct LayerMeta {
   ds::NDArray* W = nullptr;
   ds::NDArray* Z = nullptr;
   ds::NDArray* A = nullptr;
-  ds::NDArray* B = nullptr;
+  ds::NDArray* b = nullptr;
   // Back-propagation arrays
   ds::NDArray* dW = nullptr;
   ds::NDArray* dZ = nullptr;
   ds::NDArray* dA = nullptr;
-  ds::NDArray* dB = nullptr;
+  ds::NDArray* db = nullptr;
   // Regularization
   ds::NDArray* inverted_dropout = nullptr;
 };
@@ -111,8 +111,8 @@ void Model::AllocateLayers() {
       ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size_);
       ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
       ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
-      ALLOCATE_MEMORY(layers_[l]->B, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->dB, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(layers_[l]->b, layers_[l]->layer->Nodes(), 1);
+      ALLOCATE_MEMORY(layers_[l]->db, layers_[l]->layer->Nodes(), 1);
     }
     if(l == layers_.size() - 1) {
       ALLOCATE_MEMORY(true_matrix_, layers_[l]->layer->Nodes(), batch_size_);
@@ -212,7 +212,7 @@ void Model::MakeWeightData(wabt::Var memory) {
                    "Wrong weight distribution for the output layer");
     }
     auto weight_size = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
-    auto bias_size = layers_[l]->B->Shape()[0] * layers_[l]->B->Shape()[1];
+    auto bias_size = layers_[l]->b->Shape()[0] * layers_[l]->b->Shape()[1];
     std::vector<DataEntry> weight_entries;
     std::vector<DataEntry> bias_entries;
     switch (weight_type) {
@@ -250,7 +250,7 @@ void Model::MakeWeightData(wabt::Var memory) {
         assert(!"Weight distribution not implemented");
     }
     module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), weight_entries);
-    module_manager_.MakeData(memory, layers_[l]->B->Memory()->Begin(), bias_entries);
+    module_manager_.MakeData(memory, layers_[l]->b->Memory()->Begin(), bias_entries);
   }
 }
 
@@ -293,14 +293,14 @@ Var Model::GenerateFeedForward() {
         }));
       }
 
-      // Z[l] = W[l] . A[l-1] + B[l]
+      // Z[l] = W[l] . A[l-1] + b[l]
       // 1) Z[l] = W[l] . A[l-1]
-      // 2) Z[l] = Z[l] + B[l]
+      // 2) Z[l] = Z[l] + b[l]
       f.Insert(snippets_.matrix->MatrixDot(layers_[l]->W,
                                   (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
                                   snippet::RelocMat(layers_[l-1]->A), layers_[l]->Z,
                                   {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixVectorAddition(layers_[l]->Z, layers_[l]->B, layers_[l]->Z,
+      f.Insert(snippets_.matrix->MatrixVectorAddition(layers_[l]->Z, layers_[l]->b, layers_[l]->Z,
                                                       {vi32_1, vi32_2, vi32_3, vi32_4}));
 
       // A[l] = g(Z[l])
@@ -352,11 +352,11 @@ wabt::Var Model::GenerateBackpropagation() {
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
                                               {vi32_1, vi32_2, vf32_1}));
 
-      // dB[l] = (1/m) dZ[l]
-      // 1) dB[l] = SUM(dZ[l], row wise)
-      // 2) dB[l] = (1/m) dB[l]
-      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->dB, {vi32_1, vi32_2, vi32_3, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dB, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
+      // db[l] = (1/m) dZ[l]
+      // 1) db[l] = SUM(dZ[l], row wise)
+      // 2) db[l] = (1/m) db[l]
+      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(1.0f/batch_size_), layers_[l]->db,
                                               {vi32_1, vi32_2, vf32_1}));
 
       if(l > 1) {
@@ -372,12 +372,12 @@ wabt::Var Model::GenerateBackpropagation() {
                                               {vi32_1, vi32_2, vf32_1}));
       f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
 
-      // B[l] = B[l] - alpha * dB[l]
-      // 1) dB[l] = alpha * dB[l]
-      // 2) B[l] = B[l] - dB[l]
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dB, MakeF32Const(learning_rate_), layers_[l]->dB,
+      // b[l] = b[l] - alpha * db[l]
+      // 1) db[l] = alpha * db[l]
+      // 2) b[l] = b[l] - db[l]
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(learning_rate_), layers_[l]->db,
                                               {vi32_1, vi32_2, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->B, layers_[l]->dB, layers_[l]->B, {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->b, layers_[l]->db, layers_[l]->b, {vi32_1, vi32_2}));
     }
   });
 }
