@@ -47,8 +47,8 @@ protected:
   // +-+-+ + +-+ = +---+---+
   // |b|d|   |B|   |B+b|B+d|
   // +-+-+   +-+   +---+---+
-  virtual wabt::ExprList* MatrixVectorBinaryOperation(wabt::Opcode op, ds::NDArray* matrix, ds::NDArray* vector, ds::NDArray* dst_matrix,
-                                                      std::vector<wabt::Var> locals);
+  virtual wabt::ExprList* MatrixVectorBinaryOperation(wabt::Opcode op, ds::NDArray* matrix, ds::NDArray* vector,
+                                                      ds::NDArray* dst_matrix, std::vector<wabt::Var> locals);
 
 public:
   MatrixSnippet(wasmpp::LabelManager* label_manager) : Snippet(label_manager) {}
@@ -96,10 +96,12 @@ public:
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {
-protected:
+private:
   wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                                              std::vector<wabt::Var> locals) override;
 
+  wabt::ExprList* MatrixVectorBinaryOperation(wabt::Opcode op, ds::NDArray* matrix, ds::NDArray* vector,
+                                              ds::NDArray* dst_matrix, std::vector<wabt::Var> locals) override;
 public:
   explicit MatrixSnippetSimd(wasmpp::LabelManager* label_manager) : MatrixSnippet(label_manager) {}
 
