@@ -78,6 +78,13 @@ int main(int argc, char *argv[]) {
   matrix_snippet_test.MatrixDotLT_test_1();
   matrix_snippet_test.MatrixDotRT_test_1();
 
+  // Create matrix simd tests
+  nn::test::MatrixSnippetSimdTest matrix_snippet_simd_test(&module_manager, &test_builtins);
+  matrix_snippet_simd_test.MatrixAdditionSimd_test_1();
+  matrix_snippet_simd_test.MatrixSubtractionSimd_test_1();
+  matrix_snippet_simd_test.MatrixMultiplicationSimd_test_1();
+  matrix_snippet_simd_test.MatrixScalarSimd_test_1();
+
   assert(module_manager.Validate());
   if(!output_file.empty()) {
     std::ofstream file;

@@ -25,6 +25,20 @@ public:
   void MatrixDotRT_test_1();
 };
 
+class MatrixSnippetSimdTest {
+private:
+  snippet::MatrixSnippet matrix_snippet_simd_;
+  wasmpp::ModuleManager* module_manager_;
+  TestBuiltins* test_builtins_;
+public:
+  MatrixSnippetSimdTest(wasmpp::ModuleManager* module_manager, TestBuiltins* test_builtins) :
+      module_manager_(module_manager), test_builtins_(test_builtins), matrix_snippet_simd_(&module_manager->Label()) {}
+  void MatrixAdditionSimd_test_1();
+  void MatrixSubtractionSimd_test_1();
+  void MatrixMultiplicationSimd_test_1();
+  void MatrixScalarSimd_test_1();
+};
+
 } // namespace test
 } // namespace nn
 

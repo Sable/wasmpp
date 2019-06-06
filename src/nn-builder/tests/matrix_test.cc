@@ -300,6 +300,129 @@ void MatrixSnippetTest::MatrixDotRT_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixDotRT_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32);
 }
 
+void MatrixSnippetSimdTest::MatrixAdditionSimd_test_1() {
+  NN_TEST() {
+    uint32_t rows = 57;
+    uint32_t cols = 100;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val + val)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixAddition(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAdditionSimd_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetSimdTest::MatrixSubtractionSimd_test_1() {
+  NN_TEST() {
+    uint32_t rows = 57;
+    uint32_t cols = 100;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val*4)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val*-3)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixSubtraction(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixSubtractionSimd_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetSimdTest::MatrixMultiplicationSimd_test_1() {
+  NN_TEST() {
+    uint32_t rows = 57;
+    uint32_t cols = 100;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val*val)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixMultiplication(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixMultiplicationSimd_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetSimdTest::MatrixScalarSimd_test_1() {
+  NN_TEST() {
+    uint32_t rows = 57;
+    uint32_t cols = 100;
+
+    NEW_MATRIX(src, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float scalar = 0.2;
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(src->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val * scalar)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixScalar(src, MakeF32Const(scalar), dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixScalarSimd_1", Type::I32, Type::I32, Type::F32);
+}
+
 } // namespace test
 } // namespace nn
 
