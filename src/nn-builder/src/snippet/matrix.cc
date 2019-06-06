@@ -12,6 +12,10 @@ using namespace ds;
   ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
   ERROR_UNLESS((x)->Shape().size() == 2, #x " is expected to be a 2D matrix");
 
+#define VECTOR_CHECK(x) \
+  MATRIX_CHECK(x) \
+  ERROR_UNLESS((x)->Shape()[1] == 1, #x" is expected to be a vector");
+
 #define MATRIX_SAME_SHAPE(x, y) \
   ERROR_UNLESS((x)->Shape() == (y)->Shape(), #x " and " #y " matrices are not compatible");
 
@@ -182,6 +186,46 @@ wabt::ExprList* MatrixSnippet::MatrixMultiplication(NDArray* lhs, NDArray* rhs, 
   return ElementWiseBinaryOperation(Opcode::F32Mul, lhs, rhs, dst, locals);
 }
 
+wabt::ExprList* MatrixSnippet::MatrixVectorAddition(NDArray* matrix, NDArray* vector, NDArray* dst_matrix,
+                                                    std::vector<Var> locals) {
+  return MatrixVectorBinaryOperation(Opcode::F32Add, matrix, vector, dst_matrix, locals);
+}
+
+wabt::ExprList* MatrixSnippet::MatrixVectorBinaryOperation(Opcode op, NDArray *matrix, NDArray *vector,
+                                                           NDArray *dst_matrix, std::vector<Var> locals) {
+  MATRIX_CHECK(matrix);
+  MATRIX_CHECK(vector);
+  MATRIX_CHECK(dst_matrix);
+  MATRIX_SAME_SHAPE(matrix, dst_matrix);
+  ERROR_UNLESS(vector->Shape()[1] == 1, "vector must be of shape (n, 1)");
+
+  assert(locals.size() == 4);
+
+  auto row = locals[0];
+  auto col = locals[1];
+  auto vec_row_offset = locals[2];
+  auto addr = locals[3];
+
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t dst_width_bytes = dst_matrix->Shape()[1] * type_size;
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(vec_row_offset, MakeI32Const(vector->Memory()->Begin())));
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager_, row, 0, dst_matrix->Memory()->Bytes(), dst_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager_, col, 0, dst_width_bytes, type_size, {}, [&](BlockBody* b2){
+      auto mat_addr = MakeBinary(Opcode::I32Add, MakeI32Const(matrix->Memory()->Begin()), MakeLocalGet(addr));
+      auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst_matrix->Memory()->Begin()), MakeLocalGet(addr));
+      auto vec_addr = MakeLocalGet(vec_row_offset);
+      auto result = MakeBinary(op, MakeF32Load(mat_addr), MakeF32Load(vec_addr));
+      b2->Insert(MakeF32Store(dst_addr, result));
+      b2->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+    }));
+    b1->Insert(GenerateCompoundAssignment(vec_row_offset, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
+  return e;
+}
+
 wabt::ExprList* MatrixSnippet::MatrixScalar(NDArray* src, ExprList* scalar, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(src);
   MATRIX_CHECK(dst);
@@ -286,26 +330,9 @@ wabt::ExprList* MatrixSnippet::MatrixColumnArgmax(NDArray* src, std::vector<Var>
   return e;
 }
 
-wabt::ExprList* MatrixSnippet::MatrixBiasBroadcast(NDArray* bias, std::vector<Var> locals) {
-  MATRIX_CHECK(bias);
-  assert(locals.size() == 2);
+wabt::ExprList* MatrixSnippet::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
+                                            std::vector<wabt::Var> locals) {
 
-  auto dst_addr = locals[0];
-  auto addr = locals[1];
-
-  uint32_t type_size = TypeSize(Type::F32);
-  uint32_t bias_width_bytes = bias->Shape()[1] * type_size;
-
-  wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
-  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, bias->Memory()->Begin(), bias->Memory()->End(), type_size, {}, [&](BlockBody* b) {
-    auto src_rel_addr = MakeBinary(Opcode::I32Mul,
-        MakeBinary(Opcode::I32DivU, MakeLocalGet(addr), MakeI32Const(bias_width_bytes)), MakeI32Const(bias_width_bytes));
-    auto src_abs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(bias->Memory()->Begin()), src_rel_addr);
-    b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeF32Load(src_abs_addr)));
-    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
-  }));
-  return e;
 }
 
 wabt::Opcode OpcodeToSimd(wabt::Opcode op) {
