@@ -171,14 +171,14 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
 }
 
 void Model::MakeTrainingData(wabt::Var memory) {
-  for(uint32_t i=0; i < training_vals_.size(); ++i) {
+  for(uint32_t i=0; i < training_.size(); ++i) {
     // Training data
     auto training_begin = training_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size_);
     module_manager_.MakeData(memory, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
   }
 
-  for(uint32_t i=0; i < training_labels_vals_.size(); ++i) {
+  for(uint32_t i=0; i < training_labels_.size(); ++i) {
     // Training labels
     auto labels_begin = training_labels_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
@@ -188,14 +188,14 @@ void Model::MakeTrainingData(wabt::Var memory) {
 }
 
 void Model::MakeTestingData(wabt::Var memory) {
-  for(uint32_t i=0; i < testing_vals_.size(); ++i) {
+  for(uint32_t i=0; i < testing_.size(); ++i) {
     // Testing data
     auto testing_begin = testing_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + batch_size_);
     module_manager_.MakeData(memory, testing_[i]->Memory()->Begin(), MakeTransposeData(testing_[i], sub_input));
   }
 
-  for(uint32_t i=0; i < testing_labels_vals_.size(); ++i) {
+  for(uint32_t i=0; i < testing_labels_.size(); ++i) {
     // Testing labels
     auto labels_begin = testing_labels_vals_.begin() + (i * batch_size_);
     std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
@@ -300,7 +300,8 @@ Var Model::GenerateFeedForward() {
                                   (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
                                   snippet::RelocMat(layers_[l-1]->A), layers_[l]->Z,
                                   {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixAddition(layers_[l]->Z, layers_[l]->B, layers_[l]->Z, {vi32_1, vi32_2}));
+      f.Insert(snippets_.matrix->MatrixVectorAddition(layers_[l]->Z, layers_[l]->B, layers_[l]->Z,
+                                                      {vi32_1, vi32_2, vi32_3, vi32_4}));
 
       // A[l] = g(Z[l])
       f.Insert(snippets_.matrix->MatrixActivation(snippet::RelocMat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
@@ -352,8 +353,10 @@ wabt::Var Model::GenerateBackpropagation() {
                                               {vi32_1, vi32_2, vf32_1}));
 
       // dB[l] = (1/m) dZ[l]
-      // FIXME Sum dZ[l] horizontally, store it into first column of dB[l], then broadcast
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dZ, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
+      // 1) dB[l] = SUM(dZ[l], row wise)
+      // 2) dB[l] = (1/m) dB[l]
+      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->dB, {vi32_1, vi32_2, vi32_3, vf32_1}));
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dB, MakeF32Const(1.0f/batch_size_), layers_[l]->dB,
                                               {vi32_1, vi32_2, vf32_1}));
 
       if(l > 1) {
