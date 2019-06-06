@@ -23,6 +23,7 @@ public:
   void MatrixDot_test_1();
   void MatrixDotLT_test_1();
   void MatrixDotRT_test_1();
+  void MatrixVectorAddition_test_1();
 };
 
 class MatrixSnippetSimdTest {

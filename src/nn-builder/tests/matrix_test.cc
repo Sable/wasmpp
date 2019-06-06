@@ -300,6 +300,39 @@ void MatrixSnippetTest::MatrixDotRT_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixDotRT_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32);
 }
 
+void MatrixSnippetTest::MatrixVectorAddition_test_1() {
+  NN_TEST() {
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(matrix, rows, cols);
+    NEW_MATRIX(vector, rows, 1);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float mat_val = 1;
+    float vec_val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      f.Insert(MakeF32Store(MakeI32Const(vector->GetLinearIndex({row, 0})), MakeF32Const(vec_val)));
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(matrix->GetLinearIndex({row, col})), MakeF32Const(mat_val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(mat_val+vec_val)));
+        mat_val++;
+      }
+      vec_val++;
+    }
+
+    f.Insert(matrix_snippet_.MatrixVectorAddition(matrix, vector, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixVectorAddition_1", Type::I32, Type::I32, Type::I32, Type::I32);
+}
+
 void MatrixSnippetSimdTest::MatrixAdditionSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;

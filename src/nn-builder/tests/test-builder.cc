@@ -77,6 +77,7 @@ int main(int argc, char *argv[]) {
   matrix_snippet_test.MatrixDot_test_1();
   matrix_snippet_test.MatrixDotLT_test_1();
   matrix_snippet_test.MatrixDotRT_test_1();
+  matrix_snippet_test.MatrixVectorAddition_test_1();
 
   // Create matrix simd tests
   nn::test::MatrixSnippetSimdTest matrix_snippet_simd_test(&module_manager, &test_builtins);
