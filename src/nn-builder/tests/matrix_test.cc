@@ -14,37 +14,6 @@ using namespace wasmpp;
 void MatrixSnippetTest::MatrixAddition_test_1() {
   NN_TEST() {
     uint32_t rows = 5;
-    uint32_t cols = 5;
-
-    NEW_MATRIX(lhs, rows, cols);
-    NEW_MATRIX(rhs, rows, cols);
-    NEW_MATRIX(dst, rows, cols);
-    NEW_MATRIX(expected, rows, cols);
-
-    float val = 1;
-    for (uint32_t row = 0; row < rows; row++) {
-      for (uint32_t col = 0; col < cols; col++) {
-        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
-        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
-        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val + val)));
-        val++;
-      }
-    }
-
-    f.Insert(matrix_snippet_.MatrixAddition(lhs, rhs, dst, locals));
-    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
-        MakeI32Const(dst->Memory()->Begin()),
-        MakeI32Const(expected->Memory()->Begin()),
-        MakeI32Const(dst->Shape()[0]),
-        MakeI32Const(dst->Shape()[1])
-    }));
-  };
-  ADD_NN_TEST(module_manager_, "MatrixAddition_1", Type::I32, Type::I32);
-}
-
-void MatrixSnippetTest::MatrixAddition_test_2() {
-  NN_TEST() {
-    uint32_t rows = 5;
     uint32_t cols = 10;
 
     NEW_MATRIX(lhs, rows, cols);
@@ -70,7 +39,7 @@ void MatrixSnippetTest::MatrixAddition_test_2() {
         MakeI32Const(dst->Shape()[1])
     }));
   };
-  ADD_NN_TEST(module_manager_, "MatrixAddition_2", Type::I32, Type::I32);
+  ADD_NN_TEST(module_manager_, "MatrixAddition_1", Type::I32, Type::I32);
 }
 
 void MatrixSnippetTest::MatrixSubtraction_test_1() {
@@ -102,6 +71,233 @@ void MatrixSnippetTest::MatrixSubtraction_test_1() {
     }));
   };
   ADD_NN_TEST(module_manager_, "MatrixSubtraction_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetTest::MatrixMultiplication_test_1() {
+  NN_TEST() {
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val*val)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixMultiplication(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixMultiplication_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetTest::MatrixScalar_test_1() {
+  NN_TEST() {
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(src, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float scalar = 0.2;
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(src->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val * scalar)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixScalar(src, MakeF32Const(scalar), dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixScalar_1", Type::I32, Type::I32, Type::F32);
+}
+
+void MatrixSnippetTest::MatrixDot_test_1() {
+  NN_TEST() {
+    uint32_t lhs_rows = 5;
+    uint32_t lhs_cols = 10;
+    uint32_t rhs_rows = lhs_cols;
+    uint32_t rhs_cols = 7;
+
+    NEW_MATRIX(lhs, lhs_rows, lhs_cols);
+    NEW_MATRIX(rhs, rhs_rows, rhs_cols);
+    NEW_MATRIX(dst, lhs_rows, rhs_cols);
+    NEW_MATRIX(expected, lhs_rows, rhs_cols);
+
+    std::vector<std::vector<float>> mat1(lhs_rows, std::vector<float>(lhs_cols, 0));
+    std::vector<std::vector<float>> mat2(rhs_rows, std::vector<float>(rhs_cols, 0));
+    std::vector<std::vector<float>> res(lhs_rows, std::vector<float>(rhs_cols, 0));
+    float val = 1;
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < lhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat1[row][col] = val;
+        val++;
+      }
+    }
+    for (uint32_t row = 0; row < rhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat2[row][col] = val;
+        val++;
+      }
+    }
+    for (auto i = 0; i < lhs_rows; ++i) {
+      for (auto j = 0; j < rhs_cols; ++j) {
+        for (auto k = 0; k <lhs_cols; ++k) {
+          res[i][j] += mat1[i][k] * mat2[k][j];
+        }
+      }
+    }
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(res[row][col])));
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixDot(lhs, snippet::RelocMat(rhs), dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixDot_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32);
+}
+
+void MatrixSnippetTest::MatrixDotLT_test_1() {
+  NN_TEST() {
+    uint32_t lhs_rows = 10;
+    uint32_t lhs_cols = 5;
+    uint32_t rhs_rows = lhs_rows;
+    uint32_t rhs_cols = 7;
+    uint32_t dst_rows = lhs_cols;
+    uint32_t dst_cols = rhs_cols;
+
+    NEW_MATRIX(lhs, lhs_rows, lhs_cols);
+    NEW_MATRIX(rhs, rhs_rows, rhs_cols);
+    NEW_MATRIX(dst, dst_rows, dst_cols);
+    NEW_MATRIX(expected, dst_rows, dst_cols);
+
+    std::vector<std::vector<float>> mat1(lhs_rows, std::vector<float>(lhs_cols, 0));
+    std::vector<std::vector<float>> mat2(rhs_rows, std::vector<float>(rhs_cols, 0));
+    std::vector<std::vector<float>> res(dst_rows, std::vector<float>(dst_cols, 0));
+    float val = 1;
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < lhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat1[row][col] = val;
+        val++;
+      }
+    }
+    for (uint32_t row = 0; row < rhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat2[row][col] = val;
+        val++;
+      }
+    }
+    for (auto i = 0; i < lhs_cols; ++i) {
+      for (auto j = 0; j < rhs_cols; ++j) {
+        for (auto k = 0; k <lhs_rows; ++k) {
+          res[i][j] += mat1[k][i] * mat2[k][j];
+        }
+      }
+    }
+    for (uint32_t row = 0; row < dst_rows; row++) {
+      for (uint32_t col = 0; col < dst_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(res[row][col])));
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixDotLT(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixDotLT_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32);
+}
+
+void MatrixSnippetTest::MatrixDotRT_test_1() {
+  NN_TEST() {
+    uint32_t lhs_rows = 5;
+    uint32_t lhs_cols = 10;
+    uint32_t rhs_rows = 7;
+    uint32_t rhs_cols = lhs_cols;
+    uint32_t dst_rows = lhs_rows;
+    uint32_t dst_cols = rhs_rows;
+
+    NEW_MATRIX(lhs, lhs_rows, lhs_cols);
+    NEW_MATRIX(rhs, rhs_rows, rhs_cols);
+    NEW_MATRIX(dst, dst_rows, dst_cols);
+    NEW_MATRIX(expected, dst_rows, dst_cols);
+
+    std::vector<std::vector<float>> mat1(lhs_rows, std::vector<float>(lhs_cols, 0));
+    std::vector<std::vector<float>> mat2(rhs_rows, std::vector<float>(rhs_cols, 0));
+    std::vector<std::vector<float>> res(dst_rows, std::vector<float>(dst_cols, 0));
+    float val = 1;
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < lhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat1[row][col] = val;
+        val++;
+      }
+    }
+    for (uint32_t row = 0; row < rhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat2[row][col] = val;
+        val++;
+      }
+    }
+    for (auto i = 0; i < lhs_rows; ++i) {
+      for (auto j = 0; j < rhs_rows; ++j) {
+        for (auto k = 0; k <lhs_cols; ++k) {
+          res[i][j] += mat1[i][k] * mat2[j][k];
+        }
+      }
+    }
+    for (uint32_t row = 0; row < dst_rows; row++) {
+      for (uint32_t col = 0; col < dst_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(res[row][col])));
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixDotRT(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixDotRT_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32);
 }
 
 } // namespace test

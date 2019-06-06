@@ -71,8 +71,12 @@ int main(int argc, char *argv[]) {
   // Create matrix tests
   nn::test::MatrixSnippetTest matrix_snippet_test(&module_manager, &test_builtins);
   matrix_snippet_test.MatrixAddition_test_1();
-  matrix_snippet_test.MatrixAddition_test_2();
   matrix_snippet_test.MatrixSubtraction_test_1();
+  matrix_snippet_test.MatrixMultiplication_test_1();
+  matrix_snippet_test.MatrixScalar_test_1();
+  matrix_snippet_test.MatrixDot_test_1();
+  matrix_snippet_test.MatrixDotLT_test_1();
+  matrix_snippet_test.MatrixDotRT_test_1();
 
   assert(module_manager.Validate());
   if(!output_file.empty()) {

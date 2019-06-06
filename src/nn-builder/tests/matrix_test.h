@@ -17,8 +17,12 @@ public:
   MatrixSnippetTest(wasmpp::ModuleManager* module_manager, TestBuiltins* test_builtins) :
       module_manager_(module_manager), test_builtins_(test_builtins), matrix_snippet_(&module_manager->Label()) {}
   void MatrixAddition_test_1();
-  void MatrixAddition_test_2();
   void MatrixSubtraction_test_1();
+  void MatrixMultiplication_test_1();
+  void MatrixScalar_test_1();
+  void MatrixDot_test_1();
+  void MatrixDotLT_test_1();
+  void MatrixDotRT_test_1();
 };
 
 } // namespace test
