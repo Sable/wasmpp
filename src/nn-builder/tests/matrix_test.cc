@@ -12,56 +12,21 @@ using namespace wasmpp;
                             {rows, cols}, TypeSize(Type::F32));
 
 void MatrixSnippetTest::MatrixAddition_test_1() {
-module_manager_->MakeFunction("test_MatrixAddition_1", {}, {Type::I32, Type::I32},
-                              [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-  uint32_t rows = 5;
-  uint32_t cols = 5;
-
-  NEW_MATRIX(lhs, rows, cols);
-  NEW_MATRIX(rhs, rows, cols);
-  NEW_MATRIX(dst, rows, cols);
-  NEW_MATRIX(expected, rows, cols);
-
-  uint32_t val = 1;
-  for(uint32_t row = 0; row < rows; row++) {
-    for(uint32_t col = 0; col < cols; col++) {
-      f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
-      f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
-      f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val+val)));
-      val++;
-    }
-  }
-
-  f.Insert(matrix_snippet_.MatrixAddition(lhs, rhs, dst, locals));
-  f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
-    MakeI32Const(dst->Memory()->Begin()),
-    MakeI32Const(expected->Memory()->Begin()),
-    MakeI32Const(dst->Shape()[0]),
-    MakeI32Const(dst->Shape()[1])
-  }));
-});
-}
-
-void MatrixSnippetTest::MatrixAddition_test_2() {
-  module_manager_->MakeFunction("test_MatrixAddition_2", {}, {Type::I32, Type::I32},
-                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+  NN_TEST() {
     uint32_t rows = 5;
-    uint32_t cols = 10;
+    uint32_t cols = 5;
 
     NEW_MATRIX(lhs, rows, cols);
     NEW_MATRIX(rhs, rows, cols);
     NEW_MATRIX(dst, rows, cols);
     NEW_MATRIX(expected, rows, cols);
 
-    uint32_t val = 1;
+    float val = 1;
     for (uint32_t row = 0; row < rows; row++) {
       for (uint32_t col = 0; col < cols; col++) {
-        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})),
-                              MakeF32Const(val)));
-        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})),
-                              MakeF32Const(val)));
-        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})),
-                              MakeF32Const(val + val)));
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val + val)));
         val++;
       }
     }
@@ -73,7 +38,70 @@ void MatrixSnippetTest::MatrixAddition_test_2() {
         MakeI32Const(dst->Shape()[0]),
         MakeI32Const(dst->Shape()[1])
     }));
-  });
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddition_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetTest::MatrixAddition_test_2() {
+  NN_TEST() {
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val + val)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixAddition(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddition_2", Type::I32, Type::I32);
+}
+
+void MatrixSnippetTest::MatrixSubtraction_test_1() {
+  NN_TEST() {
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val*4)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val*-3)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixSubtraction(lhs, rhs, dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixSubtraction_1", Type::I32, Type::I32);
 }
 
 } // namespace test
