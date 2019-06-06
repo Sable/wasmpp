@@ -194,10 +194,9 @@ wabt::ExprList* MatrixSnippet::MatrixVectorAddition(NDArray* matrix, NDArray* ve
 wabt::ExprList* MatrixSnippet::MatrixVectorBinaryOperation(Opcode op, NDArray *matrix, NDArray *vector,
                                                            NDArray *dst_matrix, std::vector<Var> locals) {
   MATRIX_CHECK(matrix);
-  MATRIX_CHECK(vector);
+  VECTOR_CHECK(vector);
   MATRIX_CHECK(dst_matrix);
   MATRIX_SAME_SHAPE(matrix, dst_matrix);
-  ERROR_UNLESS(vector->Shape()[1] == 1, "vector must be of shape (n, 1)");
 
   assert(locals.size() == 4);
 
@@ -333,6 +332,30 @@ wabt::ExprList* MatrixSnippet::MatrixColumnArgmax(NDArray* src, std::vector<Var>
 wabt::ExprList* MatrixSnippet::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
                                             std::vector<wabt::Var> locals) {
 
+  MATRIX_CHECK(matrix);
+  VECTOR_CHECK(dst_vector);
+  assert(locals.size() == 4);
+
+  auto mat_row_offset = locals[0];
+  auto col = locals[1];
+  auto vec_row_offset = locals[2];
+  auto res = locals[3];
+
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t matrix_width_bytes = matrix->Shape()[1] * type_size;
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(vec_row_offset, MakeI32Const(dst_vector->Memory()->Begin())));
+  Merge(e, GenerateRangeLoop(label_manager_, mat_row_offset, matrix->Memory()->Begin(), matrix->Memory()->End(), matrix_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(res, MakeF32Const(0)));
+    b1->Insert(GenerateRangeLoop(label_manager_, col, 0, matrix_width_bytes, type_size, {}, [&](BlockBody* b2){
+      auto mat_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(mat_row_offset), MakeLocalGet(col));
+      b2->Insert(GenerateCompoundAssignment(res, Opcode::F32Add, MakeF32Load(mat_addr)));
+    }));
+    b1->Insert(MakeF32Store(MakeLocalGet(vec_row_offset), MakeLocalGet(res)));
+    b1->Insert(GenerateCompoundAssignment(vec_row_offset, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
+  return e;
 }
 
 wabt::Opcode OpcodeToSimd(wabt::Opcode op) {
@@ -444,10 +467,9 @@ wabt::ExprList* MatrixSnippetSimd::MatrixScalar(nn::ds::NDArray *src, wabt::Expr
 wabt::ExprList* MatrixSnippetSimd::MatrixVectorBinaryOperation(Opcode op, NDArray *matrix, NDArray *vector,
                                                                NDArray *dst_matrix, std::vector<Var> locals) {
   MATRIX_CHECK(matrix);
-  MATRIX_CHECK(vector);
+  VECTOR_CHECK(vector);
   MATRIX_CHECK(dst_matrix);
   MATRIX_SAME_SHAPE(matrix, dst_matrix);
-  ERROR_UNLESS(vector->Shape()[1] == 1, "vector must be of shape (n, 1)");
   assert(locals.size() == 4);
 
   uint32_t simd_type_size = TypeSize(Type::V128);
