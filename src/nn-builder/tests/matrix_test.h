@@ -3,7 +3,7 @@
 
 #include <src/wasmpp/wasm-manager.h>
 #include <src/nn-builder/src/snippet/matrix.h>
-#include <src/nn-builder/tests/test-builtins.h>
+#include <src/nn-builder/tests/test-common.h>
 
 namespace nn {
 namespace test {
@@ -16,7 +16,8 @@ private:
 public:
   MatrixSnippetTest(wasmpp::ModuleManager* module_manager, TestBuiltins* test_builtins) :
       module_manager_(module_manager), test_builtins_(test_builtins), matrix_snippet_(&module_manager->Label()) {}
-  void MatrixAddition_test_1(uint32_t id);
+  void MatrixAddition_test_1();
+  void MatrixAddition_test_2();
 };
 
 } // namespace test

@@ -8,7 +8,6 @@ namespace test {
 
 struct TestBuiltins {
   wabt::Var assert_matrix_eq;
-  wabt::Var log_start_function;
 };
 
 } // namespace test

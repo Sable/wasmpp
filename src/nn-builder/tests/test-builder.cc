@@ -61,8 +61,6 @@ int main(int argc, char *argv[]) {
 
   // Import js functions
   nn::test::TestBuiltins test_builtins;
-  test_builtins.log_start_function = module_manager.MakeFuncImport("Test", "log_start_function",
-      {{wabt::Type::I32},{}});
   test_builtins.assert_matrix_eq = module_manager.MakeFuncImport("Test", "assert_matrix_eq",
       {{wabt::Type ::I32, wabt::Type::I32, wabt::Type::I32, wabt::Type::I32},{}});
 
@@ -72,7 +70,8 @@ int main(int argc, char *argv[]) {
 
   // Create matrix tests
   nn::test::MatrixSnippetTest matrix_snippet_test(&module_manager, &test_builtins);
-  matrix_snippet_test.MatrixAddition_test_1(1);
+  matrix_snippet_test.MatrixAddition_test_1();
+  matrix_snippet_test.MatrixAddition_test_2();
 
   assert(module_manager.Validate());
   if(!output_file.empty()) {

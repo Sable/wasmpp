@@ -30,7 +30,6 @@ const imports = {
     }
   },
   "Test": {
-    log_start_function: (id) => {console.log(">> Testing function", id, "...");},
     assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
       let mat1 = new Float32Array(g_wasm.instance.exports.memory.buffer, mat1_index, rows*cols);
       let mat2 = new Float32Array(g_wasm.instance.exports.memory.buffer, mat2_index, rows*cols);
@@ -60,6 +59,7 @@ if(process.argv.length > 2) {
       }
       Object.keys(wasm.instance.exports).forEach((func) => {
         if(func.startsWith("test_")) {
+          console.log("Testing function:", func);
           wasm.instance.exports[func]();
         }
       });
