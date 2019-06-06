@@ -47,4 +47,13 @@ wabt::ExprList* GenerateCompoundAssignment(wabt::Var var, wabt::Opcode op, wabt:
   return e;
 }
 
+wabt::ExprList* GenerateExpensiveF32X4HorizontalSum(wabt::Var var) {
+  wabt::ExprList* e = new wabt::ExprList();
+  auto tree_1 = MakeBinary(wabt::Opcode::F32Add,
+      MakeF32X4ExtractLane(MakeLocalGet(var), 0), MakeF32X4ExtractLane(MakeLocalGet(var), 1));
+  auto tree_2 = MakeBinary(wabt::Opcode::F32Add,
+      MakeF32X4ExtractLane(MakeLocalGet(var), 2), MakeF32X4ExtractLane(MakeLocalGet(var), 3));
+  Merge(e, MakeBinary(wabt::Opcode::F32Add, tree_1, tree_2));
+  return e;
+}
 } // namespace wasmpp

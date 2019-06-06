@@ -57,6 +57,18 @@ wabt::ExprList* GenerateDoWhileLoop(LabelManager* label_manager, wabt::Var begin
 //   set_local {var}
 wabt::ExprList* GenerateCompoundAssignment(wabt::Var var, wabt::Opcode op, wabt::ExprList* operand);
 
+// TODO This is a temporary solution for horizontally summing v128
+// Future release will include a SIMD instruction for this
+// Generate
+//   f32.extract_lane {var} 0
+//   f32.extract_lane {var} 1
+//   f32.add
+//   f32.extract_lane {var} 2
+//   f32.extract_lane {var} 3
+//   f32.add
+//   f32.add
+  wabt::ExprList* GenerateExpensiveF32X4HorizontalSum(wabt::Var var);
+
 } // namespace wasmpp
 
 #endif

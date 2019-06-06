@@ -40,6 +40,7 @@ public:
   void MatrixMultiplicationSimd_test_1();
   void MatrixScalarSimd_test_1();
   void MatrixVectorAdditionSimd_test_1();
+  void MatrixRowSumSimd_test_1();
 };
 
 } // namespace test

@@ -329,6 +329,7 @@ wabt::Var Model::GenerateBackpropagation() {
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
+    auto v128_1 = locals[6];
 
     auto input_begin = params[0];
 
@@ -355,7 +356,7 @@ wabt::Var Model::GenerateBackpropagation() {
       // db[l] = (1/m) dZ[l]
       // 1) db[l] = SUM(dZ[l], row wise)
       // 2) db[l] = (1/m) db[l]
-      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1}));
+      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(1.0f/batch_size_), layers_[l]->db,
                                               {vi32_1, vi32_2, vf32_1}));
 

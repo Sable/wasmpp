@@ -334,12 +334,13 @@ wabt::ExprList* MatrixSnippet::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDA
 
   MATRIX_CHECK(matrix);
   VECTOR_CHECK(dst_vector);
-  assert(locals.size() == 4);
+  assert(locals.size() == 5);
 
   auto mat_row_offset = locals[0];
   auto col = locals[1];
   auto vec_row_offset = locals[2];
   auto res = locals[3];
+  auto used_by_simd = locals[4];
 
   uint32_t type_size = TypeSize(Type::F32);
   uint32_t matrix_width_bytes = matrix->Shape()[1] * type_size;
@@ -515,6 +516,57 @@ wabt::ExprList* MatrixSnippetSimd::MatrixVectorBinaryOperation(Opcode op, NDArra
       }));
     }
 
+    b1->Insert(GenerateCompoundAssignment(vec_row_offset, Opcode::I32Add, MakeI32Const(type_size)));
+  }));
+  return e;
+}
+
+// TODO Currently SIMD horizontal summation is not implemented:
+// Issue ulr: https://github.com/WebAssembly/simd/issues/20
+// Once implemented, this code can be improved
+wabt::ExprList* MatrixSnippetSimd::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
+                                                std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(matrix);
+  VECTOR_CHECK(dst_vector);
+  assert(locals.size() == 5);
+
+  uint32_t simd_type_size = TypeSize(Type::V128);
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t matrix_width_bytes = matrix->Shape()[1] * type_size;
+  auto width_remainder = matrix_width_bytes % WASMPP_V128_SIZE;
+  auto matrix_simd_width_bytes = matrix_width_bytes - width_remainder;
+
+  // Cannot optimize if matrix width bytes is too small
+  if(matrix_simd_width_bytes < WASMPP_V128_SIZE) {
+    return MatrixSnippet::MatrixRowSum(matrix, dst_vector, locals);
+  }
+
+  auto mat_row_offset = locals[0];
+  auto col = locals[1];
+  auto vec_row_offset = locals[2];
+  auto res = locals[3];
+  auto res_128 = locals[4];
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(vec_row_offset, MakeI32Const(dst_vector->Memory()->Begin())));
+  Merge(e, GenerateRangeLoop(label_manager_, mat_row_offset, matrix->Memory()->Begin(), matrix->Memory()->End(), matrix_width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(res_128, MakeF32X4Const(0, 0, 0, 0)));
+
+    // Use SIMD while possible
+    b1->Insert(GenerateRangeLoop(label_manager_, col, 0, matrix_simd_width_bytes, simd_type_size, {}, [&](BlockBody* b2){
+      auto mat_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(mat_row_offset), MakeLocalGet(col));
+      b2->Insert(GenerateCompoundAssignment(res_128, Opcode::F32X4Add, MakeV128Load(mat_addr)));
+    }));
+    b1->Insert(MakeLocalSet(res, GenerateExpensiveF32X4HorizontalSum(res_128)));
+
+    // Fallback to regular computation
+    if(width_remainder > 0) {
+      b1->Insert(GenerateDoWhileLoop(label_manager_, col, matrix_width_bytes, type_size, {}, [&](BlockBody* b2){
+        auto mat_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(mat_row_offset), MakeLocalGet(col));
+        b2->Insert(GenerateCompoundAssignment(res, Opcode::F32Add, MakeF32Load(mat_addr)));
+      }));
+    }
+    b1->Insert(MakeF32Store(MakeLocalGet(vec_row_offset), MakeLocalGet(res)));
     b1->Insert(GenerateCompoundAssignment(vec_row_offset, Opcode::I32Add, MakeI32Const(type_size)));
   }));
   return e;

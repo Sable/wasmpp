@@ -107,6 +107,8 @@ public:
 
   wabt::ExprList* MatrixScalar(ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
                                std::vector<wabt::Var> locals) override ;
+
+  wabt::ExprList* MatrixRowSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals) override;
 };
 
 

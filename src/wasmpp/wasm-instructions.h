@@ -32,6 +32,19 @@ wabt::ExprList* MakeI32Const(uint32_t val);
 wabt::ExprList* MakeI64Const(uint64_t val);
 wabt::ExprList* MakeF32Const(float val);
 wabt::ExprList* MakeF64Const(double val);
+wabt::ExprList* MakeF32X4Const(float a, float b, float c, float d);
+
+// Make SIMD extract lane
+#define EXTRACT_LANE_LIST(V) \
+  V(I32X4ExtractLane) \
+  V(F32X4ExtractLane) \
+  V(I64X2ExtractLane) \
+  V(F64X2ExtractLane)
+
+#define DECLARE_EXTRACT(name) \
+  wabt::ExprList* Make##name(wabt::ExprList* operand, uint64_t index);
+EXTRACT_LANE_LIST(DECLARE_EXTRACT)
+#undef DECLARE_EXTRACT
 
   // Make loads
 #define LOAD_INSTRUCTIONS_LIST(V) \
