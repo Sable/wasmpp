@@ -20,6 +20,7 @@ include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
 set(WABT wabt)
 set(WASMPP wasmpp)
 set(NN_BUILDER nnb)
+set(NN_TEST nn-test)
 set(LOGIC logic)
 set(MNIST mnist)
 
@@ -32,6 +33,11 @@ target_link_libraries(${WASMPP} ${WABT})
 file(GLOB_RECURSE NN_BUILDER_FILES src/nn-builder/*/*.cc)
 add_library(${NN_BUILDER} ${NN_BUILDER_FILES})
 target_link_libraries(${NN_BUILDER} ${WASMPP})
+
+# Create test cases
+file(GLOB_RECURSE NN_TEST_FILES src/nn-builder/tests/*.cc)
+add_executable(${NN_TEST} ${NN_TEST_FILES})
+target_link_libraries(${NN_TEST} ${NN_BUILDER})
 
 # Create logic example
 file(GLOB_RECURSE LOGIC_FILES src/nn-builder/examples/logic.cc)
