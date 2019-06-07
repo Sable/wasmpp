@@ -26,4 +26,22 @@ uint32_t TypeShiftLeft(wabt::Type type) {
   return shift;
 }
 
+#define SIMD_OPCODE_CONVERSION_LIST(V) \
+  V(F32Add, F32X4Add) \
+  V(F32Sub, F32X4Sub) \
+  V(F32Mul, F32X4Mul) \
+  V(F32Div, F32X4Div)
+
+#define SIMD_OPCODE_CASE_CONVERSION(opcode, simd_opcode) \
+  case wabt::Opcode::opcode: \
+    return wabt::Opcode::simd_opcode;
+
+wabt::Opcode OpcodeToSimdOpcode(wabt::Opcode op) {
+  switch (op) {
+    SIMD_OPCODE_CONVERSION_LIST(SIMD_OPCODE_CASE_CONVERSION)
+    default:
+      assert(!"Opcode to SIMD not implemented");
+  }
+}
+
 } // namespace wasmpp

@@ -2,6 +2,7 @@
 #define WASMPP_COMMON_H_
 
 #include <src/common.h>
+#include <src/opcode.h>
 
 namespace wasmpp {
 
@@ -30,6 +31,10 @@ const uint32_t WASMPP_V128_SIZE = 16;
 // Size of types
 uint32_t TypeSize(wabt::Type type);
 uint32_t TypeShiftLeft(wabt::Type type);
-}
+
+// Opcode conversion to SIMD opcode
+wabt::Opcode OpcodeToSimdOpcode(wabt::Opcode op);
+
+} // namespace wasmpp
 
 #endif

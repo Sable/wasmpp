@@ -360,21 +360,6 @@ wabt::ExprList* MatrixSnippet::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDA
   return e;
 }
 
-wabt::Opcode OpcodeToSimd(wabt::Opcode op) {
-  switch (op) {
-    case wabt::Opcode::F32Add:
-      return wabt::Opcode::F32X4Add;
-    case wabt::Opcode::F32Sub:
-      return wabt::Opcode::F32X4Sub;
-    case wabt::Opcode::F32Mul:
-      return wabt::Opcode::F32X4Mul;
-    case wabt::Opcode::F32Div:
-      return wabt::Opcode::F32X4Div;
-    default:
-      assert(!"Opcode to SIMD not implemented");
-  }
-}
-
 wabt::ExprList* MatrixSnippetSimd::ElementWiseBinaryOperation(Opcode op, NDArray *lhs, NDArray *rhs, NDArray *dst,
                                                               std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
@@ -403,7 +388,7 @@ wabt::ExprList* MatrixSnippetSimd::ElementWiseBinaryOperation(Opcode op, NDArray
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
     b->Insert(MakeV128Store(MakeLocalGet(dst_addr),
-                            MakeBinary(OpcodeToSimd(op), MakeV128Load(lhs_addr), MakeV128Load(rhs_addr))));
+                            MakeBinary(OpcodeToSimdOpcode(op), MakeV128Load(lhs_addr), MakeV128Load(rhs_addr))));
     b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(simd_type_size)));
   }));
 
@@ -500,7 +485,7 @@ wabt::ExprList* MatrixSnippetSimd::MatrixVectorBinaryOperation(Opcode op, NDArra
       auto mat_addr = MakeBinary(Opcode::I32Add, MakeI32Const(matrix->Memory()->Begin()), MakeLocalGet(addr));
       auto dst_addr = MakeBinary(Opcode::I32Add, MakeI32Const(dst_matrix->Memory()->Begin()), MakeLocalGet(addr));
       auto vec_addr = MakeLocalGet(vec_row_offset);
-      auto result = MakeBinary(OpcodeToSimd(op), MakeV128Load(mat_addr), MakeUnary(Opcode::F32X4Splat, MakeF32Load(vec_addr)));
+      auto result = MakeBinary(OpcodeToSimdOpcode(op), MakeV128Load(mat_addr), MakeUnary(Opcode::F32X4Splat, MakeF32Load(vec_addr)));
       b2->Insert(MakeV128Store(dst_addr, result));
       b2->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(simd_type_size)));
     }));
