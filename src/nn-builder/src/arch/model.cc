@@ -47,6 +47,7 @@ void Model::AddLayer(Layer* layer) {
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
+  AllocateMembers();
   InitImports();
   InitDefinitions();
 
@@ -459,7 +460,6 @@ void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) 
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   batch_size_ = batch_size;
   loss_ = loss;
-  AllocateMembers();
   AllocateLayers();
   forward_ = GenerateFeedForward();
   backward_ = GenerateBackpropagation();
