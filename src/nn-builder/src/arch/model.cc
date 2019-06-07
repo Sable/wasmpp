@@ -320,7 +320,7 @@ Var Model::GenerateFeedForward() {
 }
 
 wabt::Var Model::GenerateBackpropagation() {
-  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
+  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
   return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto vi32_1 = locals[0];
