@@ -35,8 +35,13 @@ private:
   wasmpp::ModuleManager module_manager_;
   std::vector<LayerMeta*> layers_;
   uint32_t batch_size_;
-  float learning_rate_;
   builtins::LossFunction loss_;
+
+  // Model members
+  wasmpp::Memory* learning_rate = nullptr;
+  wabt::ExprList* SetLearningRate(wabt::ExprList* val);
+  wabt::ExprList* GetLearningRate();
+  void AllocateMembers();
 
   // Model components variables
   wabt::Var forward_;
@@ -98,8 +103,8 @@ public:
   bool RemoveLayer(uint32_t index);
   Layer* GetLayer(uint32_t index) const;
 
-  void CompileLayers(uint32_t batch_size, float learning_rate, builtins::LossFunction loss);
-  void CompileTraining(uint32_t epoch, const std::vector<std::vector<float>> &input,
+  void CompileLayers(uint32_t batch_size, builtins::LossFunction loss);
+  void CompileTraining(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
   void CompileTesting(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompileInitialization();

@@ -26,6 +26,16 @@ struct LayerMeta {
   ds::NDArray* inverted_dropout = nullptr;
 };
 
+wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
+  assert(learning_rate != nullptr);
+  return MakeF32Store(MakeI32Const(learning_rate->Begin()), val);
+}
+
+wabt::ExprList* Model::GetLearningRate() {
+  assert(learning_rate != nullptr);
+  return MakeF32Load(MakeI32Const(learning_rate->Begin()));
+}
+
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
   for(auto l : layers) {
     AddLayer(l);
@@ -45,7 +55,6 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
     snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
   } else {
     snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
-
   }
 }
 
@@ -96,6 +105,10 @@ void Model::InitDefinitions() {
       MakeI32Const((table)->Shape()[0]),                \
       MakeI32Const((table)->Shape()[1])                 \
   }));
+
+void Model::AllocateMembers() {
+  learning_rate = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+}
 
 void Model::AllocateLayers() {
   ERROR_UNLESS(layers_.size() >= 2, "At least an input and output layer should be defined");
@@ -369,14 +382,14 @@ wabt::Var Model::GenerateBackpropagation() {
       // W[l] = W[l] - alpha * dW[l]
       // 1) dW[l] = alpha * dW[l]
       // 2) W[l] = W[l] - dW[l]
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(learning_rate_), layers_[l]->dW,
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, GetLearningRate(), layers_[l]->dW,
                                               {vi32_1, vi32_2, vf32_1}));
       f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
 
       // b[l] = b[l] - alpha * db[l]
       // 1) db[l] = alpha * db[l]
       // 2) b[l] = b[l] - db[l]
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(learning_rate_), layers_[l]->db,
+      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, GetLearningRate(), layers_[l]->db,
                                               {vi32_1, vi32_2, vf32_1}));
       f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->b, layers_[l]->db, layers_[l]->b, {vi32_1, vi32_2}));
     }
@@ -442,18 +455,18 @@ void Model::CompileInitialization() {
   MakeWeightData(memory);
 }
 
-void Model::CompileLayers(uint32_t batch_size, float learning_rate, nn::builtins::LossFunction loss) {
+void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) {
   ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
   batch_size_ = batch_size;
   loss_ = loss;
-  learning_rate_ = learning_rate;
+  AllocateMembers();
   AllocateLayers();
   forward_ = GenerateFeedForward();
   backward_ = GenerateBackpropagation();
   confusion_matrix_func_ = GenerateConfusionMatrixFunction();
 }
 
-void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float>> &input,
+void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
                             const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
@@ -469,6 +482,10 @@ void Model::CompileTraining(uint32_t epochs, const std::vector<std::vector<float
   std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
+
+    // Set learning rate
+    f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
+
     auto time = locals[0];
     auto cost_mean = locals[1];
     auto epoch = locals[2];

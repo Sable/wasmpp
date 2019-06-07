@@ -91,8 +91,8 @@ int main(int argc, char *argv[]) {
   uint32_t batch = 1;
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
-  model.CompileLayers(batch, learning_rate, loss);
-  model.CompileTraining(epoch, train, labels);
+  model.CompileLayers(batch, loss);
+  model.CompileTraining(epoch, learning_rate, train, labels);
   model.CompileTesting(train, labels);
   model.CompileInitialization();
 
