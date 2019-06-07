@@ -349,7 +349,7 @@ wabt::Var Model::GenerateBackpropagation() {
       f.Insert(snippets_.matrix->MatrixDotRT(layers_[l]->dZ,
                                              (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
                                              snippet::RelocMat(layers_[l-1]->A), layers_[l]->dW,
-                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
                                               {vi32_1, vi32_2, vf32_1}));
 

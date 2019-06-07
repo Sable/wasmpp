@@ -109,8 +109,12 @@ public:
                                std::vector<wabt::Var> locals) override ;
 
   // The SIMD version of this function generates a result slightly different
-  // than the non-SIMD one because of the order of float summation
+  // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixRowSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals) override;
+
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float addition
+  wabt::ExprList* MatrixDotRT(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) override;
 };
 
 

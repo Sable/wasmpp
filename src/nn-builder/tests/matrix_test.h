@@ -39,6 +39,7 @@ public:
   void MatrixSubtractionSimd_test_1();
   void MatrixMultiplicationSimd_test_1();
   void MatrixScalarSimd_test_1();
+  void MatrixDotRTSimd_test_1();
   void MatrixVectorAdditionSimd_test_1();
   void MatrixRowSumSimd_test_1();
 };
