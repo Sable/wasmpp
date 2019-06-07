@@ -521,9 +521,6 @@ wabt::ExprList* MatrixSnippetSimd::MatrixVectorBinaryOperation(Opcode op, NDArra
   return e;
 }
 
-// TODO Currently SIMD horizontal summation is not implemented:
-// Issue ulr: https://github.com/WebAssembly/simd/issues/20
-// Once implemented, this code can be improved
 wabt::ExprList* MatrixSnippetSimd::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
                                                 std::vector<wabt::Var> locals) {
   MATRIX_CHECK(matrix);
@@ -550,14 +547,14 @@ wabt::ExprList* MatrixSnippetSimd::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds:
   wabt::ExprList* e = new wabt::ExprList();
   Merge(e, MakeLocalSet(vec_row_offset, MakeI32Const(dst_vector->Memory()->Begin())));
   Merge(e, GenerateRangeLoop(label_manager_, mat_row_offset, matrix->Memory()->Begin(), matrix->Memory()->End(), matrix_width_bytes, {}, [&](BlockBody* b1) {
-    b1->Insert(MakeLocalSet(res_128, MakeF32X4Const(0, 0, 0, 0)));
+    b1->Insert(MakeLocalSet(res_128, MakeUnary(Opcode::F32X4Splat, MakeF32Const(0))));
 
     // Use SIMD while possible
     b1->Insert(GenerateRangeLoop(label_manager_, col, 0, matrix_simd_width_bytes, simd_type_size, {}, [&](BlockBody* b2){
       auto mat_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(mat_row_offset), MakeLocalGet(col));
       b2->Insert(GenerateCompoundAssignment(res_128, Opcode::F32X4Add, MakeV128Load(mat_addr)));
     }));
-    b1->Insert(MakeLocalSet(res, GenerateExpensiveF32X4HorizontalSum(res_128)));
+    b1->Insert(MakeLocalSet(res, GenerateF32X4HorizontalLTRSum(res_128)));
 
     // Fallback to regular computation
     if(width_remainder > 0) {

@@ -59,8 +59,10 @@ if(process.argv.length > 2) {
       }
       Object.keys(wasm.instance.exports).forEach((func) => {
         if(func.startsWith("test_")) {
-          console.log("Testing function:", func);
+          console.log(">>  Testing function:", func);
+          console.time("    exectuion time")
           wasm.instance.exports[func]();
+          console.timeEnd("    exectuion time");
         }
       });
     })

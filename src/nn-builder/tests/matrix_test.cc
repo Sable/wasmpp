@@ -367,7 +367,7 @@ void MatrixSnippetTest::MatrixRowSum_test_1() {
 void MatrixSnippetSimdTest::MatrixAdditionSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;
-    uint32_t cols = 100;
+    uint32_t cols = 101;
 
     NEW_MATRIX(lhs, rows, cols);
     NEW_MATRIX(rhs, rows, cols);
@@ -398,7 +398,7 @@ void MatrixSnippetSimdTest::MatrixAdditionSimd_test_1() {
 void MatrixSnippetSimdTest::MatrixSubtractionSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;
-    uint32_t cols = 100;
+    uint32_t cols = 101;
 
     NEW_MATRIX(lhs, rows, cols);
     NEW_MATRIX(rhs, rows, cols);
@@ -429,7 +429,7 @@ void MatrixSnippetSimdTest::MatrixSubtractionSimd_test_1() {
 void MatrixSnippetSimdTest::MatrixMultiplicationSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;
-    uint32_t cols = 100;
+    uint32_t cols = 101;
 
     NEW_MATRIX(lhs, rows, cols);
     NEW_MATRIX(rhs, rows, cols);
@@ -460,7 +460,7 @@ void MatrixSnippetSimdTest::MatrixMultiplicationSimd_test_1() {
 void MatrixSnippetSimdTest::MatrixScalarSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;
-    uint32_t cols = 100;
+    uint32_t cols = 101;
 
     NEW_MATRIX(src, rows, cols);
     NEW_MATRIX(dst, rows, cols);
@@ -523,16 +523,37 @@ void MatrixSnippetSimdTest::MatrixVectorAdditionSimd_test_1() {
 void MatrixSnippetSimdTest::MatrixRowSumSimd_test_1() {
   NN_TEST() {
     uint32_t rows = 57;
-    uint32_t cols = 100;
+    uint32_t cols = 101;
 
     NEW_MATRIX(matrix, rows, cols);
     NEW_MATRIX(dst, rows, 1);
     NEW_MATRIX(expected, rows, 1);
 
+    // Simulate the same order of addition for the
+    // float numbers as the SIMD version of this function
+    // otherwise the result will be slightly off
+    // Non-SIMD: (((a[0] + a[1]) + a[2]) + ... + a[n])
+    // SIMD: ((a[0] + a[4], a[1] + a[5], a[2] + a[6], a[3] + a[7]) + ...)
     float mat_val = 1.2;
+    uint32_t simd_remainder = cols % 4;
+    uint32_t simd_cols = cols - simd_remainder;
     for (uint32_t row = 0; row < rows; row++) {
-      float result = 0;
-      for (uint32_t col = 0; col < cols; col++) {
+      float vec[4] = {0, 0, 0, 0};
+      uint32_t col = 0;
+      // Simulate SIMD computation
+      for (; col < simd_cols; col++) {
+        if(col % 4 == 0) {
+          vec[0] += mat_val;
+          vec[1] += mat_val + 1;
+          vec[2] += mat_val + 2;
+          vec[3] += mat_val + 3;
+        }
+        f.Insert(MakeF32Store(MakeI32Const(matrix->GetLinearIndex({row, col})), MakeF32Const(mat_val)));
+        mat_val++;
+      }
+      float result = (((vec[0] + vec[1]) + vec[2]) + vec[3]);
+      // Simulate regular computation for the remaining values
+      for(; col < cols; col++) {
         f.Insert(MakeF32Store(MakeI32Const(matrix->GetLinearIndex({row, col})), MakeF32Const(mat_val)));
         result += mat_val;
         mat_val++;

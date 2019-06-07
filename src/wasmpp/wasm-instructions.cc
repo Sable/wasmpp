@@ -102,25 +102,29 @@ wabt::ExprList* MakeF64Const(double val) {
   return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::F64(value_bits)));
 }
 
-wabt::ExprList* MakeF32X4Const(float a, float b, float c, float d) {
-  v128 value_bits;
-  memcpy(&value_bits.v[0], &a, sizeof(a));
-  memcpy(&value_bits.v[1], &b, sizeof(b));
-  memcpy(&value_bits.v[2], &c, sizeof(c));
-  memcpy(&value_bits.v[3], &d, sizeof(d));
-  return ExprToExprList(wabt::MakeUnique<wabt::ConstExpr>(wabt::Const::V128(value_bits)));
-}
-
-#define DEFINE_EXTRACT(name)  \
-wabt::ExprList* Make##name(wabt::ExprList* operand, uint64_t index) { \
-  ERROR_UNLESS(operand != nullptr, "operand cannot be null"); \
-  wabt::ExprList* e = new wabt::ExprList(); \
-  Merge(e, operand); \
-  Merge(e, ExprToExprList(wabt::MakeUnique<wabt::SimdLaneOpExpr>(wabt::Opcode::name, index))); \
-  return e; \
+#define DEFINE_EXTRACT(name)                                                                    \
+wabt::ExprList* Make##name(wabt::ExprList* operand, uint64_t index) {                           \
+  ERROR_UNLESS(operand != nullptr, "operand cannot be null");                                   \
+  wabt::ExprList* e = new wabt::ExprList();                                                     \
+  Merge(e, operand);                                                                            \
+  Merge(e, ExprToExprList(wabt::MakeUnique<wabt::SimdLaneOpExpr>(wabt::Opcode::name, index)));  \
+  return e;                                                                                     \
 }
 EXTRACT_LANE_LIST(DEFINE_EXTRACT)
 #undef DEFINE_EXTRACT
+
+#define DEFINE_REPLACE(name)  \
+wabt::ExprList* Make##name(wabt::ExprList* operand, wabt::ExprList* val, uint64_t index) {      \
+  ERROR_UNLESS(operand != nullptr, "operand cannot be null");                                   \
+  ERROR_UNLESS(val != nullptr, "val cannot be null");                                           \
+  wabt::ExprList* e = new wabt::ExprList();                                                     \
+  Merge(e, operand);                                                                            \
+  Merge(e, val);                                                                                \
+  Merge(e, ExprToExprList(wabt::MakeUnique<wabt::SimdLaneOpExpr>(wabt::Opcode::name, index)));  \
+  return e;                                                                                     \
+}
+  REPLACE_LANE_LIST(DEFINE_REPLACE)
+#undef DEFINE_REPLACE
 
 wabt::ExprList* MakeBr(wabt::Var label) {
   return ExprToExprList(wabt::MakeUnique<wabt::BrExpr>(label));

@@ -29,7 +29,7 @@ public:
 
 class MatrixSnippetSimdTest {
 private:
-  snippet::MatrixSnippet matrix_snippet_simd_;
+  snippet::MatrixSnippetSimd matrix_snippet_simd_;
   wasmpp::ModuleManager* module_manager_;
   TestBuiltins* test_builtins_;
 public:

@@ -108,6 +108,8 @@ public:
   wabt::ExprList* MatrixScalar(ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
                                std::vector<wabt::Var> locals) override ;
 
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float summation
   wabt::ExprList* MatrixRowSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals) override;
 };
 
