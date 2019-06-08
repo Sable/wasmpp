@@ -38,25 +38,15 @@ wabt::ExprList* Model::GetLearningRate() {
 
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
   for(auto l : layers) {
-    AddLayer(l);
+    layers_.push_back(new LayerMeta(l));
   }
-}
-
-void Model::AddLayer(Layer* layer) {
-  layers_.push_back(new LayerMeta(layer));
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
   AllocateMembers();
-  InitImports();
-  InitDefinitions();
-
-  // Init snippets
-  if(options.use_simd) {
-    snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
-  } else {
-    snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
-  }
+  InitBuiltinImports();
+  InitBuiltinDefinitions();
+  InitSnippets();
 }
 
 Model::~Model() {
@@ -65,22 +55,7 @@ Model::~Model() {
   }
 }
 
-bool Model::RemoveLayer(uint32_t index) {
-  if(index >= layers_.size()) {
-    return false;
-  }
-  layers_.erase(layers_.begin() + index);
-  return true;
-}
-
-Layer* Model::GetLayer(uint32_t index) const {
-  if(index < layers_.size()) {
-    return layers_[index]->layer;
-  }
-  ERROR_EXIT("Index out of bound");
-}
-
-void Model::InitImports() {
+void Model::InitBuiltinImports() {
   builtins_.system.InitImports(this, &module_manager_, "System");
   builtins_.math.InitImports(this, &module_manager_, "Math");
   builtins_.activation.InitImports(this, &module_manager_, "Activation");
@@ -88,7 +63,7 @@ void Model::InitImports() {
   builtins_.message.InitImports(this, &module_manager_, "Message");
 }
 
-void Model::InitDefinitions() {
+void Model::InitBuiltinDefinitions() {
   builtins_.system.InitDefinitions(this, &module_manager_);
   builtins_.math.InitDefinitions(this, &module_manager_);
   builtins_.activation.InitDefinitions(this, &module_manager_);
@@ -96,16 +71,19 @@ void Model::InitDefinitions() {
   builtins_.message.InitDefinitions(this, &module_manager_);
 }
 
+void Model::InitSnippets() {
+  if(options_.use_simd) {
+    snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
+    snippets_.confusion_matrix = new snippet::ConfusionMatrixSnippet(&module_manager_.Label());
+  } else {
+    snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
+    snippets_.confusion_matrix = new snippet::ConfusionMatrixSnippetSimd(&module_manager_.Label());
+  }
+}
+
 #define ALLOCATE_MEMORY(array, rows, cols) \
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \
                             {rows, cols}, TypeSize(Type::F32));
-
-#define PRINT_TABLE(f, table)                              \
-  (f).Insert(MakeCall(builtins_.system.PrintTableF32(), { \
-      MakeI32Const((table)->Memory()->Begin()),         \
-      MakeI32Const((table)->Shape()[0]),                \
-      MakeI32Const((table)->Shape()[1])                 \
-  }));
 
 void Model::AllocateMembers() {
   learning_rate = module_manager_.Memory().Allocate(TypeSize(Type::F32));
@@ -268,7 +246,7 @@ void Model::MakeWeightData(wabt::Var memory) {
   }
 }
 
-Var Model::GenerateFeedForward() {
+Var Model::GenerateFeedForwardWasmFunction() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32, Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -333,7 +311,7 @@ Var Model::GenerateFeedForward() {
   });
 }
 
-wabt::Var Model::GenerateBackpropagation() {
+wabt::Var Model::GenerateBackpropagationWasmFunction() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
   return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -370,7 +348,7 @@ wabt::Var Model::GenerateBackpropagation() {
       // db[l] = (1/m) dZ[l]
       // 1) db[l] = SUM(dZ[l], row wise)
       // 2) db[l] = (1/m) db[l]
-      f.Insert(snippets_.matrix->MatrixRowSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
+      f.Insert(snippets_.matrix->MatrixHorizontalSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
       f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(1.0f/batch_size_), layers_[l]->db,
                                               {vi32_1, vi32_2, vf32_1}));
 
@@ -397,54 +375,26 @@ wabt::Var Model::GenerateBackpropagation() {
   });
 }
 
-wabt::Var Model::GenerateConfusionMatrixFunction() {
-  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
+  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   return module_manager_.MakeFunction("confusion_matrix_function", {{Type::I32}, {}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    auto col = locals[0];
-    auto row = locals[1];
-    auto rel_row = locals[2];
-    auto vi32_1 = locals[3];
-    auto vi32_2 = locals[4];
-    auto vi32_3 = locals[5];
-    auto vi32_4 = locals[6];
-    auto x = vi32_1;
-    auto y = vi32_2;
-    auto offset = vi32_3;
+    auto vi32_1 = locals[0];
+    auto vi32_2 = locals[1];
+    auto vi32_3 = locals[2];
+    auto vi32_4 = locals[3];
+    auto vi32_5 = locals[4];
+    auto vi32_6 = locals[5];
 
-    auto label_begin = params[0];
+    auto target_begin = params[0];
 
-    auto A = layers_.back()->A;
-    uint32_t type_size = TypeSize(Type::F32);
-    uint32_t A_width = A->Shape()[1] * type_size;
-    uint32_t A_height = A->Shape()[0] * A_width;
+    // A[L] = Hardmax(A[L])
+    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, layers_.back()->A, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
 
-    f.Insert(snippets_.matrix->MatrixColumnArgmax(A, {vi32_1, vi32_2, vi32_3, vi32_4}));
-    f.Insert(GenerateRangeLoop(f.Label(), col, 0, A_width, type_size, {}, [&](BlockBody* b1) {
-      // Find 1 in both A and target
-      b1->Insert(MakeLocalSet(rel_row, MakeI32Const(0)));
-      b1->Insert(GenerateRangeLoop(f.Label(), row, 0, A_height, A_width, {}, [&](BlockBody* b2) {
-        b2->Insert(MakeLocalSet(offset, MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeLocalGet(row))));
-        auto label_cur = MakeBinary(Opcode::I32Add, MakeLocalGet(offset), MakeLocalGet(label_begin));
-        auto A_cur = MakeBinary(Opcode::I32Add, MakeLocalGet(offset), MakeI32Const(A->Memory()->Begin()));
-        b2->Insert(MakeIf(f.Label(), MakeBinary(Opcode::F32Eq, MakeF32Load(label_cur), MakeF32Const(1)), {},
-                          [&](BlockBody t, Var label) {
-          t.Insert(MakeLocalSet(y, MakeLocalGet(rel_row)));
-        }));
-        b2->Insert(MakeIf(f.Label(), MakeBinary(Opcode::F32Eq, MakeF32Load(A_cur), MakeF32Const(1)), {},
-                          [&](BlockBody t, Var label) {
-          t.Insert(MakeLocalSet(x, MakeLocalGet(rel_row)));
-        }));
-        b2->Insert(GenerateCompoundAssignment(rel_row, Opcode::I32Add, MakeI32Const(type_size)));
-      }));
-
-      // Add 1 in confusion matrix
-      auto cm_y = MakeBinary(Opcode::I32Mul, MakeLocalGet(y), MakeI32Const(confusion_matrix_->Shape()[0]));
-      b1->Insert(MakeLocalSet(offset, MakeBinary(Opcode::I32Add, MakeLocalGet(x), cm_y)));
-      b1->Insert(GenerateCompoundAssignment(offset, Opcode::I32Add, MakeI32Const(confusion_matrix_->Memory()->Begin())));
-      b1->Insert(MakeF32Store(MakeLocalGet(offset), MakeBinary(Opcode::F32Add, MakeF32Load(MakeLocalGet(offset)),
-                                                             MakeF32Const(1))));
-    }));
+    // Update confusion matrix
+    f.Insert(snippets_.confusion_matrix->ConfusionMatrixUpdate(confusion_matrix_, layers_.back()->A,
+                                                               snippet::RelocMat(true_matrix_, target_begin),
+                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
   });
 }
 
@@ -461,9 +411,9 @@ void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) 
   batch_size_ = batch_size;
   loss_ = loss;
   AllocateLayers();
-  forward_ = GenerateFeedForward();
-  backward_ = GenerateBackpropagation();
-  confusion_matrix_func_ = GenerateConfusionMatrixFunction();
+  forward_ = GenerateFeedForwardWasmFunction();
+  backward_ = GenerateBackpropagationWasmFunction();
+  confusion_matrix_func_ = GenerateUpdateConfusionMatrixFunction();
 }
 
 void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
@@ -622,7 +572,11 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
     if(options_.log_testing_confusion_matrix) {
       // Log confusion matrix
-      PRINT_TABLE(f, confusion_matrix_);
+      f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+          MakeI32Const(confusion_matrix_->Memory()->Begin()),
+          MakeI32Const(confusion_matrix_->Shape()[0]),
+          MakeI32Const(confusion_matrix_->Shape()[1])
+      }));
     }
   });
 }

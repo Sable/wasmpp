@@ -8,17 +8,6 @@ using namespace wasmpp;
 using namespace wabt;
 using namespace ds;
 
-#define MATRIX_CHECK(x) \
-  ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
-  ERROR_UNLESS((x)->Shape().size() == 2, #x " is expected to be a 2D matrix");
-
-#define VECTOR_CHECK(x) \
-  MATRIX_CHECK(x) \
-  ERROR_UNLESS((x)->Shape()[1] == 1, #x" is expected to be a vector");
-
-#define MATRIX_SAME_SHAPE(x, y) \
-  ERROR_UNLESS((x)->Shape() == (y)->Shape(), #x " and " #y " matrices are not compatible");
-
 wabt::ExprList* MatrixSnippet::MatrixDot(NDArray* lhs, RelocMat rhs, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(lhs);
   MATRIX_CHECK(rhs.Array());
@@ -287,51 +276,58 @@ wabt::ExprList* MatrixSnippet::MatrixActivation(RelocMat src, builtins::Activati
   return ElementWiseFunction({src}, prime ? func.derivative : func.function, dst, locals);
 }
 
-wabt::ExprList* MatrixSnippet::MatrixColumnArgmax(NDArray* src, std::vector<Var> locals) {
+wabt::ExprList* MatrixSnippet::MatrixColumnHardmax(NDArray* src, NDArray* dst, std::vector<Var> locals) {
   MATRIX_CHECK(src);
-  assert(locals.size() == 4);
+  MATRIX_CHECK(dst);
+  MATRIX_SAME_SHAPE(src, dst);
+  assert(locals.size() == 5);
 
   auto row = locals[0];
-  auto src_col_offset = locals[1];
-  auto max = locals[2];
-  auto curr = locals[3];
+  auto col = locals[1];
+  auto src_max_addr = locals[2];
+  auto dst_max_addr = locals[3];
+  auto curr_addr = locals[4];
 
   uint32_t type_size = TypeSize(Type::F32);
-  uint32_t width = src->Shape()[1] * type_size;
-  uint32_t height = src->Shape()[0] * width;
-  uint32_t col_begin = src->Memory()->Begin();
-  uint32_t col_end = col_begin + width;
+  uint32_t width_bytes = src->Shape()[1] * type_size;
+  uint32_t height_bytes = src->Shape()[0] * width_bytes;
 
   wabt::ExprList* e = new wabt::ExprList();
-  Merge(e, GenerateRangeLoop(label_manager_, src_col_offset, col_begin, col_end, type_size, {}, [&](BlockBody* b1) {
+  Merge(e, GenerateRangeLoop(label_manager_, col, 0, width_bytes, type_size, {}, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(src_max_addr, MakeBinary(Opcode::I32Add, MakeI32Const(src->Begin()), MakeLocalGet(col))));
+    b1->Insert(MakeLocalSet(dst_max_addr, MakeBinary(Opcode::I32Add, MakeI32Const(dst->Begin()), MakeLocalGet(col))));
     // Find max
-    b1->Insert(MakeLocalSet(max, MakeLocalGet(src_col_offset)));
-    b1->Insert(GenerateRangeLoop(label_manager_, row, width, height, width, {}, [&](BlockBody* b2) {
-      b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
-      auto cond = MakeBinary(Opcode::F32Ge, MakeF32Load(MakeLocalGet(curr)), MakeF32Load(MakeLocalGet(max)));
-      auto comp = MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
-        t.Insert(MakeLocalSet(max, MakeLocalGet(curr)));
-      });
-      b2->Insert(comp);
+    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(curr_addr,
+                              MakeBinary(Opcode::I32Add, MakeLocalGet(row),
+                                         MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(src->Begin())))));
+      auto cond = MakeBinary(Opcode::F32Ge, MakeF32Load(MakeLocalGet(curr_addr)), MakeF32Load(MakeLocalGet(src_max_addr)));
+      b2->Insert(MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
+        t.Insert(MakeLocalSet(src_max_addr, MakeLocalGet(curr_addr)));
+        t.Insert(MakeLocalSet(dst_max_addr,
+                                MakeBinary(Opcode::I32Add, MakeLocalGet(row),
+                                           MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(dst->Begin())))));
+      }));
     }));
 
     // Place 1 in max and 0 in rest
-    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height, width, {}, [&](BlockBody* b2) {
-      b2->Insert(MakeLocalSet(curr, MakeBinary(Opcode::I32Add, MakeLocalGet(row), MakeLocalGet(src_col_offset))));
-      auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(curr), MakeLocalGet(max));
-      auto comp = MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
-        t.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(1)));
+    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
+      b2->Insert(MakeLocalSet(curr_addr,
+                              MakeBinary(Opcode::I32Add, MakeLocalGet(row),
+                                         MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(dst->Begin())))));
+      auto cond = MakeBinary(Opcode::I32Eq, MakeLocalGet(curr_addr), MakeLocalGet(dst_max_addr));
+      b2->Insert(MakeIf(label_manager_, cond, {}, [&](BlockBody t, Var label) {
+        t.Insert(MakeF32Store(MakeLocalGet(curr_addr), MakeF32Const(1)));
       }, [&](BlockBody f) {
-        f.Insert(MakeF32Store(MakeLocalGet(curr), MakeF32Const(0)));
-      });
-      b2->Insert(comp);
+        f.Insert(MakeF32Store(MakeLocalGet(curr_addr), MakeF32Const(0)));
+      }));
     }));
   }));
   return e;
 }
 
-wabt::ExprList* MatrixSnippet::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
-                                            std::vector<wabt::Var> locals) {
+wabt::ExprList* MatrixSnippet::MatrixHorizontalSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
+                                                   std::vector<wabt::Var> locals) {
 
   MATRIX_CHECK(matrix);
   VECTOR_CHECK(dst_vector);
@@ -507,7 +503,7 @@ wabt::ExprList* MatrixSnippetSimd::MatrixVectorBinaryOperation(Opcode op, NDArra
   return e;
 }
 
-wabt::ExprList* MatrixSnippetSimd::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
+wabt::ExprList* MatrixSnippetSimd::MatrixHorizontalSum(nn::ds::NDArray *matrix, nn::ds::NDArray *dst_vector,
                                                 std::vector<wabt::Var> locals) {
   MATRIX_CHECK(matrix);
   VECTOR_CHECK(dst_vector);
@@ -521,7 +517,7 @@ wabt::ExprList* MatrixSnippetSimd::MatrixRowSum(nn::ds::NDArray *matrix, nn::ds:
 
   // Cannot optimize if matrix width bytes is too small
   if(matrix_width_bytes < WASMPP_V128_SIZE) {
-    return MatrixSnippet::MatrixRowSum(matrix, dst_vector, locals);
+    return MatrixSnippet::MatrixHorizontalSum(matrix, dst_vector, locals);
   }
 
   auto mat_row_offset = locals[0];

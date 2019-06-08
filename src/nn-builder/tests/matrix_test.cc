@@ -354,7 +354,7 @@ void MatrixSnippetTest::MatrixRowSum_test_1() {
       f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, 0})), MakeF32Const(result)));
     }
 
-    f.Insert(matrix_snippet_.MatrixRowSum(matrix, dst, locals));
+    f.Insert(matrix_snippet_.MatrixHorizontalSum(matrix, dst, locals));
     f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
         MakeI32Const(dst->Memory()->Begin()),
         MakeI32Const(expected->Memory()->Begin()),
@@ -562,7 +562,7 @@ void MatrixSnippetSimdTest::MatrixRowSumSimd_test_1() {
       f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, 0})), MakeF32Const(result)));
     }
 
-    f.Insert(matrix_snippet_simd_.MatrixRowSum(matrix, dst, locals));
+    f.Insert(matrix_snippet_simd_.MatrixHorizontalSum(matrix, dst, locals));
     f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
         MakeI32Const(dst->Memory()->Begin()),
         MakeI32Const(expected->Memory()->Begin()),

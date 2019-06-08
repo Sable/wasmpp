@@ -88,11 +88,11 @@ public:
   virtual wabt::ExprList* MatrixActivation(RelocMat src, builtins::ActivationFunction func, ds::NDArray* dst,
                                            std::vector<wabt::Var> locals, bool prime);
 
-  // Apply argmax on each matrix column
-  virtual wabt::ExprList* MatrixColumnArgmax(ds::NDArray* src, std::vector<wabt::Var> locals);
+  // Apply hard-max on each matrix column
+  virtual wabt::ExprList* MatrixColumnHardmax(ds::NDArray* src, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
   // Sum row values and store them in destination vector
-  virtual wabt::ExprList* MatrixRowSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals);
+  virtual wabt::ExprList* MatrixHorizontalSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals);
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {
@@ -110,13 +110,23 @@ public:
 
   // The SIMD version of this function generates a result slightly different
   // than the non-SIMD one because of the order of float addition
-  wabt::ExprList* MatrixRowSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals) override;
+  wabt::ExprList* MatrixHorizontalSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals) override;
 
   // The SIMD version of this function generates a result slightly different
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixDotRT(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) override;
 };
 
+#define MATRIX_CHECK(x) \
+  ERROR_UNLESS((x) != nullptr, #x " cannot be null"); \
+  ERROR_UNLESS((x)->Shape().size() == 2, #x " is expected to be a 2D matrix");
+
+#define VECTOR_CHECK(x) \
+  MATRIX_CHECK(x) \
+  ERROR_UNLESS((x)->Shape()[1] == 1, #x" is expected to be a vector");
+
+#define MATRIX_SAME_SHAPE(x, y) \
+  ERROR_UNLESS((x)->Shape() == (y)->Shape(), #x " and " #y " matrices are not compatible");
 
 } // namespace snippet
 } // namespace nn

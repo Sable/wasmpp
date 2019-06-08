@@ -27,6 +27,16 @@ uint32_t NDArray::GetLinearIndex(std::vector<uint32_t> index) const {
   return lindex;
 }
 
+uint32_t NDArray::Begin() const {
+  assert(memory_ != nullptr);
+  return memory_->Begin();
+}
+
+uint32_t NDArray::End() const {
+  assert(memory_ != nullptr);
+  return memory_->End();
+}
+
 void NDArray::Reshape(std::vector<uint32_t> shape) {
   ERROR_UNLESS(!shape.empty(), "shape cannot be empty");
   ERROR_UNLESS(memory_ != nullptr, "memory cannot be null");

@@ -23,6 +23,8 @@ public:
   std::vector<uint32_t >Shape() const { return shape_;}
   uint32_t GetLinearIndex(std::vector<uint32_t> index) const;
   const wasmpp::Memory* Memory() const { return memory_; }
+  uint32_t Begin() const;
+  uint32_t End() const;
 };
 
 } // namespace ds

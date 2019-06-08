@@ -10,15 +10,17 @@
 #include <src/nn-builder/src/builtins/system.h>
 #include <src/nn-builder/src/builtins/message.h>
 #include <src/nn-builder/src/data_structure/ndarray.h>
+#include <src/nn-builder/src/snippet/matrix.h>
+#include <src/nn-builder/src/snippet/confusion_matrix.h>
+#include <src/nn-builder/src/arch/initializers.h>
 #include <memory>
 #include <utility>
-#include <src/nn-builder/src/snippet/matrix.h>
-#include "initializers.h"
 
 namespace nn {
 namespace arch {
 
 struct LayerMeta;
+
 struct ModelOptions {
   bool log_training_error = false;
   bool log_training_time = false;
@@ -29,6 +31,7 @@ struct ModelOptions {
   builtins::ActivationOptions activation_options;
   WeightDistributionOptions weights_options;
 };
+
 class Model {
 private:
   ModelOptions options_;
@@ -41,7 +44,6 @@ private:
   wasmpp::Memory* learning_rate = nullptr;
   wabt::ExprList* SetLearningRate(wabt::ExprList* val);
   wabt::ExprList* GetLearningRate();
-  void AllocateMembers();
 
   // Model components variables
   wabt::Var forward_;
@@ -78,30 +80,36 @@ private:
   // Snippet codes
   struct Snippets {
     snippet::MatrixSnippet* matrix;
+    snippet::ConfusionMatrixSnippet* confusion_matrix;
   } snippets_;
 
-  // Initalize functions
-  void InitImports();
-  void InitDefinitions();
-  // Model functions
+  // Initialize builtins
+  void InitBuiltinImports();
+  void InitBuiltinDefinitions();
+
+  // Initialize snippets
+  void InitSnippets();
+
+  // Memory allocation
+  void AllocateMembers();
   void AllocateLayers();
   void AllocateTraining();
   void AllocateTest();
+
+  // Date generation
   void MakeTrainingData(wabt::Var memory);
   void MakeTestingData(wabt::Var memory);
   void MakeWeightData(wabt::Var memory);
+
   // Generate neural network algorithms
-  wabt::Var GenerateFeedForward();
-  wabt::Var GenerateBackpropagation();
-  wabt::Var GenerateConfusionMatrixFunction();
+  wabt::Var GenerateFeedForwardWasmFunction();
+  wabt::Var GenerateBackpropagationWasmFunction();
+  wabt::Var GenerateUpdateConfusionMatrixFunction();
 public:
   Model(ModelOptions options);
   ~Model();
   const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
   void SetLayers(std::vector<Layer*> layers);
-  void AddLayer(Layer* layer);
-  bool RemoveLayer(uint32_t index);
-  Layer* GetLayer(uint32_t index) const;
 
   void CompileLayers(uint32_t batch_size, builtins::LossFunction loss);
   void CompileTraining(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
