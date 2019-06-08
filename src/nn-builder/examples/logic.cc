@@ -1,10 +1,12 @@
 #include <src/nn-builder/src/arch/model.h>
+#include <src/nn-builder/src/arch/layers/dense.h>
 #include <iostream>
 #include <getopt.h>
 #include <fstream>
 
 using namespace nn;
 using namespace nn::arch;
+using namespace nn::arch::layer;
 using namespace wabt;
 
 bool FLAG_to_wasm = false;
@@ -70,9 +72,9 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     NewLayer<InputDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
-     NewLayer<HiddenDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
-     NewLayer<OutputDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(LeCunNormal),
+     NewLayer<DenseInputLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
+     NewLayer<DenseHiddenLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
+     NewLayer<DenseOutputLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(LeCunNormal),
   });
 
   // Train

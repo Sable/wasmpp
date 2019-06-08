@@ -1,9 +1,9 @@
-#include <src/nn-builder/src/arch/layer.h>
+#include <src/nn-builder/src/arch/layers/dense.h>
 #include <src/nn-builder/src/arch/model.h>
-#include "layer.h"
 
 namespace nn {
 namespace arch {
+namespace layer {
 
 using namespace wasmpp;
 using namespace wabt;
@@ -271,5 +271,6 @@ void FullyConnectedLayer::MakeData(wabt::Var memory) {
   NetworkModel()->ModuleManager().MakeData(memory, b_->Memory()->Begin(), bias_entries);
 }
 
+} // namespace layer
 } // namespace arch
 } // namespace nn

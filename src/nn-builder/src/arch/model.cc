@@ -1,4 +1,5 @@
 #include <src/nn-builder/src/arch/model.h>
+#include <src/nn-builder/src/arch/layers/dense.h>
 #include <src/nn-builder/src/snippet/matrix.h>
 #include <src/nn-builder/src/arch/initializers.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
@@ -8,6 +9,7 @@ namespace arch {
 
 using namespace wasmpp;
 using namespace wabt;
+using namespace layer;
 
 wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
   assert(learning_rate != nullptr);
@@ -19,7 +21,7 @@ wabt::ExprList* Model::GetLearningRate() {
   return MakeF32Load(MakeI32Const(learning_rate->Begin()));
 }
 
-void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
+void Model::SetLayers(std::vector<Layer *> layers) {
   for(uint32_t index = 0; index < layers.size(); index++) {
     if(index == 0) {
       ERROR_UNLESS(layers[index]->Position() == Input, "First layer must be an input layer");
@@ -91,7 +93,7 @@ void Model::AllocateLayers() {
       assert(layers_[l]->Position() == Output);
       uint32_t output_size = 0;
       if(layers_[l]->Type() == FullyConnected) {
-        output_size = static_cast<OutputDenseLayer*>(layers_[l])->Nodes();
+        output_size = static_cast<DenseOutputLayer*>(layers_[l])->Nodes();
       } else {
         assert(!"Not implemented");
       }
@@ -257,7 +259,7 @@ wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
 
     assert(layers_.back()->Position() == Output);
     if(layers_.back()->Type() == FullyConnected) {
-      auto last_layer = static_cast<OutputDenseLayer*>(layers_.back());
+      auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
       // pred_hardmax_matrix_ = Hardmax(A[L])
       f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
                                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
@@ -288,7 +290,7 @@ wabt::Var Model::GenerateCountCorrectPredictionsFunction() {
 
     assert(layers_.back()->Position() == Output);
     if(layers_.back()->Type() == FullyConnected) {
-      auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+      auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
       // pred_hardmax_matrix_ = Hardmax(A[L])
       f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
                                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
@@ -392,7 +394,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
           // Compute training error
           assert(layers_.back()->Position() == Output);
           if(layers_.back()->Type() == FullyConnected) {
-            auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+            auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
             b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
                 MakeLocalGet(label_addr),
                 MakeI32Const(last_layer->Predictions()->Begin()),
@@ -487,7 +489,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
         // Compute testing error
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
-          auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+          auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
           b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
               MakeLocalGet(label_addr),
               MakeI32Const(last_layer->Predictions()->Begin()),

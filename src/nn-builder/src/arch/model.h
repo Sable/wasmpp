@@ -2,7 +2,7 @@
 #define NN_ARCH_MODEL_H_
 
 #include <src/wasmpp/wasm-manager.h>
-#include <src/nn-builder/src/arch/layer.h>
+#include <src/nn-builder/src/arch/layers/layer.h>
 #include <src/nn-builder/src/builtins/loss.h>
 #include <src/nn-builder/src/builtins/activation.h>
 #include <src/nn-builder/src/builtins/loss.h>
@@ -36,7 +36,7 @@ class Model {
 private:
   ModelOptions options_;
   wasmpp::ModuleManager module_manager_;
-  std::vector<Layer*> layers_;
+  std::vector<layer::Layer*> layers_;
   uint32_t batch_size_;
   builtins::LossFunction loss_;
 
@@ -110,8 +110,8 @@ public:
   Model(ModelOptions options);
   ~Model();
   wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
-  std::vector<Layer*> Layers() const { return layers_; }
-  void SetLayers(std::vector<Layer*> layers);
+  std::vector<layer::Layer*> Layers() const { return layers_; }
+  void SetLayers(std::vector<layer::Layer*> layers);
 
   // Compile functions
   void CompileLayers(uint32_t batch_size, builtins::LossFunction loss);

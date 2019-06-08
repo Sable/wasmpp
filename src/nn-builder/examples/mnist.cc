@@ -1,10 +1,12 @@
 #include <src/nn-builder/src/arch/model.h>
+#include <src/nn-builder/src/arch/layers/dense.h>
 #include <iostream>
 #include <getopt.h>
 #include <fstream>
 
 using namespace nn;
 using namespace nn::arch;
+using namespace nn::arch::layer;
 using namespace wabt;
 
 bool FLAG_to_wasm = false;
@@ -81,7 +83,7 @@ void LoadValues(std::vector<std::vector<float>> &train_data, std::vector<std::ve
             number *= 10;
             number += line[i] - '0';
           } else {
-            data.push_back(number / 255.0);
+            data.push_back(number / 255.0f);
             number = 0;
           }
         }
@@ -130,9 +132,9 @@ int main(int argc, char *argv[]) {
   options.use_simd = true;
   Model model(options);
   model.SetLayers({
-     NewLayer<InputDenseLayer>(784, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
-     NewLayer<HiddenDenseLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
-     NewLayer<OutputDenseLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
+     NewLayer<DenseInputLayer>(784, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
+     NewLayer<DenseHiddenLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
+     NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
   });
 
   uint32_t epoch = 10;
