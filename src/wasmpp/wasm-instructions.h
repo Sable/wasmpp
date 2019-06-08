@@ -115,6 +115,7 @@ wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args);
 
 // Misc
 wabt::ExprList* MakeDrop();
+wabt::ExprList* MakeNop();
 
 }
 

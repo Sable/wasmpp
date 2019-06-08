@@ -19,8 +19,6 @@
 namespace nn {
 namespace arch {
 
-struct LayerMeta;
-
 struct ModelOptions {
   bool log_training_accuracy = false;
   bool log_training_error = false;
@@ -38,14 +36,12 @@ class Model {
 private:
   ModelOptions options_;
   wasmpp::ModuleManager module_manager_;
-  std::vector<LayerMeta*> layers_;
+  std::vector<Layer*> layers_;
   uint32_t batch_size_;
   builtins::LossFunction loss_;
 
   // Model members
   wasmpp::Memory* learning_rate = nullptr;
-  wabt::ExprList* SetLearningRate(wabt::ExprList* val);
-  wabt::ExprList* GetLearningRate();
 
   // Model components variables
   wabt::Var forward_func_;
@@ -103,7 +99,7 @@ private:
   // Date generation
   void MakeTrainingData(wabt::Var memory);
   void MakeTestingData(wabt::Var memory);
-  void MakeWeightData(wabt::Var memory);
+  void MakeLayersData(wabt::Var memory);
 
   // Generate neural network algorithms
   wabt::Var GenerateFeedForwardWasmFunction();
@@ -113,16 +109,27 @@ private:
 public:
   Model(ModelOptions options);
   ~Model();
-  const wasmpp::ModuleManager& ModuleManager() const { return module_manager_; }
+  wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
+  std::vector<Layer*> Layers() const { return layers_; }
   void SetLayers(std::vector<Layer*> layers);
 
+  // Compile functions
   void CompileLayers(uint32_t batch_size, builtins::LossFunction loss);
   void CompileTraining(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
   void CompileTesting(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompileInitialization();
+
+  // Members accessors
+  wabt::ExprList* SetLearningRate(wabt::ExprList* val);
+  wabt::ExprList* GetLearningRate();
+
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
+  const Snippets& Snippets() const { return snippets_; }
+  uint32_t BatchSize() const { return batch_size_; }
+  const ModelOptions& Options() const { return options_; }
+  const builtins::LossFunction& Loss() const { return loss_; }
 };
 
 } // namespace arch

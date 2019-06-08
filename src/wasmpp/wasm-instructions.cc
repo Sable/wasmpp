@@ -174,6 +174,12 @@ wabt::ExprList* MakeDrop() {
   return e;
 }
 
+wabt::ExprList* MakeNop() {
+  wabt::ExprList* e = new wabt::ExprList();
+  e->push_back(wabt::MakeUnique<wabt::NopExpr>());
+  return e;
+}
+
 #define DEFINE_LOAD(opcode) \
 wabt::ExprList* Make##opcode(wabt::ExprList* index, wabt::Address align, uint32_t offset) { \
   ERROR_UNLESS(index != nullptr, "index cannot be null");                                   \

@@ -28,8 +28,8 @@ enum WeightDistributionType {
   Uniform,
   Gaussian,
   Constant,
-  FIRST_HIDDEN_OUTPUT = LeCunUniform,
-  LAST_HIDDEN_OUTPUT = Constant
+  FIRST_HIDDEN_OR_OUTPUT = LeCunUniform,
+  LAST_HIDDEN_OR_OUTPUT = Constant
 
 };
 

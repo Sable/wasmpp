@@ -130,9 +130,9 @@ int main(int argc, char *argv[]) {
   options.use_simd = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(784, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),
-     new FullyConnectedLayer(100, model.Builtins().activation.Sigmoid(), XavierUniform, 1.0),
-     new FullyConnectedLayer(10, model.Builtins().activation.Sigmoid(), LeCunUniform, 1)
+     NewLayer<InputDenseLayer>(784, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
+     NewLayer<HiddenDenseLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
+     NewLayer<OutputDenseLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
   });
 
   uint32_t epoch = 10;

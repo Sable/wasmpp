@@ -61,16 +61,18 @@ int main(int argc, char *argv[]) {
   }
 
   ModelOptions options;
+  options.log_training_accuracy = true;
   options.log_training_error = true;
   options.log_training_time = true;
+  options.log_testing_accuracy;
   options.log_testing_error = true;
   options.log_testing_time = true;
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal, 1),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), XavierNormal, 1),
-     new FullyConnectedLayer(2, model.Builtins().activation.Sigmoid(), LeCunNormal, 1)
+     NewLayer<InputDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
+     NewLayer<HiddenDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
+     NewLayer<OutputDenseLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(LeCunNormal),
   });
 
   // Train

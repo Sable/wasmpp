@@ -9,23 +9,6 @@ namespace arch {
 using namespace wasmpp;
 using namespace wabt;
 
-struct LayerMeta {
-  LayerMeta(Layer* l):layer(l) {}
-  Layer* layer = nullptr;
-  // Feed-forward arrays
-  ds::NDArray* W = nullptr;
-  ds::NDArray* Z = nullptr;
-  ds::NDArray* A = nullptr;
-  ds::NDArray* b = nullptr;
-  // Back-propagation arrays
-  ds::NDArray* dW = nullptr;
-  ds::NDArray* dZ = nullptr;
-  ds::NDArray* dA = nullptr;
-  ds::NDArray* db = nullptr;
-  // Regularization
-  ds::NDArray* inverted_dropout = nullptr;
-};
-
 wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
   assert(learning_rate != nullptr);
   return MakeF32Store(MakeI32Const(learning_rate->Begin()), val);
@@ -37,8 +20,17 @@ wabt::ExprList* Model::GetLearningRate() {
 }
 
 void Model::SetLayers(std::vector<nn::arch::Layer *> layers) {
-  for(auto l : layers) {
-    layers_.push_back(new LayerMeta(l));
+  for(uint32_t index = 0; index < layers.size(); index++) {
+    if(index == 0) {
+      ERROR_UNLESS(layers[index]->Position() == Input, "First layer must be an input layer");
+    } else if(index == layers.size() - 1) {
+      ERROR_UNLESS(layers[index]->Position() == Output, "Last layer must be an output layer");
+    } else {
+      ERROR_UNLESS(layers[index]->Position() == Hidden, "Middle layer must be a hidden layer");
+    }
+    layers[index]->SetIndex(index);
+    layers[index]->SetModel(this);
+    layers_.push_back(layers[index]);
   }
 }
 
@@ -81,7 +73,7 @@ void Model::InitSnippets() {
   }
 }
 
-#define ALLOCATE_MEMORY(array, rows, cols) \
+#define ALLOCATE_MATRIX(array, rows, cols) \
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \
                             {rows, cols}, TypeSize(Type::F32));
 
@@ -92,25 +84,21 @@ void Model::AllocateMembers() {
 void Model::AllocateLayers() {
   ERROR_UNLESS(layers_.size() >= 2, "At least an input and output layer should be defined");
   for(auto l = 0; l < layers_.size(); ++l) {
-    // FIXME For now only support fully connected layer
-    assert(layers_[l]->layer->Type() == FullyConnected);
+    layers_[l]->AllocateMemory();
 
-    ALLOCATE_MEMORY(layers_[l]->A, layers_[l]->layer->Nodes(), batch_size_);
-    ALLOCATE_MEMORY(layers_[l]->inverted_dropout, layers_[l]->layer->Nodes(), batch_size_);
-    if(l > 0) {
-      ALLOCATE_MEMORY(layers_[l]->Z, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->dZ, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->dA, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(layers_[l]->W, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
-      ALLOCATE_MEMORY(layers_[l]->dW, layers_[l]->layer->Nodes(), layers_[l-1]->layer->Nodes());
-      ALLOCATE_MEMORY(layers_[l]->b, layers_[l]->layer->Nodes(), 1);
-      ALLOCATE_MEMORY(layers_[l]->db, layers_[l]->layer->Nodes(), 1);
-    }
+    // Allocate memory for confusion matrix, true_matrix, etc...
     if(l == layers_.size() - 1) {
-      ALLOCATE_MEMORY(true_matrix_, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(pred_hardmax_matrix_, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(cost_matrix_, layers_[l]->layer->Nodes(), batch_size_);
-      ALLOCATE_MEMORY(confusion_matrix_, layers_[l]->layer->Nodes(), layers_[l]->layer->Nodes());
+      assert(layers_[l]->Position() == Output);
+      uint32_t output_size = 0;
+      if(layers_[l]->Type() == FullyConnected) {
+        output_size = static_cast<OutputDenseLayer*>(layers_[l])->Nodes();
+      } else {
+        assert(!"Not implemented");
+      }
+      ALLOCATE_MATRIX(true_matrix_, output_size, batch_size_);
+      ALLOCATE_MATRIX(pred_hardmax_matrix_, output_size, batch_size_);
+      ALLOCATE_MATRIX(cost_matrix_, output_size, batch_size_);
+      ALLOCATE_MATRIX(confusion_matrix_, output_size, output_size);
     }
   }
 }
@@ -122,14 +110,14 @@ void Model::AllocateTraining() {
   for(uint32_t b=0; b < training_vals_.size(); b += batch_size_) {
     // Training data
     ds::NDArray* training_array = nullptr;
-    ALLOCATE_MEMORY(training_array, (uint32_t) training_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(training_array, (uint32_t) training_vals_[0].size(), batch_size_);
     training_.push_back(training_array);
   }
 
   for(uint32_t b=0; b < training_labels_vals_.size(); b += batch_size_) {
     // Training labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MEMORY(labels_array, (uint32_t) training_labels_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(labels_array, (uint32_t) training_labels_vals_[0].size(), batch_size_);
     training_labels_.push_back(labels_array);
   }
 }
@@ -141,14 +129,14 @@ void Model::AllocateTest() {
   for(uint32_t b=0; b < testing_vals_.size(); b += batch_size_) {
     // Testing data
     ds::NDArray* testing_array = nullptr;
-    ALLOCATE_MEMORY(testing_array, (uint32_t) testing_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(testing_array, (uint32_t) testing_vals_[0].size(), batch_size_);
     testing_.push_back(testing_array);
   }
 
   for(uint32_t b=0; b < testing_labels_vals_.size(); b += batch_size_) {
     // Testing labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MEMORY(labels_array, (uint32_t) testing_labels_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(labels_array, (uint32_t) testing_labels_vals_[0].size(), batch_size_);
     testing_labels_.push_back(labels_array);
   }
 }
@@ -197,53 +185,9 @@ void Model::MakeTestingData(wabt::Var memory) {
   }
 }
 
-void Model::MakeWeightData(wabt::Var memory) {
+void Model::MakeLayersData(wabt::Var memory) {
   for(int l=1; l < layers_.size(); ++l) {
-    auto weight_type = layers_[l]->layer->WeightType();
-    if(l == layers_.size() - 1) {
-      ERROR_UNLESS(weight_type >= FIRST_HIDDEN_OUTPUT && weight_type <= LAST_HIDDEN_OUTPUT,
-                   "Wrong weight distribution for the output layer");
-    }
-    auto weight_size = layers_[l]->W->Shape()[0] * layers_[l]->W->Shape()[1];
-    auto bias_size = layers_[l]->b->Shape()[0] * layers_[l]->b->Shape()[1];
-    std::vector<DataEntry> weight_entries;
-    std::vector<DataEntry> bias_entries;
-    switch (weight_type) {
-      case XavierUniform:
-      case XavierNormal:
-        weight_entries = XavierDistribution(weight_size, layers_[l-1]->A->Shape()[0], layers_[l+1]->A->Shape()[0],
-            weight_type == XavierUniform, options_.weights_options.seed);
-        bias_entries = XavierDistribution(bias_size, layers_[l-1]->A->Shape()[0], layers_[l+1]->A->Shape()[0],
-            weight_type == XavierUniform, options_.weights_options.seed);
-        break;
-      case LeCunUniform:
-      case LeCunNormal:
-        weight_entries = LeCunDistribution(weight_size, layers_[l - 1]->A->Shape()[0], weight_type == LeCunUniform,
-            options_.weights_options.seed);
-        bias_entries = LeCunDistribution(bias_size, layers_[l - 1]->A->Shape()[0], weight_type == LeCunUniform,
-            options_.weights_options.seed);
-        break;
-      case Gaussian:
-        weight_entries = GaussianDistribution(weight_size, options_.weights_options.gaussian_mean,
-            options_.weights_options.gaussian_std_dev, options_.weights_options.seed);
-        bias_entries = GaussianDistribution(bias_size, options_.weights_options.gaussian_mean,
-            options_.weights_options.gaussian_std_dev, options_.weights_options.seed);
-        break;
-      case Uniform:
-        weight_entries = UniformDistribution(weight_size, options_.weights_options.uniform_low,
-            options_.weights_options.uniform_high, options_.weights_options.seed);
-        bias_entries = UniformDistribution(bias_size, options_.weights_options.uniform_low,
-            options_.weights_options.uniform_high, options_.weights_options.seed);
-        break;
-      case Constant:
-        weight_entries = ConstantDistribution(weight_size, options_.weights_options.constant_value);
-        bias_entries = ConstantDistribution(bias_size, options_.weights_options.constant_value);
-        break;
-      default:
-        assert(!"Weight distribution not implemented");
-    }
-    module_manager_.MakeData(memory, layers_[l]->W->Memory()->Begin(), weight_entries);
-    module_manager_.MakeData(memory, layers_[l]->b->Memory()->Begin(), bias_entries);
+    layers_[l]->MakeData(memory);
   }
 }
 
@@ -251,6 +195,7 @@ Var Model::GenerateFeedForwardWasmFunction() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32, Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    assert(locals.size() == 6);
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -258,57 +203,18 @@ Var Model::GenerateFeedForwardWasmFunction() {
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
 
+    assert(params.size() == 3);
     auto input_begin = params[0];
     auto target_begin = params[1];
     auto is_training = params[2];
 
-    for(int l=1; l < layers_.size(); ++l) {
-
-      // Check for dropout regularization
-      if(layers_[l-1]->layer->KeepProb() != 1.0) {
-        // Only dropout on training
-        f.Insert(MakeIf(f.Label(), MakeBinary(Opcode::I32Eq, MakeLocalGet(is_training), MakeI32Const(1)), {},
-                        [&](BlockBody true_block, Var true_label){
-          // Generate a mask matrix
-          true_block.Insert(MakeCall(builtins_.math.MaskMatrix(), {
-              MakeI32Const(layers_[l-1]->inverted_dropout->Memory()->Begin()),
-              MakeI32Const(layers_[l-1]->inverted_dropout->Memory()->End()),
-              MakeF32Const(layers_[l-1]->layer->KeepProb())
-          }));
-          // A[l-1] = (1/keep_prob) * (A[l-1] * inverted_dropout[l-1])
-          // 1) A[l-1] = A[l-1] * inverted_dropout[l-1]
-          // 2) A[l-1] = A[l-1] * (1/keep_prob)
-          true_block.Insert(snippets_.matrix->MatrixMultiplication(layers_[l-1]->A, layers_[l-1]->inverted_dropout,
-                                                 layers_[l-1]->A, {vi32_1, vi32_2}));
-          auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(layers_[l-1]->layer->KeepProb()));
-          true_block.Insert(snippets_.matrix->MatrixScalar(layers_[l-1]->A, scalar, layers_[l-1]->A,
-                                                  {vi32_1, vi32_2, vf32_1}));
-        }));
+    for(int l=0; l < layers_.size(); ++l) {
+      if(layers_[l]->Type() == FullyConnected) {
+        f.Insert(layers_[l]->Forward(true, input_begin, target_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+      } else {
+        assert(!"Not implemented!");
       }
-
-      // Z[l] = W[l] . A[l-1] + b[l]
-      // 1) Z[l] = W[l] . A[l-1]
-      // 2) Z[l] = Z[l] + b[l]
-      f.Insert(snippets_.matrix->MatrixDot(layers_[l]->W,
-                                  (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
-                                  snippet::RelocMat(layers_[l-1]->A), layers_[l]->Z,
-                                  {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixVectorAddition(layers_[l]->Z, layers_[l]->b, layers_[l]->Z,
-                                                      {vi32_1, vi32_2, vi32_3, vi32_4}));
-
-      // A[l] = g(Z[l])
-      f.Insert(snippets_.matrix->MatrixActivation(snippet::RelocMat(layers_[l]->Z), layers_[l]->layer->ActivationFunction(),
-          layers_[l]->A, {vi32_1, vi32_2}, false));
     }
-
-    // dA[L] = Loss(T[L], A[L])
-    f.Insert(MakeCall(loss_.loss, {
-      MakeLocalGet(target_begin),
-      MakeI32Const(layers_.back()->A->Memory()->Begin()),
-      MakeI32Const(layers_.back()->dA->Memory()->Begin()),
-      MakeI32Const(layers_.back()->A->Shape()[0]),
-      MakeI32Const(layers_.back()->A->Shape()[1])
-    }));
   });
 }
 
@@ -316,6 +222,7 @@ wabt::Var Model::GenerateBackpropagationWasmFunction() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
   return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    assert(locals.size() == 7);
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -324,62 +231,20 @@ wabt::Var Model::GenerateBackpropagationWasmFunction() {
     auto vf32_1 = locals[5];
     auto v128_1 = locals[6];
 
+    assert(params.size() == 1);
     auto input_begin = params[0];
 
-    for(auto l = layers_.size()-1; l > 0; --l) {
-       // dZ[l] = dA[l] * g'(Z[l])
-       // 1) dZ[l] = g'(Z[l])
-       // 2) dZ[l] = dA[l] * dZ[l]
-      f.Insert(snippets_.matrix->MatrixActivation(snippet::RelocMat(layers_[l]->Z),
-                                                  layers_[l]->layer->ActivationFunction(), layers_[l]->dZ,
-                                                  {vi32_1, vi32_2}, true));
-      f.Insert(snippets_.matrix->MatrixMultiplication(layers_[l]->dA, layers_[l]->dZ, layers_[l]->dZ,
-                                                      {vi32_1, vi32_2}));
-
-      // dW[l] = (1/m) dZ[l] . A[l-1]^T
-      // 1) dW[l] = dZ[l] . A[l-1]^T
-      // 2) dW[l] = (1/m) dW[l]
-      f.Insert(snippets_.matrix->MatrixDotRT(layers_[l]->dZ,
-                                             (l == 1) ? snippet::RelocMat(layers_[0]->A, input_begin) :
-                                             snippet::RelocMat(layers_[l-1]->A), layers_[l]->dW,
-                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, MakeF32Const(1.0f/batch_size_), layers_[l]->dW,
-                                              {vi32_1, vi32_2, vf32_1}));
-
-      // db[l] = (1/m) dZ[l]
-      // 1) db[l] = SUM(dZ[l], row wise)
-      // 2) db[l] = (1/m) db[l]
-      f.Insert(snippets_.matrix->MatrixHorizontalSum(layers_[l]->dZ, layers_[l]->db, {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, MakeF32Const(1.0f/batch_size_), layers_[l]->db,
-                                              {vi32_1, vi32_2, vf32_1}));
-
-      if(l > 1) {
-        // dA[l-1] = W[l]^T . dZ[l]
-        f.Insert(snippets_.matrix->MatrixDotLT(layers_[l]->W, layers_[l]->dZ, layers_[l-1]->dA,
-                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      }
-
-      // W[l] = W[l] - alpha * dW[l]
-      // 1) dW[l] = alpha * dW[l]
-      // 2) W[l] = W[l] - dW[l]
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->dW, GetLearningRate(), layers_[l]->dW,
-                                              {vi32_1, vi32_2, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->W, layers_[l]->dW, layers_[l]->W, {vi32_1, vi32_2}));
-
-      // b[l] = b[l] - alpha * db[l]
-      // 1) db[l] = alpha * db[l]
-      // 2) b[l] = b[l] - db[l]
-      f.Insert(snippets_.matrix->MatrixScalar(layers_[l]->db, GetLearningRate(), layers_[l]->db,
-                                              {vi32_1, vi32_2, vf32_1}));
-      f.Insert(snippets_.matrix->MatrixSubtraction(layers_[l]->b, layers_[l]->db, layers_[l]->b, {vi32_1, vi32_2}));
+    for(int64_t l = layers_.size()-1; l >= 0; --l) {
+      f.Insert(layers_[l]->Backward(input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
     }
   });
 }
 
 wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
-  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   return module_manager_.MakeFunction("confusion_matrix_function", {{Type::I32}, {}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(locals.size() == 6);
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -387,15 +252,22 @@ wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
     auto vi32_5 = locals[4];
     auto vi32_6 = locals[5];
 
+    assert(params.size() == 1);
     auto target_begin = params[0];
 
-    // pred_hardmax_matrix_ = Hardmax(A[L])
-    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, pred_hardmax_matrix_, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
-
-    // Update confusion matrix
-    f.Insert(snippets_.analysis->ConfusionMatrixUpdate(confusion_matrix_, pred_hardmax_matrix_,
-                                                               snippet::RelocMat(true_matrix_, target_begin),
-                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
+    assert(layers_.back()->Position() == Output);
+    if(layers_.back()->Type() == FullyConnected) {
+      auto last_layer = static_cast<OutputDenseLayer*>(layers_.back());
+      // pred_hardmax_matrix_ = Hardmax(A[L])
+      f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
+                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+      // Update confusion matrix
+      f.Insert(snippets_.analysis->ConfusionMatrixUpdate(confusion_matrix_, pred_hardmax_matrix_,
+                                                         snippet::RelocMat(true_matrix_, target_begin),
+                                                         {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
+    } else {
+      assert(!"Not implemented!");
+    }
   });
 }
 
@@ -414,15 +286,21 @@ wabt::Var Model::GenerateCountCorrectPredictionsFunction() {
     assert(params.size() == 1);
     auto target_begin = params[0];
 
-    // pred_hardmax_matrix_ = Hardmax(A[L])
-    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, pred_hardmax_matrix_,
-                                                   {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
-
-    // Count correct results
-    f.Insert(snippets_.analysis->CorrectPredictions(pred_hardmax_matrix_, snippet::RelocMat(true_matrix_, target_begin),
-                                                    correct_count, {vi32_1, vi32_2, vi32_3}));
-    // Return correct count
-    f.Insert(MakeLocalGet(correct_count));
+    assert(layers_.back()->Position() == Output);
+    if(layers_.back()->Type() == FullyConnected) {
+      auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+      // pred_hardmax_matrix_ = Hardmax(A[L])
+      f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
+                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+      // Count correct results
+      f.Insert(snippets_.analysis->CorrectPredictions(pred_hardmax_matrix_,
+                                                      snippet::RelocMat(true_matrix_, target_begin), correct_count,
+                                                      {vi32_1, vi32_2, vi32_3}));
+      // Return correct count
+      f.Insert(MakeLocalGet(correct_count));
+    } else {
+      assert(!"Not implemented!");
+    }
   });
 
 }
@@ -432,7 +310,7 @@ void Model::CompileInitialization() {
   module_manager_.MakeMemoryExport("memory", memory);
   MakeTrainingData(memory);
   MakeTestingData(memory);
-  MakeWeightData(memory);
+  MakeLayersData(memory);
 }
 
 void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) {
@@ -512,12 +390,18 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
 
         if(options_.log_training_error) {
           // Compute training error
-          b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
-              MakeLocalGet(label_addr),
-              MakeI32Const(layers_.back()->A->Memory()->Begin()),
-              MakeI32Const(layers_.back()->A->Shape()[0]),
-              MakeI32Const(layers_.back()->A->Shape()[1])
-          })));
+          assert(layers_.back()->Position() == Output);
+          if(layers_.back()->Type() == FullyConnected) {
+            auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+            b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
+                MakeLocalGet(label_addr),
+                MakeI32Const(last_layer->Predictions()->Begin()),
+                MakeI32Const(last_layer->Predictions()->Shape()[0]),
+                MakeI32Const(last_layer->Predictions()->Shape()[1])
+            })));
+          } else {
+            assert(!"Not implemented");
+          }
         }
 
         b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
@@ -601,12 +485,18 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
       if(options_.log_testing_error) {
         // Compute testing error
-        b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
-            MakeLocalGet(label_addr),
-            MakeI32Const(layers_.back()->A->Memory()->Begin()),
-            MakeI32Const(layers_.back()->A->Shape()[0]),
-            MakeI32Const(layers_.back()->A->Shape()[1])
-        })));
+        assert(layers_.back()->Position() == Output);
+        if(layers_.back()->Type() == FullyConnected) {
+          auto last_layer = static_cast<OutputDenseLayer *>(layers_.back());
+          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
+              MakeLocalGet(label_addr),
+              MakeI32Const(last_layer->Predictions()->Begin()),
+              MakeI32Const(last_layer->Predictions()->Shape()[0]),
+              MakeI32Const(last_layer->Predictions()->Shape()[1])
+          })));
+        } else {
+          assert(!"Not implemented");
+        }
       }
 
       if(options_.log_testing_confusion_matrix) {
