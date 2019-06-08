@@ -64,8 +64,11 @@ public:
 
 class DenseInputLayer : public FullyConnectedLayer {
 public:
-  DenseInputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
-      FullyConnectedLayer(Input, nodes, act_func) {}
+  // Input Dense Layer does not have an activation function
+  // and it will not be used in the forward or
+  // the backward algorithms
+  DenseInputLayer(uint32_t nodes) :
+      FullyConnectedLayer(Input, nodes, builtins::ActivationFunction()) {}
 };
 
 } // namespace layer

@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
   options.log_testing_confusion_matrix = true;
   Model model(options);
   model.SetLayers({
-     NewLayer<DenseInputLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
+     NewLayer<DenseInputLayer>(2)->WeightType(XavierNormal),
      NewLayer<DenseHiddenLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(XavierNormal),
      NewLayer<DenseOutputLayer>(2, model.Builtins().activation.Sigmoid())->WeightType(LeCunNormal),
   });
