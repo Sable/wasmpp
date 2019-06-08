@@ -1,4 +1,4 @@
-#include <src/nn-builder/src/snippet/confusion_matrix.h>
+#include <src/nn-builder/src/snippet/analysis.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
 
 namespace nn {
@@ -8,8 +8,8 @@ using namespace wasmpp;
 using namespace wabt;
 using namespace ds;
 
-wabt::ExprList* ConfusionMatrixSnippet::ConfusionMatrixUpdate(nn::ds::NDArray *matrix, nn::ds::NDArray *predictions,
-                                                              RelocMat target, std::vector<wabt::Var> locals) {
+wabt::ExprList* AnalysisSnippet::ConfusionMatrixUpdate(nn::ds::NDArray *matrix, nn::ds::NDArray *predictions,
+                                                       RelocMat target, std::vector<wabt::Var> locals) {
   MATRIX_CHECK(matrix);
   MATRIX_CHECK(predictions);
   MATRIX_CHECK(target.Array());
@@ -64,6 +64,45 @@ wabt::ExprList* ConfusionMatrixSnippet::ConfusionMatrixUpdate(nn::ds::NDArray *m
   }));
   return e;
 }
+
+wabt::ExprList* AnalysisSnippet::CorrectPredictions(nn::ds::NDArray *predictions, nn::snippet::RelocMat target,
+                                                    wabt::Var correct_predictions, std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(predictions);
+  VECTOR_CHECK(target.Array());
+  MATRIX_SAME_SHAPE(predictions, target.Array());
+
+  assert(locals.size() == 3);
+
+  auto row = locals[0];
+  auto col = locals[1];
+  auto addr = locals[2];
+
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t width_bytes = predictions->Shape()[1] * type_size;
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  Merge(e, MakeLocalSet(correct_predictions, MakeF32Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager_, row, 0, predictions->Memory()->Bytes(), width_bytes, {}, [&](BlockBody* b1) {
+    b1->Insert(GenerateRangeLoop(label_manager_, col, 0, width_bytes, type_size, {}, [&](BlockBody* b2){
+      auto pre_addr = MakeBinary(Opcode::I32Add, MakeI32Const(predictions->Begin()), MakeLocalGet(addr));
+      b2->Insert(MakeIf(label_manager_, MakeBinary(Opcode::F32Eq, MakeF32Load(pre_addr), MakeF32Const(1.0f)), {},
+                        [&](BlockBody t1, Var label){
+        ExprList* tar_addr = nullptr;
+        if(target.HasBeginVar()) {
+          tar_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(target.Var()), MakeLocalGet(addr));
+        } else {
+          tar_addr = MakeBinary(Opcode::I32Add, MakeI32Const(target.Array()->Begin()), MakeLocalGet(addr));
+        }
+        t1.Insert(MakeIf(label_manager_, MakeBinary(Opcode::F32Eq, MakeF32Load(tar_addr), MakeF32Const(1.0f)), {},
+                        [&](BlockBody t2, Var){
+          t2.Insert(GenerateCompoundAssignment(correct_predictions, Opcode::F32Add, MakeF32Const(1.0f)));
+        }));
+      }));
+      b2->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+    }));
+  }));
+  return e;}
 
 } // namespace snippet
 } // namespace nn

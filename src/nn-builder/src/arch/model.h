@@ -11,7 +11,7 @@
 #include <src/nn-builder/src/builtins/message.h>
 #include <src/nn-builder/src/data_structure/ndarray.h>
 #include <src/nn-builder/src/snippet/matrix.h>
-#include <src/nn-builder/src/snippet/confusion_matrix.h>
+#include <src/nn-builder/src/snippet/analysis.h>
 #include <src/nn-builder/src/arch/initializers.h>
 #include <memory>
 #include <utility>
@@ -22,6 +22,7 @@ namespace arch {
 struct LayerMeta;
 
 struct ModelOptions {
+  bool log_training_accuracy = false;
   bool log_training_error = false;
   bool log_training_time = false;
   bool log_testing_error = false;
@@ -46,12 +47,14 @@ private:
   wabt::ExprList* GetLearningRate();
 
   // Model components variables
-  wabt::Var forward_;
-  wabt::Var backward_;
+  wabt::Var forward_func_;
+  wabt::Var backward_func_;
   wabt::Var confusion_matrix_func_;
+  wabt::Var count_correct_predictions_func_;
 
   // Model feature arrays
   ds::NDArray* true_matrix_ = nullptr;
+  ds::NDArray* pred_hardmax_matrix_ = nullptr;
   ds::NDArray* cost_matrix_ = nullptr;
   ds::NDArray* confusion_matrix_ = nullptr;
 
@@ -80,7 +83,7 @@ private:
   // Snippet codes
   struct Snippets {
     snippet::MatrixSnippet* matrix;
-    snippet::ConfusionMatrixSnippet* confusion_matrix;
+    snippet::AnalysisSnippet* analysis;
   } snippets_;
 
   // Initialize builtins
@@ -105,6 +108,7 @@ private:
   wabt::Var GenerateFeedForwardWasmFunction();
   wabt::Var GenerateBackpropagationWasmFunction();
   wabt::Var GenerateUpdateConfusionMatrixFunction();
+  wabt::Var GenerateCountCorrectPredictionsFunction();
 public:
   Model(ModelOptions options);
   ~Model();

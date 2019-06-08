@@ -9,7 +9,11 @@ const imports = {
   "Message": {
     log_training_time: (time) => {console.log("Training time:", time, "ms");},
     log_training_error: (epoch, error) => {
-      console.log("Training error in epoch", epoch+1, ":", error);
+      console.log("Training Error in epoch", epoch+1, ":", error);
+    },
+    log_training_accuracy: (epoch, acc) => {
+      console.log("Training Accuracy in epoch", epoch+1, ":", 
+        Math.round(acc * 10000) / 10000);
     },
     log_testing_time: (time) => {console.log("Testing time:", time, "ms");},
     log_testing_error: (error) => {console.log("Testing error:", error);},

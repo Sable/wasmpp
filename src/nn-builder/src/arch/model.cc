@@ -74,10 +74,10 @@ void Model::InitBuiltinDefinitions() {
 void Model::InitSnippets() {
   if(options_.use_simd) {
     snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
-    snippets_.confusion_matrix = new snippet::ConfusionMatrixSnippet(&module_manager_.Label());
+    snippets_.analysis = new snippet::AnalysisSnippet(&module_manager_.Label());
   } else {
     snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
-    snippets_.confusion_matrix = new snippet::ConfusionMatrixSnippetSimd(&module_manager_.Label());
+    snippets_.analysis = new snippet::AnalysisSnippetSimd(&module_manager_.Label());
   }
 }
 
@@ -108,6 +108,7 @@ void Model::AllocateLayers() {
     }
     if(l == layers_.size() - 1) {
       ALLOCATE_MEMORY(true_matrix_, layers_[l]->layer->Nodes(), batch_size_);
+      ALLOCATE_MEMORY(pred_hardmax_matrix_, layers_[l]->layer->Nodes(), batch_size_);
       ALLOCATE_MEMORY(cost_matrix_, layers_[l]->layer->Nodes(), batch_size_);
       ALLOCATE_MEMORY(confusion_matrix_, layers_[l]->layer->Nodes(), layers_[l]->layer->Nodes());
     }
@@ -388,14 +389,42 @@ wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
 
     auto target_begin = params[0];
 
-    // A[L] = Hardmax(A[L])
-    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, layers_.back()->A, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+    // pred_hardmax_matrix_ = Hardmax(A[L])
+    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, pred_hardmax_matrix_, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
 
     // Update confusion matrix
-    f.Insert(snippets_.confusion_matrix->ConfusionMatrixUpdate(confusion_matrix_, layers_.back()->A,
+    f.Insert(snippets_.analysis->ConfusionMatrixUpdate(confusion_matrix_, pred_hardmax_matrix_,
                                                                snippet::RelocMat(true_matrix_, target_begin),
                                                                {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
   });
+}
+
+wabt::Var Model::GenerateCountCorrectPredictionsFunction() {
+  std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
+  return module_manager_.MakeFunction("count_correct_predictions", {{Type::I32}, {Type::F32}}, locals,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(locals.size() == 6);
+    auto vi32_1 = locals[0];
+    auto vi32_2 = locals[1];
+    auto vi32_3 = locals[2];
+    auto vi32_4 = locals[3];
+    auto vi32_5 = locals[4];
+    auto correct_count = locals[5];
+
+    assert(params.size() == 1);
+    auto target_begin = params[0];
+
+    // pred_hardmax_matrix_ = Hardmax(A[L])
+    f.Insert(snippets_.matrix->MatrixColumnHardmax(layers_.back()->A, pred_hardmax_matrix_,
+                                                   {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+
+    // Count correct results
+    f.Insert(snippets_.analysis->CorrectPredictions(pred_hardmax_matrix_, snippet::RelocMat(true_matrix_, target_begin),
+                                                    correct_count, {vi32_1, vi32_2, vi32_3}));
+    // Return correct count
+    f.Insert(MakeLocalGet(correct_count));
+  });
+
 }
 
 void Model::CompileInitialization() {
@@ -411,9 +440,10 @@ void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) 
   batch_size_ = batch_size;
   loss_ = loss;
   AllocateLayers();
-  forward_ = GenerateFeedForwardWasmFunction();
-  backward_ = GenerateBackpropagationWasmFunction();
+  forward_func_ = GenerateFeedForwardWasmFunction();
+  backward_func_ = GenerateBackpropagationWasmFunction();
   confusion_matrix_func_ = GenerateUpdateConfusionMatrixFunction();
+  count_correct_predictions_func_ = GenerateCountCorrectPredictionsFunction();
 }
 
 void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
@@ -429,20 +459,22 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
   training_labels_vals_ = labels;
   AllocateTraining();
 
-  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
 
     // Set learning rate
     f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
 
+    assert(locals.size() == 8);
     auto time = locals[0];
     auto cost_mean = locals[1];
-    auto epoch = locals[2];
-    auto train_addr = locals[3];
-    auto label_addr = locals[4];
-    auto vi32_1 = locals[5];
-    auto vi32_2 = locals[6];
+    auto accuracy = locals[2];
+    auto epoch = locals[3];
+    auto train_addr = locals[4];
+    auto label_addr = locals[5];
+    auto vi32_1 = locals[6];
+    auto vi32_2 = locals[7];
 
     auto train_begin = training_.front()->Memory()->Begin();
     auto train_end = training_.back()->Memory()->End();
@@ -457,16 +489,26 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
       b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
+      b1->Insert(MakeLocalSet(accuracy, MakeF32Const(0)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
-        // Apply neural network algorithms
-        b2->Insert(MakeCall(forward_, {
+        // Forward algorithm
+        b2->Insert(MakeCall(forward_func_, {
           MakeLocalGet(train_addr),
           MakeLocalGet(label_addr),
           MakeI32Const(1) // is_training = 1
         }));
-        b2->Insert(MakeCall(backward_, {
+
+        // Backward algorithm
+        b2->Insert(MakeCall(backward_func_, {
           MakeLocalGet(train_addr)
         }));
+
+        if(options_.log_training_accuracy) {
+          // Count number of correct results
+          b2->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_func_, {
+              MakeLocalGet(label_addr)
+          })));
+        }
 
         if(options_.log_training_error) {
           // Compute training error
@@ -486,6 +528,14 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
         b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {
           MakeLocalGet(epoch),
           MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(training_.size()))
+        }));
+      }
+
+      if(options_.log_training_accuracy) {
+        // Log training accuracy
+        b1->Insert(MakeCall(builtins_.message.LogTrainingAccuracy(), {
+            MakeLocalGet(epoch),
+            MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(training_vals_.size()))
         }));
       }
     }));
@@ -532,7 +582,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     }
     f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
     f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
-      b1->Insert(MakeCall(forward_, {
+      b1->Insert(MakeCall(forward_func_, {
         MakeLocalGet(test_addr),
         MakeLocalGet(label_addr),
         MakeI32Const(0) // is_training = 0

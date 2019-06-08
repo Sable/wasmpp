@@ -120,6 +120,7 @@ int main(int argc, char *argv[]) {
   LoadValues(train_data, train_labels, test_data, test_labels, training_limit, testing_limit);
 
   ModelOptions options;
+  options.log_training_accuracy = true;
   options.log_training_error = true;
   options.log_training_time = true;
   options.log_testing_error = true;
