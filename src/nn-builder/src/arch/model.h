@@ -25,6 +25,7 @@ struct ModelOptions {
   bool log_training_accuracy = false;
   bool log_training_error = false;
   bool log_training_time = false;
+  bool log_testing_accuracy = false;
   bool log_testing_error = false;
   bool log_testing_time = false;
   bool log_testing_confusion_matrix = false;

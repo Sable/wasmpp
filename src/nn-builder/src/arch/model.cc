@@ -560,15 +560,17 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
   testing_labels_vals_ = labels;
   AllocateTest();
 
-  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("test", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
+    assert(locals.size() == 7);
     auto time = locals[0];
     auto cost_mean = locals[1];
-    auto test_addr = locals[2];
-    auto label_addr = locals[3];
-    auto vi32_1 = locals[4];
-    auto vi32_2 = locals[5];
+    auto accuracy = locals[2];
+    auto test_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
     auto test_begin = testing_.front()->Memory()->Begin();
     auto test_end = testing_.back()->Memory()->End();
@@ -582,11 +584,20 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     }
     f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
     f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
+
+      // Forward algorithm
       b1->Insert(MakeCall(forward_func_, {
         MakeLocalGet(test_addr),
         MakeLocalGet(label_addr),
         MakeI32Const(0) // is_training = 0
       }));
+
+      if(options_.log_testing_accuracy) {
+        // Count number of correct results
+        b1->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_func_, {
+            MakeLocalGet(label_addr)
+        })));
+      }
 
       if(options_.log_testing_error) {
         // Compute testing error
@@ -610,8 +621,16 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
     if(options_.log_testing_error) {
       // Log testing error
-      f.Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Div, MakeF32Const(testing_.size())));
-      f.Insert(MakeCall(builtins_.message.LogTestingError(), {MakeLocalGet(cost_mean)}));
+      f.Insert(MakeCall(builtins_.message.LogTestingError(), {
+        MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(testing_.size()))
+      }));
+    }
+
+    if(options_.log_testing_accuracy) {
+      // Log testing accuracy
+      f.Insert(MakeCall(builtins_.message.LogTestingAccuracy(), {
+          MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(testing_vals_.size()))
+      }));
     }
 
     if(options_.log_testing_time) {

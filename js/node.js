@@ -16,7 +16,10 @@ const imports = {
         Math.round(acc * 10000) / 10000);
     },
     log_testing_time: (time) => {console.log("Testing time:", time, "ms");},
-    log_testing_error: (error) => {console.log("Testing error:", error);},
+    log_testing_error: (error) => {console.log("Testing Error:", error);},
+    log_testing_accuracy: (acc) => {
+      console.log("Testing Accuracy:", Math.round(acc * 10000) / 10000);
+    },
   },
   "System": {
     print: console.log,

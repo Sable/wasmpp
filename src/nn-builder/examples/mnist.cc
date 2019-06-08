@@ -123,6 +123,7 @@ int main(int argc, char *argv[]) {
   options.log_training_accuracy = true;
   options.log_training_error = true;
   options.log_training_time = true;
+  options.log_testing_accuracy = true;
   options.log_testing_error = true;
   options.log_testing_time = true;
   options.log_testing_confusion_matrix = true;
