@@ -9,7 +9,8 @@ using namespace wasmpp;
 using namespace wabt;
 
 FullyConnectedLayer* FullyConnectedLayer::KeepProb(float keep_prob) {
-  assert(keep_prob_ >= KEEP_PROB_MIN && keep_prob_ <= KEEP_PROB_MAX);
+  ERROR_UNLESS(keep_prob >= KEEP_PROB_MIN && keep_prob <= KEEP_PROB_MAX, "Keep probability must be between %f and %f",
+               KEEP_PROB_MIN, KEEP_PROB_MAX);
   keep_prob_ = keep_prob;
   return this;
 }
@@ -269,6 +270,12 @@ void FullyConnectedLayer::MakeData(wabt::Var memory) {
   }
   NetworkModel()->ModuleManager().MakeData(memory, W_->Memory()->Begin(), weight_entries);
   NetworkModel()->ModuleManager().MakeData(memory, b_->Memory()->Begin(), bias_entries);
+}
+
+FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
+  ERROR_EXIT("Dense output layer cannot have a keep probability value "
+             "because dropout regularization does not apply to it");
+  return this;
 }
 
 } // namespace layer

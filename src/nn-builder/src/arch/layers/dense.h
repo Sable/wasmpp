@@ -44,7 +44,7 @@ public:
   void MakeData(wabt::Var memory);
 
   // Layer configuration
-  FullyConnectedLayer* KeepProb(float keep_prob);
+  virtual FullyConnectedLayer* KeepProb(float keep_prob);
   FullyConnectedLayer* WeightType(WeightDistributionType type);
 };
 
@@ -59,6 +59,7 @@ public:
   DenseOutputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
       FullyConnectedLayer(Output, nodes, act_func) {}
   ds::NDArray* Predictions() const { return A_; }
+  FullyConnectedLayer* KeepProb(float keep_prob);
 };
 
 class DenseInputLayer : public FullyConnectedLayer {

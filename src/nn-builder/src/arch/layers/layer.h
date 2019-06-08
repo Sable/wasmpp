@@ -24,14 +24,15 @@ private:
   LayerPosition position_;
   Model* model_;
   uint32_t index_;
+protected:
+  Model* NetworkModel() const { return model_; }
+  uint32_t LayerIndex() const { return index_; }
 public:
   Layer(LayerType type, LayerPosition position) : type_(type), position_(position) {}
   LayerType Type() const  { return type_; }
   LayerPosition Position() const  { return position_; }
   void SetModel(Model* model) { model_ = model; }
-  Model* NetworkModel() const { return model_; }
   void SetIndex(uint32_t index) { index_ = index; }
-  uint32_t LayerIndex() const { return index_; }
   virtual wabt::ExprList* Forward(bool is_training, wabt::Var input_begin, wabt::Var target_begin,
                                   std::vector<wabt::Var> locals) = 0;
   virtual wabt::ExprList* Backward(wabt::Var input_begin, std::vector<wabt::Var> locals) = 0;

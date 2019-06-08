@@ -132,8 +132,8 @@ int main(int argc, char *argv[]) {
   options.use_simd = true;
   Model model(options);
   model.SetLayers({
-     NewLayer<DenseInputLayer>(784, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
-     NewLayer<DenseHiddenLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform),
+     NewLayer<DenseInputLayer>(784, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform)->KeepProb(1),
+     NewLayer<DenseHiddenLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform)->KeepProb(1),
      NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
   });
 
