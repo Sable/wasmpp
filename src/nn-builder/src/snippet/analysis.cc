@@ -68,7 +68,7 @@ wabt::ExprList* AnalysisSnippet::ConfusionMatrixUpdate(nn::ds::NDArray *matrix, 
 wabt::ExprList* AnalysisSnippet::CorrectPredictions(nn::ds::NDArray *predictions, nn::snippet::RelocMat target,
                                                     wabt::Var correct_predictions, std::vector<wabt::Var> locals) {
   MATRIX_CHECK(predictions);
-  VECTOR_CHECK(target.Array());
+  MATRIX_CHECK(target.Array());
   MATRIX_SAME_SHAPE(predictions, target.Array());
 
   assert(locals.size() == 3);
