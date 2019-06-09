@@ -23,6 +23,7 @@ struct ModelOptions {
   bool log_training_accuracy = false;
   bool log_training_error = false;
   bool log_training_time = false;
+  bool log_training_confusion_matrix = false;
   bool log_testing_accuracy = false;
   bool log_testing_error = false;
   bool log_testing_time = false;
@@ -37,17 +38,23 @@ private:
   ModelOptions options_;
   wasmpp::ModuleManager module_manager_;
   std::vector<layer::Layer*> layers_;
-  uint32_t batch_size_;
   builtins::LossFunction loss_;
+  uint32_t training_batch_size_;
+  uint32_t testing_batch_size_;
+  uint32_t prediction_batch_size_;
 
   // Model members
   wasmpp::Memory* learning_rate = nullptr;
 
   // Model functions
-  wabt::Var forward_func_;
+  wabt::Var forward_training_func_;
+  wabt::Var forward_testing_func_;
+  wabt::Var forward_prediction_func_;
   wabt::Var backward_func_;
-  wabt::Var confusion_matrix_func_;
-  wabt::Var count_correct_predictions_func_;
+  wabt::Var confusion_matrix_training_func_;
+  wabt::Var confusion_matrix_testing_func_;
+  wabt::Var count_correct_predictions_training_func_;
+  wabt::Var count_correct_predictions_testing_func_;
 
   // Training data
   std::vector<ds::NDArray*> training_;
@@ -96,10 +103,10 @@ private:
   void MakeLayersData(wabt::Var memory);
 
   // Generate neural network algorithms
-  wabt::Var ForwardAlgorithmFunction();
+  wabt::Var ForwardAlgorithmFunction(uint8_t mode_index);
   wabt::Var BackwardAlgorithmFunction();
-  wabt::Var ConfusionMatrixFunction();
-  wabt::Var CountCorrectPredictionsFunction();
+  wabt::Var ConfusionMatrixFunction(uint8_t mode_index);
+  wabt::Var CountCorrectPredictionsFunction(uint8_t mode_index);
 public:
   Model(ModelOptions options);
   wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
@@ -107,7 +114,8 @@ public:
   void SetLayers(std::vector<layer::Layer*> layers);
 
   // Compile functions
-  void CompileLayers(uint32_t batch_size, builtins::LossFunction loss);
+  void CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_size, uint32_t prediction_batch_size,
+                     builtins::LossFunction loss);
   void CompileTraining(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
   void CompileTesting(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
@@ -120,14 +128,21 @@ public:
   bool Validate();
   const Builtins& Builtins() const { return builtins_; }
   const Snippets& Snippets() const { return snippets_; }
-  uint32_t BatchSize() const { return batch_size_; }
+  uint32_t TrainingBatchSize() const { return training_batch_size_; }
+  uint32_t TestingBatchSize() const { return testing_batch_size_; }
+  uint32_t PredictionBatchSize() const { return prediction_batch_size_; }
   const ModelOptions& Options() const { return options_; }
   const builtins::LossFunction& Loss() const { return loss_; }
 
-  enum Mode {
-    Training = 1,
+  enum Mode : uint8_t {
+    Training = 0,
     Testing,
-    Prediction
+    Prediction,
+
+    // Keep those pointers at the end
+    // because enums are used as indices
+    FIRST_MODE = Training,
+    LAST_MODE = Prediction
   };
 };
 

@@ -89,17 +89,17 @@ void Model::AllocateTraining() {
   // Do not merge loops so that all
   // training data are consecutive in memory
 
-  for(uint32_t b=0; b < training_vals_.size(); b += batch_size_) {
+  for(uint32_t b=0; b < training_vals_.size(); b += TrainingBatchSize()) {
     // Training data
     ds::NDArray* training_array = nullptr;
-    ALLOCATE_MATRIX(training_array, (uint32_t) training_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(training_array, (uint32_t) training_vals_[0].size(), TrainingBatchSize());
     training_.push_back(training_array);
   }
 
-  for(uint32_t b=0; b < training_labels_vals_.size(); b += batch_size_) {
+  for(uint32_t b=0; b < training_labels_vals_.size(); b += TrainingBatchSize()) {
     // Training labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MATRIX(labels_array, (uint32_t) training_labels_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(labels_array, (uint32_t) training_labels_vals_[0].size(), TrainingBatchSize());
     training_labels_.push_back(labels_array);
   }
 }
@@ -108,17 +108,17 @@ void Model::AllocateTest() {
   // Do not merge loops so that all
   // test data are consecutive in memory
 
-  for(uint32_t b=0; b < testing_vals_.size(); b += batch_size_) {
+  for(uint32_t b=0; b < testing_vals_.size(); b += TestingBatchSize()) {
     // Testing data
     ds::NDArray* testing_array = nullptr;
-    ALLOCATE_MATRIX(testing_array, (uint32_t) testing_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(testing_array, (uint32_t) testing_vals_[0].size(), TestingBatchSize());
     testing_.push_back(testing_array);
   }
 
-  for(uint32_t b=0; b < testing_labels_vals_.size(); b += batch_size_) {
+  for(uint32_t b=0; b < testing_labels_vals_.size(); b += TestingBatchSize()) {
     // Testing labels
     ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MATRIX(labels_array, (uint32_t) testing_labels_vals_[0].size(), batch_size_);
+    ALLOCATE_MATRIX(labels_array, (uint32_t) testing_labels_vals_[0].size(), TestingBatchSize());
     testing_labels_.push_back(labels_array);
   }
 }
@@ -136,15 +136,15 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
 void Model::MakeTrainingData(wabt::Var memory) {
   for(uint32_t i=0; i < training_.size(); ++i) {
     // Training data
-    auto training_begin = training_vals_.begin() + (i * batch_size_);
-    std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size_);
+    auto training_begin = training_vals_.begin() + (i * TrainingBatchSize());
+    std::vector<std::vector<float>> sub_input(training_begin, training_begin + TrainingBatchSize());
     module_manager_.MakeData(memory, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
   }
 
   for(uint32_t i=0; i < training_labels_.size(); ++i) {
     // Training labels
-    auto labels_begin = training_labels_vals_.begin() + (i * batch_size_);
-    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
+    auto labels_begin = training_labels_vals_.begin() + (i * TrainingBatchSize());
+    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TrainingBatchSize());
     module_manager_.MakeData(memory, training_labels_[i]->Memory()->Begin(),
                              MakeTransposeData(training_labels_[i], sub_labels));
   }
@@ -153,15 +153,15 @@ void Model::MakeTrainingData(wabt::Var memory) {
 void Model::MakeTestingData(wabt::Var memory) {
   for(uint32_t i=0; i < testing_.size(); ++i) {
     // Testing data
-    auto testing_begin = testing_vals_.begin() + (i * batch_size_);
-    std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + batch_size_);
+    auto testing_begin = testing_vals_.begin() + (i * TestingBatchSize());
+    std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + TestingBatchSize());
     module_manager_.MakeData(memory, testing_[i]->Memory()->Begin(), MakeTransposeData(testing_[i], sub_input));
   }
 
   for(uint32_t i=0; i < testing_labels_.size(); ++i) {
     // Testing labels
-    auto labels_begin = testing_labels_vals_.begin() + (i * batch_size_);
-    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size_);
+    auto labels_begin = testing_labels_vals_.begin() + (i * TestingBatchSize());
+    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TestingBatchSize());
     module_manager_.MakeData(memory, testing_labels_[i]->Memory()->Begin(),
                              MakeTransposeData(testing_labels_[i], sub_labels));
   }
@@ -173,9 +173,9 @@ void Model::MakeLayersData(wabt::Var memory) {
   }
 }
 
-Var Model::ForwardAlgorithmFunction() {
+Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32, Type::I32},{}}, locals_types,
+  return module_manager_.MakeFunction(nullptr, {{Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(locals.size() == 6);
     auto vi32_1 = locals[0];
@@ -185,14 +185,12 @@ Var Model::ForwardAlgorithmFunction() {
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
 
-    assert(params.size() == 3);
+    assert(params.size() == 1);
     auto input_begin = params[0];
-    auto target_begin = params[1];
-    auto mode = params[2];
 
     for(int l=0; l < layers_.size(); ++l) {
       if(layers_[l]->Type() == FullyConnected) {
-        f.Insert(layers_[l]->Forward(mode, input_begin, target_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+        f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
       } else {
         assert(!"Not implemented!");
       }
@@ -202,7 +200,7 @@ Var Model::ForwardAlgorithmFunction() {
 
 wabt::Var Model::BackwardAlgorithmFunction() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
-  return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
+  return module_manager_.MakeFunction(nullptr, {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(locals.size() == 7);
     auto vi32_1 = locals[0];
@@ -222,9 +220,9 @@ wabt::Var Model::BackwardAlgorithmFunction() {
   });
 }
 
-wabt::Var Model::ConfusionMatrixFunction() {
+wabt::Var Model::ConfusionMatrixFunction(uint8_t mode_index) {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
-  return module_manager_.MakeFunction("confusion_matrix_function", {{Type::I32}, {}}, locals,
+  return module_manager_.MakeFunction(nullptr, {{Type::I32}, {}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     assert(locals.size() == 6);
     auto vi32_1 = locals[0];
@@ -241,16 +239,16 @@ wabt::Var Model::ConfusionMatrixFunction() {
     if(layers_.back()->Type() == FullyConnected) {
       auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
       // Update confusion matrix
-      f.Insert(out_layer->UpdateConfusionMatrix(target_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
+      f.Insert(out_layer->UpdateConfusionMatrix(mode_index, target_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
     } else {
       assert(!"Not implemented!");
     }
   });
 }
 
-wabt::Var Model::CountCorrectPredictionsFunction() {
+wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
-  return module_manager_.MakeFunction("count_correct_predictions", {{Type::I32}, {Type::F32}}, locals,
+  return module_manager_.MakeFunction(nullptr, {{Type::I32}, {Type::F32}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     assert(locals.size() == 6);
     auto vi32_1 = locals[0];
@@ -267,7 +265,7 @@ wabt::Var Model::CountCorrectPredictionsFunction() {
     if(layers_.back()->Type() == FullyConnected) {
       auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
       // Count correct prediction
-      f.Insert(out_layer->CountCorrectPredictions(target_begin, correct_count, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+      f.Insert(out_layer->CountCorrectPredictions(mode_index, target_begin, correct_count, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
       // Return correct count
       f.Insert(MakeLocalGet(correct_count));
     } else {
@@ -285,15 +283,24 @@ void Model::CompileInitialization() {
   MakeLayersData(memory);
 }
 
-void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) {
-  ERROR_UNLESS(batch_size >= 1, "batch size must be at least 1");
-  batch_size_ = batch_size;
+void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_size, uint32_t prediction_batch_size,
+                          nn::builtins::LossFunction loss) {
+  ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
+  ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
+  ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
+  training_batch_size_ = training_batch_size;
+  testing_batch_size_ = testing_batch_size;
+  prediction_batch_size_ = prediction_batch_size;
   loss_ = loss;
   AllocateLayers();
-  forward_func_ = ForwardAlgorithmFunction();
+  forward_training_func_ = ForwardAlgorithmFunction(Mode::Training);
+  forward_testing_func_ = ForwardAlgorithmFunction(Mode::Testing);
+  forward_prediction_func_ = ForwardAlgorithmFunction(Mode::Prediction);
   backward_func_ = BackwardAlgorithmFunction();
-  confusion_matrix_func_ = ConfusionMatrixFunction();
-  count_correct_predictions_func_ = CountCorrectPredictionsFunction();
+  confusion_matrix_training_func_ = ConfusionMatrixFunction(Mode::Training);
+  confusion_matrix_testing_func_ = ConfusionMatrixFunction(Mode::Testing);
+  count_correct_predictions_training_func_ = CountCorrectPredictionsFunction(Mode::Training);
+  count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
 void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
@@ -301,9 +308,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
-
-  // FIXME Add zero padding for unaligned batches
-  assert(batch_size_ == 1);
+  ERROR_UNLESS(input.size() % training_batch_size_ == 0, "Input must be a multiple of the training batch size");
 
   training_vals_ = input;
   training_labels_vals_ = labels;
@@ -342,11 +347,17 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
       b1->Insert(MakeLocalSet(accuracy, MakeF32Const(0)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Forward algorithm
-        b2->Insert(MakeCall(forward_func_, {
-          MakeLocalGet(train_addr),
-          MakeLocalGet(label_addr),
-          MakeI32Const(Mode::Training)
+        b2->Insert(MakeCall(forward_training_func_, {
+          MakeLocalGet(train_addr)
         }));
+
+        // Compute the loss
+        assert(layers_.back()->Position() == Output);
+        if(layers_.back()->Type() == FullyConnected) {
+          b2->Insert(static_cast<DenseOutputLayer*>(layers_.back())->ComputeLoss(Mode::Training, label_addr));
+        } else {
+          assert(!"Compute loss not implemented!");
+        }
 
         // Backward algorithm
         b2->Insert(MakeCall(backward_func_, {
@@ -355,7 +366,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
 
         if(options_.log_training_accuracy) {
           // Count number of correct results
-          b2->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_func_, {
+          b2->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
               MakeLocalGet(label_addr)
           })));
         }
@@ -364,16 +375,16 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
           // Compute training error
           assert(layers_.back()->Position() == Output);
           if(layers_.back()->Type() == FullyConnected) {
-            auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
-            b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
-                MakeLocalGet(label_addr),
-                MakeI32Const(last_layer->Predictions()->Begin()),
-                MakeI32Const(last_layer->Predictions()->Shape()[0]),
-                MakeI32Const(last_layer->Predictions()->Shape()[1])
-            })));
+            auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
+            b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
           } else {
-            assert(!"Not implemented");
+            assert(!"Compute cost not implemented");
           }
+        }
+
+        if(options_.log_training_confusion_matrix) {
+          // Update confusion matrix
+          b2->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
         }
 
         b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
@@ -401,6 +412,21 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
       f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
       f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
     }
+
+    if(options_.log_training_confusion_matrix) {
+      assert(layers_.back()->Position() == Output);
+      if(layers_.back()->Type() == FullyConnected) {
+        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+        // Log confusion matrix
+        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Begin()),
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Shape()[0]),
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Shape()[1])
+        }));
+      } else {
+        assert(!"Not implemented");
+      }
+    }
   });
 }
 
@@ -408,9 +434,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
                            const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(!input.empty(), "test input cannot be empty");
   ERROR_UNLESS(input.size() == labels.size(), "testing and labels size should match");
-
-  // FIXME Add zero padding for unaligned batches
-  assert(batch_size_ == 1);
+  ERROR_UNLESS(input.size() % testing_batch_size_ == 0, "Input must be a multiple of the testing batch size");
 
   testing_vals_ = input;
   testing_labels_vals_ = labels;
@@ -442,15 +466,21 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
 
       // Forward algorithm
-      b1->Insert(MakeCall(forward_func_, {
-        MakeLocalGet(test_addr),
-        MakeLocalGet(label_addr),
-        MakeI32Const(Mode::Testing)
+      b1->Insert(MakeCall(forward_testing_func_, {
+        MakeLocalGet(test_addr)
       }));
+
+      // Compute the loss
+      assert(layers_.back()->Position() == Output);
+      if(layers_.back()->Type() == FullyConnected) {
+        b1->Insert(static_cast<DenseOutputLayer*>(layers_.back())->ComputeLoss(Mode::Testing, label_addr));
+      } else {
+        assert(!"Compute loss not implemented!");
+      }
 
       if(options_.log_testing_accuracy) {
         // Count number of correct results
-        b1->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_func_, {
+        b1->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_testing_func_, {
             MakeLocalGet(label_addr)
         })));
       }
@@ -459,21 +489,16 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
         // Compute testing error
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
-          auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
-          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, MakeCall(loss_.cost, {
-              MakeLocalGet(label_addr),
-              MakeI32Const(last_layer->Predictions()->Begin()),
-              MakeI32Const(last_layer->Predictions()->Shape()[0]),
-              MakeI32Const(last_layer->Predictions()->Shape()[1])
-          })));
+          auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
+          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
         } else {
-          assert(!"Not implemented");
+          assert(!"Compute cost not implemented");
         }
       }
 
       if(options_.log_testing_confusion_matrix) {
         // Update confusion matrix
-        b1->Insert(MakeCall(confusion_matrix_func_, {MakeLocalGet(label_addr)}));
+        b1->Insert(MakeCall(confusion_matrix_testing_func_, {MakeLocalGet(label_addr)}));
       }
 
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
@@ -505,9 +530,9 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
         auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
         // Log confusion matrix
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->ConfusionMatrix()->Begin()),
-            MakeI32Const(out_layer->ConfusionMatrix()->Shape()[0]),
-            MakeI32Const(out_layer->ConfusionMatrix()->Shape()[1])
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Begin()),
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Shape()[0]),
+            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Shape()[1])
         }));
       } else {
         assert(!"Not implemented");

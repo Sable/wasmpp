@@ -92,10 +92,12 @@ int main(int argc, char *argv[]) {
     {0, 1}
   };
   uint32_t epoch = 3000;
-  uint32_t batch = 1;
+  uint32_t training_batch_size = 1;
+  uint32_t testing_batch_size = 1;
+  uint32_t prediction_batch_size = 1;
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
-  model.CompileLayers(batch, loss);
+  model.CompileLayers(training_batch_size, testing_batch_size, prediction_batch_size, loss);
   model.CompileTraining(epoch, learning_rate, train, labels);
   model.CompileTesting(train, labels);
   model.CompileInitialization();

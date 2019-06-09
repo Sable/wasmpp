@@ -20,8 +20,8 @@ FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributio
   return this;
 }
 
-wabt::ExprList* FullyConnectedLayer::Forward(wabt::Var mode, wabt::Var input_begin, wabt::Var target_begin,
-                                             std::vector<wabt::Var> locals) {
+wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   assert(locals.size() == 6);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -40,14 +40,14 @@ wabt::ExprList* FullyConnectedLayer::Forward(wabt::Var mode, wabt::Var input_beg
       // 1) Z[l] = W[l] . A[l-1]
       // 2) Z[l] = Z[l] + b[l]
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDot(W_, (LayerIndex() == 1) ?
-                                                                snippet::RelocMat(prev_fc_layer->A_, input_begin) :
-                                                                snippet::RelocMat(prev_fc_layer->A_), Z_,
+                                                                snippet::RelocMat(prev_fc_layer->A_[mode_index], input_begin) :
+                                                                snippet::RelocMat(prev_fc_layer->A_[mode_index]), Z_[mode_index],
                                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixVectorAddition(Z_, b_, Z_,
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixVectorAddition(Z_[mode_index], b_, Z_[mode_index],
                                                                              {vi32_1, vi32_2, vi32_3, vi32_4}));
 
       // A[l] = g(Z[l])
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_), activation_func_, A_,
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
                                                                    {vi32_1, vi32_2}, false));
     } else {
       assert(!"Not implemented!");
@@ -61,42 +61,47 @@ wabt::ExprList* FullyConnectedLayer::Forward(wabt::Var mode, wabt::Var input_beg
   // Check for dropout regularization
   // Only apply for training forward algorithm
   // Skip dropout for output
-  if(Position() != Output && keep_prob_ != KEEP_PROB_MAX) {
+  if(Position() != Output && keep_prob_ != KEEP_PROB_MAX && mode_index == Model::Mode::Training) {
     assert(LayerIndex() < NetworkModel()->Layers().size() - 1);
-    Merge(e, MakeIf(&NetworkModel()->ModuleManager().Label(),
-                    MakeBinary(Opcode::I32Eq, MakeLocalGet(mode), MakeI32Const(Model::Mode::Training)), {},
-                    [&](BlockBody true_body, Var label) {
 
-      // Generate a mask matrix
-      true_body.Insert(MakeCall(NetworkModel()->Builtins().math.MaskMatrix(), {
-          MakeI32Const(inverted_dropout_->Memory()->Begin()),
-          MakeI32Const(inverted_dropout_->Memory()->End()),
-          MakeF32Const(keep_prob_)
-      }));
-
-      // A[l] = (1/keep_prob) * (A[l] * inverted_dropout[l])
-      // 1) A[l] = A[l] * inverted_dropout[l]
-      // 2) A[l] = A[l] * (1/keep_prob)
-      true_body.Insert(NetworkModel()->Snippets().matrix->MatrixMultiplication(A_, inverted_dropout_, A_,
-                                                                               {vi32_1, vi32_2}));
-      auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(keep_prob_));
-      true_body.Insert(NetworkModel()->Snippets().matrix->MatrixScalar(A_, scalar, A_, {vi32_1, vi32_2, vf32_1}));
+    // Generate a mask matrix
+    Merge(e, MakeCall(NetworkModel()->Builtins().math.MaskMatrix(), {
+        MakeI32Const(inverted_dropout_->Memory()->Begin()),
+        MakeI32Const(inverted_dropout_->Memory()->End()),
+        MakeF32Const(keep_prob_)
     }));
-  }
 
-  // Compute loss on output layer
-  if(Position() == Output) {
-    assert(LayerIndex() == NetworkModel()->Layers().size() - 1);
-    // dA[L] = Loss(T[L], A[L])
-    Merge(e, MakeCall(NetworkModel()->Loss().loss, {
-        MakeLocalGet(target_begin),
-        MakeI32Const(A_->Begin()),
-        MakeI32Const(dA_->Begin()),
-        MakeI32Const(A_->Shape()[0]),
-        MakeI32Const(A_->Shape()[1])
-    }));
+    // A[l] = (1/keep_prob) * (A[l] * inverted_dropout[l])
+    // 1) A[l] = A[l] * inverted_dropout[l]
+    // 2) A[l] = A[l] * (1/keep_prob)
+    Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(A_[mode_index], inverted_dropout_, A_[mode_index],
+                                                                             {vi32_1, vi32_2}));
+    auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(keep_prob_));
+    Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(A_[mode_index], scalar, A_[mode_index], {vi32_1, vi32_2, vf32_1}));
   }
   return e;
+}
+
+wabt::ExprList* DenseOutputLayer::ComputeLoss(uint8_t mode_index, wabt::Var target_begin) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+  // dA[L] = Loss(T[L], A[L])
+  return MakeCall(NetworkModel()->Loss().loss, {
+      MakeLocalGet(target_begin),
+      MakeI32Const(A_[mode_index]->Begin()),
+      MakeI32Const(dA_->Begin()),
+      MakeI32Const(A_[mode_index]->Shape()[0]),
+      MakeI32Const(A_[mode_index]->Shape()[1])
+  });
+}
+
+wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var target_begin) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+  return MakeCall(NetworkModel()->Loss().cost, {
+      MakeLocalGet(target_begin),
+      MakeI32Const(A_[mode_index]->Begin()),
+      MakeI32Const(A_[mode_index]->Shape()[0]),
+      MakeI32Const(A_[mode_index]->Shape()[1])
+  });
 }
 
 wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector<wabt::Var> locals) {
@@ -118,20 +123,21 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector
       // dZ[l] = dA[l] * g'(Z[l])
       // 1) dZ[l] = g'(Z[l])
       // 2) dZ[l] = dA[l] * dZ[l]
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_), activation_func_, dZ_,
-                                                                   {vi32_1, vi32_2}, true));
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
+                                                                   activation_func_, dZ_, {vi32_1, vi32_2}, true));
       Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
 
       // dW[l] = (1/m) dZ[l] . A[l-1]^T
       // 1) dW[l] = dZ[l] . A[l-1]^T
       // 2) dW[l] = (1/m) dW[l]
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDotRT(dZ_, (LayerIndex() == 1) ?
-                                                                   snippet::RelocMat(prev_fc_layer->A_, input_begin) :
-                                                                   snippet::RelocMat(prev_fc_layer->A_), dW_,
+                                                                   snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training],
+                                                                                     input_begin) :
+                                                                   snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training]), dW_,
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_,
-                                                                     MakeF32Const(1.0f/ NetworkModel()->BatchSize()),
-                                                                     dW_, {vi32_1, vi32_2, vf32_1}));
+                                                               MakeF32Const(1.0f/ NetworkModel()->TrainingBatchSize()), dW_,
+                                                               {vi32_1, vi32_2, vf32_1}));
 
       // db[l] = (1/m) dZ[l]
       // 1) db[l] = SUM(dZ[l], row wise)
@@ -139,8 +145,8 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector
       Merge(e, NetworkModel()->Snippets().matrix->MatrixHorizontalSum(dZ_, db_,
                                                                       {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_,
-                                                                     MakeF32Const(1.0f/NetworkModel()->BatchSize()),
-                                                                     db_, {vi32_1, vi32_2, vf32_1}));
+                                                               MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
+                                                               db_, {vi32_1, vi32_2, vf32_1}));
 
       if(LayerIndex() > 1) {
         // dA[l-1] = W[l]^T . dZ[l]
@@ -178,12 +184,16 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector
       {rows, cols}, TypeSize(Type::F32));
 
 void FullyConnectedLayer::AllocateMemory() {
-  ALLOCATE_MEMORY(A_, Nodes(), NetworkModel()->BatchSize());
+  ALLOCATE_MEMORY(A_[Model::Model::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+  ALLOCATE_MEMORY(A_[Model::Model::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+  ALLOCATE_MEMORY(A_[Model::Model::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
   if(Position()!= Input) {
     assert(LayerIndex() > 0);
-    ALLOCATE_MEMORY(Z_, Nodes(), NetworkModel()->BatchSize());
-    ALLOCATE_MEMORY(dZ_, Nodes(), NetworkModel()->BatchSize());
-    ALLOCATE_MEMORY(dA_, Nodes(), NetworkModel()->BatchSize());
+    ALLOCATE_MEMORY(Z_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+    ALLOCATE_MEMORY(Z_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+    ALLOCATE_MEMORY(Z_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
+    ALLOCATE_MEMORY(dZ_, Nodes(), NetworkModel()->TrainingBatchSize());
+    ALLOCATE_MEMORY(dA_, Nodes(), NetworkModel()->TrainingBatchSize());
     ALLOCATE_MEMORY(b_, Nodes(), 1);
     ALLOCATE_MEMORY(db_, Nodes(), 1);
 
@@ -197,11 +207,14 @@ void FullyConnectedLayer::AllocateMemory() {
     }
   }
   if(Position() != Output) {
-    ALLOCATE_MEMORY(inverted_dropout_, Nodes(), NetworkModel()->BatchSize());
+    ALLOCATE_MEMORY(inverted_dropout_, Nodes(), NetworkModel()->TrainingBatchSize());
   }
   if(Position() == Output) {
-    ALLOCATE_MEMORY(A_hardmax_, Nodes(), NetworkModel()->BatchSize());
-    ALLOCATE_MEMORY(confusion_matrix_, Nodes(), Nodes());
+    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
+    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Training], Nodes(), Nodes());
+    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Testing], Nodes(), Nodes());
   }
 }
 
@@ -291,11 +304,14 @@ FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
   return this;
 }
 
-wabt::ExprList* DenseOutputLayer::HardmaxPredictions(std::vector<Var> locals) {
-  return NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(), PredictionsHardmax(), locals);
+wabt::ExprList* DenseOutputLayer::HardmaxPredictions(uint8_t mode_index, std::vector<Var> locals) {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  return NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(mode_index),
+                                                                PredictionsHardmax(mode_index), locals);
 }
 
-wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(wabt::Var target_begin, std::vector<wabt::Var> locals) {
+wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
   assert(locals.size() == 6);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -306,16 +322,19 @@ wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(wabt::Var target_begin, 
 
   wabt::ExprList *e = new ExprList();
   // First apply hardmax
-  Merge(e, HardmaxPredictions({vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  Merge(e, HardmaxPredictions(mode_index, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
   // Second update confusion matrix
-  Merge(e, NetworkModel()->Snippets().analysis->ConfusionMatrixUpdate(ConfusionMatrix(), PredictionsHardmax(),
-                                                                      snippet::RelocMat(Predictions(), target_begin),
+  Merge(e, NetworkModel()->Snippets().analysis->ConfusionMatrixUpdate(ConfusionMatrix(mode_index),
+                                                                      PredictionsHardmax(mode_index),
+                                                                      snippet::RelocMat(Predictions(mode_index), target_begin),
                                                                       {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5,
                                                                        vi32_6}));
   return e;
 }
 
-wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(Var target_begin, Var result, std::vector<Var> locals) {
+wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(uint8_t mode_index, Var target_begin, Var result,
+                                                          std::vector<Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
   assert(locals.size() == 5);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -325,12 +344,28 @@ wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(Var target_begin, Var 
 
   wabt::ExprList* e = new ExprList();
   // First apply hardmax
-  Merge(e, HardmaxPredictions({vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  Merge(e, HardmaxPredictions(mode_index, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
   // Second count correct predictions
-  Merge(e, NetworkModel()->Snippets().analysis->CorrectPredictions(PredictionsHardmax(),
-                                                                   snippet::RelocMat(Predictions(), target_begin),
-                                                                   result, {vi32_1, vi32_2, vi32_3}));
+  Merge(e, NetworkModel()->Snippets().analysis->CorrectPredictions(PredictionsHardmax(mode_index),
+                                                                   snippet::RelocMat(Predictions(mode_index),
+                                                                                     target_begin), result,
+                                                                   {vi32_1, vi32_2, vi32_3}));
   return e;
+}
+
+ds::NDArray* DenseOutputLayer::Predictions(uint8_t mode_index) const {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  return A_[mode_index];
+}
+
+ds::NDArray* DenseOutputLayer::PredictionsHardmax(uint8_t mode_index) const {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  return A_hardmax_[mode_index];
+}
+
+ds::NDArray* DenseOutputLayer::ConfusionMatrix(uint8_t mode_index) const {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+  return confusion_matrix_[mode_index];
 }
 
 } // namespace layer
