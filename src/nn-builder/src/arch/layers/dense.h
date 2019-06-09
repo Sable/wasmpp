@@ -39,7 +39,7 @@ public:
       TypedLayer(position), nodes_(nodes), activation_func_(act_func) {}
   uint32_t Nodes() const { return nodes_; }
   wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals);
-  wabt::ExprList* Backward(wabt::Var input_begin, std::vector<wabt::Var> locals);
+  wabt::ExprList* Backward(wabt::Var input_begin, wabt::Var taget_begin, std::vector<wabt::Var> locals);
 
   // Memory functions
   void AllocateMemory();
@@ -66,8 +66,6 @@ public:
   ds::NDArray* ConfusionMatrix(uint8_t mode_index) const;
   // Error out on keep probability on the output layer
   FullyConnectedLayer* KeepProb(float keep_prob);
-  // Compute loss values
-  wabt::ExprList* ComputeLoss(uint8_t mode_index, wabt::Var target_begin);
   // Compute cost value
   wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);
   // Perform hardmax on the predictions

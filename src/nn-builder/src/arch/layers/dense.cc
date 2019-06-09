@@ -82,18 +82,6 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
   return e;
 }
 
-wabt::ExprList* DenseOutputLayer::ComputeLoss(uint8_t mode_index, wabt::Var target_begin) {
-  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
-  // dA[L] = Loss(T[L], A[L])
-  return MakeCall(NetworkModel()->Loss().loss, {
-      MakeLocalGet(target_begin),
-      MakeI32Const(A_[mode_index]->Begin()),
-      MakeI32Const(dA_->Begin()),
-      MakeI32Const(A_[mode_index]->Shape()[0]),
-      MakeI32Const(A_[mode_index]->Shape()[1])
-  });
-}
-
 wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var target_begin) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
   return MakeCall(NetworkModel()->Loss().cost, {
@@ -104,7 +92,8 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
   });
 }
 
-wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector<wabt::Var> locals) {
+wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var target_begin,
+                                              std::vector<wabt::Var> locals) {
   assert(locals.size() == 7);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -117,6 +106,18 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector
   ExprList* e = new ExprList();
   if(Position() != Input) {
     assert(LayerIndex() > 0);
+
+    if(Position() == Output) {
+      // dA[L] = L(T, A[L])
+      Merge(e, MakeCall(NetworkModel()->Loss().loss, {
+          MakeLocalGet(target_begin),
+          MakeI32Const(A_[Model::Mode::Training]->Begin()),
+          MakeI32Const(dA_->Begin()),
+          MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
+          MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
+      }));
+    }
+
     auto prev_layer = NetworkModel()->Layers()[LayerIndex()-1];
     if(prev_layer->Type() == FullyConnected) {
       auto prev_fc_layer = static_cast<FullyConnectedLayer*>(prev_layer);

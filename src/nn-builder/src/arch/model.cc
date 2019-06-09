@@ -200,7 +200,7 @@ Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
 
 wabt::Var Model::BackwardAlgorithmFunction() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
-  return module_manager_.MakeFunction(nullptr, {{Type::I32},{}}, locals_type,
+  return module_manager_.MakeFunction(nullptr, {{Type::I32, Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(locals.size() == 7);
     auto vi32_1 = locals[0];
@@ -211,11 +211,12 @@ wabt::Var Model::BackwardAlgorithmFunction() {
     auto vf32_1 = locals[5];
     auto v128_1 = locals[6];
 
-    assert(params.size() == 1);
+    assert(params.size() == 2);
     auto input_begin = params[0];
+    auto target_begin = params[1];
 
     for(int64_t l = layers_.size()-1; l >= 0; --l) {
-      f.Insert(layers_[l]->Backward(input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
+      f.Insert(layers_[l]->Backward(input_begin, target_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
     }
   });
 }
@@ -351,17 +352,10 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
           MakeLocalGet(train_addr)
         }));
 
-        // Compute the loss
-        assert(layers_.back()->Position() == Output);
-        if(layers_.back()->Type() == FullyConnected) {
-          b2->Insert(static_cast<DenseOutputLayer*>(layers_.back())->ComputeLoss(Mode::Training, label_addr));
-        } else {
-          assert(!"Compute loss not implemented!");
-        }
-
         // Backward algorithm
         b2->Insert(MakeCall(backward_func_, {
-          MakeLocalGet(train_addr)
+          MakeLocalGet(train_addr),
+          MakeLocalGet(label_addr)
         }));
 
         if(options_.log_training_accuracy) {
@@ -469,14 +463,6 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
       b1->Insert(MakeCall(forward_testing_func_, {
         MakeLocalGet(test_addr)
       }));
-
-      // Compute the loss
-      assert(layers_.back()->Position() == Output);
-      if(layers_.back()->Type() == FullyConnected) {
-        b1->Insert(static_cast<DenseOutputLayer*>(layers_.back())->ComputeLoss(Mode::Testing, label_addr));
-      } else {
-        assert(!"Compute loss not implemented!");
-      }
 
       if(options_.log_testing_accuracy) {
         // Count number of correct results

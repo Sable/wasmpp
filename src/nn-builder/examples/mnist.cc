@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
 
   uint32_t epoch = 10;
   uint32_t training_batch_size = 1;
-  uint32_t testing_batch_size = 20;
+  uint32_t testing_batch_size = 1;
   uint32_t prediction_batch_size = 1;
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
