@@ -33,7 +33,7 @@ public:
   LayerPosition Position() const  { return position_; }
   void SetModel(Model* model) { model_ = model; }
   void SetIndex(uint32_t index) { index_ = index; }
-  virtual wabt::ExprList* Forward(bool is_training, wabt::Var input_begin, wabt::Var target_begin,
+  virtual wabt::ExprList* Forward(wabt::Var mode, wabt::Var input_begin, wabt::Var target_begin,
                                   std::vector<wabt::Var> locals) = 0;
   virtual wabt::ExprList* Backward(wabt::Var input_begin, std::vector<wabt::Var> locals) = 0;
   virtual void AllocateMemory() = 0;

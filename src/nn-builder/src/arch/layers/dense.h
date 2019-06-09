@@ -38,7 +38,7 @@ public:
   FullyConnectedLayer(LayerPosition position, uint32_t nodes, builtins::ActivationFunction act_func) :
       TypedLayer(position), nodes_(nodes), activation_func_(act_func) {}
   uint32_t Nodes() const { return nodes_; }
-  wabt::ExprList* Forward(bool is_training, wabt::Var input_begin, wabt::Var target_begin,
+  wabt::ExprList* Forward(wabt::Var mode, wabt::Var input_begin, wabt::Var target_begin,
                           std::vector<wabt::Var> locals);
   wabt::ExprList* Backward(wabt::Var input_begin, std::vector<wabt::Var> locals);
 

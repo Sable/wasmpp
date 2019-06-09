@@ -43,7 +43,7 @@ private:
   // Model members
   wasmpp::Memory* learning_rate = nullptr;
 
-  // Model components variables
+  // Model functions
   wabt::Var forward_func_;
   wabt::Var backward_func_;
   wabt::Var confusion_matrix_func_;
@@ -96,10 +96,10 @@ private:
   void MakeLayersData(wabt::Var memory);
 
   // Generate neural network algorithms
-  wabt::Var GenerateFeedForwardWasmFunction();
-  wabt::Var GenerateBackpropagationWasmFunction();
-  wabt::Var GenerateUpdateConfusionMatrixFunction();
-  wabt::Var GenerateCountCorrectPredictionsFunction();
+  wabt::Var ForwardAlgorithmFunction();
+  wabt::Var BackwardAlgorithmFunction();
+  wabt::Var ConfusionMatrixFunction();
+  wabt::Var CountCorrectPredictionsFunction();
 public:
   Model(ModelOptions options);
   wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
@@ -123,6 +123,12 @@ public:
   uint32_t BatchSize() const { return batch_size_; }
   const ModelOptions& Options() const { return options_; }
   const builtins::LossFunction& Loss() const { return loss_; }
+
+  enum Mode {
+    Training = 1,
+    Testing,
+    Prediction
+  };
 };
 
 } // namespace arch

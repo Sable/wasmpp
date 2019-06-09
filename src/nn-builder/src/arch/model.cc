@@ -53,6 +53,7 @@ void Model::InitBuiltinImports() {
 }
 
 void Model::InitBuiltinDefinitions() {
+  // TODO Create simd option (same as snippets)
   builtins_.system.InitDefinitions(this, &module_manager_);
   builtins_.math.InitDefinitions(this, &module_manager_);
   builtins_.activation.InitDefinitions(this, &module_manager_);
@@ -172,7 +173,7 @@ void Model::MakeLayersData(wabt::Var memory) {
   }
 }
 
-Var Model::GenerateFeedForwardWasmFunction() {
+Var Model::ForwardAlgorithmFunction() {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("forward", {{Type::I32, Type::I32, Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -187,11 +188,11 @@ Var Model::GenerateFeedForwardWasmFunction() {
     assert(params.size() == 3);
     auto input_begin = params[0];
     auto target_begin = params[1];
-    auto is_training = params[2];
+    auto mode = params[2];
 
     for(int l=0; l < layers_.size(); ++l) {
       if(layers_[l]->Type() == FullyConnected) {
-        f.Insert(layers_[l]->Forward(true, input_begin, target_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+        f.Insert(layers_[l]->Forward(mode, input_begin, target_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
       } else {
         assert(!"Not implemented!");
       }
@@ -199,7 +200,7 @@ Var Model::GenerateFeedForwardWasmFunction() {
   });
 }
 
-wabt::Var Model::GenerateBackpropagationWasmFunction() {
+wabt::Var Model::BackwardAlgorithmFunction() {
   std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
   return module_manager_.MakeFunction("backward", {{Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -221,7 +222,7 @@ wabt::Var Model::GenerateBackpropagationWasmFunction() {
   });
 }
 
-wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
+wabt::Var Model::ConfusionMatrixFunction() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   return module_manager_.MakeFunction("confusion_matrix_function", {{Type::I32}, {}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
@@ -247,7 +248,7 @@ wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
   });
 }
 
-wabt::Var Model::GenerateCountCorrectPredictionsFunction() {
+wabt::Var Model::CountCorrectPredictionsFunction() {
   std::vector<Type> locals = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
   return module_manager_.MakeFunction("count_correct_predictions", {{Type::I32}, {Type::F32}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
@@ -289,10 +290,10 @@ void Model::CompileLayers(uint32_t batch_size, nn::builtins::LossFunction loss) 
   batch_size_ = batch_size;
   loss_ = loss;
   AllocateLayers();
-  forward_func_ = GenerateFeedForwardWasmFunction();
-  backward_func_ = GenerateBackpropagationWasmFunction();
-  confusion_matrix_func_ = GenerateUpdateConfusionMatrixFunction();
-  count_correct_predictions_func_ = GenerateCountCorrectPredictionsFunction();
+  forward_func_ = ForwardAlgorithmFunction();
+  backward_func_ = BackwardAlgorithmFunction();
+  confusion_matrix_func_ = ConfusionMatrixFunction();
+  count_correct_predictions_func_ = CountCorrectPredictionsFunction();
 }
 
 void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
@@ -344,7 +345,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
         b2->Insert(MakeCall(forward_func_, {
           MakeLocalGet(train_addr),
           MakeLocalGet(label_addr),
-          MakeI32Const(1) // is_training = 1
+          MakeI32Const(Mode::Training)
         }));
 
         // Backward algorithm
@@ -444,7 +445,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
       b1->Insert(MakeCall(forward_func_, {
         MakeLocalGet(test_addr),
         MakeLocalGet(label_addr),
-        MakeI32Const(0) // is_training = 0
+        MakeI32Const(Mode::Testing)
       }));
 
       if(options_.log_testing_accuracy) {
@@ -472,8 +473,6 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
 
       if(options_.log_testing_confusion_matrix) {
         // Update confusion matrix
-        // Note: Call Confusion matrix function
-        // will alter the values of A[L]
         b1->Insert(MakeCall(confusion_matrix_func_, {MakeLocalGet(label_addr)}));
       }
 

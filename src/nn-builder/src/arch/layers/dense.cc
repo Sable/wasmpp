@@ -20,7 +20,7 @@ FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributio
   return this;
 }
 
-wabt::ExprList* FullyConnectedLayer::Forward(bool is_training, wabt::Var input_begin, wabt::Var target_begin,
+wabt::ExprList* FullyConnectedLayer::Forward(wabt::Var mode, wabt::Var input_begin, wabt::Var target_begin,
                                              std::vector<wabt::Var> locals) {
   assert(locals.size() == 6);
   auto vi32_1 = locals[0];
@@ -61,21 +61,27 @@ wabt::ExprList* FullyConnectedLayer::Forward(bool is_training, wabt::Var input_b
   // Check for dropout regularization
   // Only apply for training forward algorithm
   // Skip dropout for output
-  if(Position() != Output && is_training && keep_prob_ != KEEP_PROB_MAX) {
+  if(Position() != Output && keep_prob_ != KEEP_PROB_MAX) {
     assert(LayerIndex() < NetworkModel()->Layers().size() - 1);
-    // Generate a mask matrix
-    Merge(e, MakeCall(NetworkModel()->Builtins().math.MaskMatrix(), {
-        MakeI32Const(inverted_dropout_->Memory()->Begin()),
-        MakeI32Const(inverted_dropout_->Memory()->End()),
-        MakeF32Const(keep_prob_)
-    }));
+    Merge(e, MakeIf(&NetworkModel()->ModuleManager().Label(),
+                    MakeBinary(Opcode::I32Eq, MakeLocalGet(mode), MakeI32Const(Model::Mode::Training)), {},
+                    [&](BlockBody true_body, Var label) {
 
-    // A[l] = (1/keep_prob) * (A[l] * inverted_dropout[l])
-    // 1) A[l] = A[l] * inverted_dropout[l]
-    // 2) A[l] = A[l] * (1/keep_prob)
-    Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(A_, inverted_dropout_, A_, {vi32_1, vi32_2}));
-    auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(keep_prob_));
-    Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(A_, scalar, A_, {vi32_1, vi32_2, vf32_1}));
+      // Generate a mask matrix
+      true_body.Insert(MakeCall(NetworkModel()->Builtins().math.MaskMatrix(), {
+          MakeI32Const(inverted_dropout_->Memory()->Begin()),
+          MakeI32Const(inverted_dropout_->Memory()->End()),
+          MakeF32Const(keep_prob_)
+      }));
+
+      // A[l] = (1/keep_prob) * (A[l] * inverted_dropout[l])
+      // 1) A[l] = A[l] * inverted_dropout[l]
+      // 2) A[l] = A[l] * (1/keep_prob)
+      true_body.Insert(NetworkModel()->Snippets().matrix->MatrixMultiplication(A_, inverted_dropout_, A_,
+                                                                               {vi32_1, vi32_2}));
+      auto scalar = MakeBinary(Opcode::F32Div, MakeF32Const(1.0f), MakeF32Const(keep_prob_));
+      true_body.Insert(NetworkModel()->Snippets().matrix->MatrixScalar(A_, scalar, A_, {vi32_1, vi32_2, vf32_1}));
+    }));
   }
 
   // Compute loss on output layer
