@@ -31,6 +31,9 @@ protected:
   ds::NDArray* db_ = nullptr;
   // Regularization
   ds::NDArray* inverted_dropout_ = nullptr;
+  // Other
+  ds::NDArray* A_hardmax_ = nullptr;
+  ds::NDArray* confusion_matrix_ = nullptr;
 public:
   FullyConnectedLayer(LayerPosition position, uint32_t nodes, builtins::ActivationFunction act_func) :
       TypedLayer(position), nodes_(nodes), activation_func_(act_func) {}
@@ -58,8 +61,18 @@ class DenseOutputLayer : public FullyConnectedLayer {
 public:
   DenseOutputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
       FullyConnectedLayer(Output, nodes, act_func) {}
+  // Get arrays
   ds::NDArray* Predictions() const { return A_; }
+  ds::NDArray* PredictionsHardmax() const { return A_hardmax_; }
+  ds::NDArray* ConfusionMatrix() const { return confusion_matrix_; }
+  // Error out on keep probability on the output layer
   FullyConnectedLayer* KeepProb(float keep_prob);
+  // Perform hardmax on the predictions
+  wabt::ExprList* HardmaxPredictions(std::vector<wabt::Var> locals);
+  // Update confusion matrix
+  wabt::ExprList* UpdateConfusionMatrix(wabt::Var target_begin, std::vector<wabt::Var> locals);
+  // Count number of correct predictions
+  wabt::ExprList* CountCorrectPredictions(wabt::Var target_begin, wabt::Var result, std::vector<wabt::Var> locals);
 };
 
 class DenseInputLayer : public FullyConnectedLayer {

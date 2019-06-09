@@ -16,8 +16,8 @@ wabt::ExprList* AnalysisSnippet::ConfusionMatrixUpdate(nn::ds::NDArray *matrix, 
   MATRIX_SAME_SHAPE(predictions, target.Array());
   ERROR_UNLESS(matrix->Shape()[0] == matrix->Shape()[1], "confusion matrix must be a square");
   ERROR_UNLESS(matrix->Shape()[0] == predictions->Shape()[0], "confusion matrix and predictions are not compatible");
-  assert(locals.size() == 6);
 
+  assert(locals.size() == 6);
   auto col = locals[0];
   auto row = locals[1];
   auto rel_row = locals[2];

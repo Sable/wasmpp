@@ -22,6 +22,7 @@ wabt::ExprList* Model::GetLearningRate() {
 }
 
 void Model::SetLayers(std::vector<Layer *> layers) {
+  ERROR_UNLESS(layers.size() >= 2, "At least an input and output layer should be defined");
   for(uint32_t index = 0; index < layers.size(); index++) {
     if(index == 0) {
       ERROR_UNLESS(layers[index]->Position() == Input, "First layer must be an input layer");
@@ -41,12 +42,6 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
   InitBuiltinImports();
   InitBuiltinDefinitions();
   InitSnippets();
-}
-
-Model::~Model() {
-  for(auto l=0; l < layers_.size(); ++l) {
-    delete layers_[l];
-  }
 }
 
 void Model::InitBuiltinImports() {
@@ -84,24 +79,8 @@ void Model::AllocateMembers() {
 }
 
 void Model::AllocateLayers() {
-  ERROR_UNLESS(layers_.size() >= 2, "At least an input and output layer should be defined");
   for(auto l = 0; l < layers_.size(); ++l) {
     layers_[l]->AllocateMemory();
-
-    // Allocate memory for confusion matrix, true_matrix, etc...
-    if(l == layers_.size() - 1) {
-      assert(layers_[l]->Position() == Output);
-      uint32_t output_size = 0;
-      if(layers_[l]->Type() == FullyConnected) {
-        output_size = static_cast<DenseOutputLayer*>(layers_[l])->Nodes();
-      } else {
-        assert(!"Not implemented");
-      }
-      ALLOCATE_MATRIX(true_matrix_, output_size, batch_size_);
-      ALLOCATE_MATRIX(pred_hardmax_matrix_, output_size, batch_size_);
-      ALLOCATE_MATRIX(cost_matrix_, output_size, batch_size_);
-      ALLOCATE_MATRIX(confusion_matrix_, output_size, output_size);
-    }
   }
 }
 
@@ -259,14 +238,9 @@ wabt::Var Model::GenerateUpdateConfusionMatrixFunction() {
 
     assert(layers_.back()->Position() == Output);
     if(layers_.back()->Type() == FullyConnected) {
-      auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
-      // pred_hardmax_matrix_ = Hardmax(A[L])
-      f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
-                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
       // Update confusion matrix
-      f.Insert(snippets_.analysis->ConfusionMatrixUpdate(confusion_matrix_, pred_hardmax_matrix_,
-                                                         snippet::RelocMat(true_matrix_, target_begin),
-                                                         {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
+      f.Insert(out_layer->UpdateConfusionMatrix(target_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
     } else {
       assert(!"Not implemented!");
     }
@@ -290,14 +264,9 @@ wabt::Var Model::GenerateCountCorrectPredictionsFunction() {
 
     assert(layers_.back()->Position() == Output);
     if(layers_.back()->Type() == FullyConnected) {
-      auto last_layer = static_cast<DenseOutputLayer*>(layers_.back());
-      // pred_hardmax_matrix_ = Hardmax(A[L])
-      f.Insert(snippets_.matrix->MatrixColumnHardmax(last_layer->Predictions(), pred_hardmax_matrix_,
-                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
-      // Count correct results
-      f.Insert(snippets_.analysis->CorrectPredictions(pred_hardmax_matrix_,
-                                                      snippet::RelocMat(true_matrix_, target_begin), correct_count,
-                                                      {vi32_1, vi32_2, vi32_3}));
+      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+      // Count correct prediction
+      f.Insert(out_layer->CountCorrectPredictions(target_begin, correct_count, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
       // Return correct count
       f.Insert(MakeLocalGet(correct_count));
     } else {
@@ -532,12 +501,18 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     }
 
     if(options_.log_testing_confusion_matrix) {
-      // Log confusion matrix
-      f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-          MakeI32Const(confusion_matrix_->Memory()->Begin()),
-          MakeI32Const(confusion_matrix_->Shape()[0]),
-          MakeI32Const(confusion_matrix_->Shape()[1])
-      }));
+      assert(layers_.back()->Position() == Output);
+      if(layers_.back()->Type() == FullyConnected) {
+        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+        // Log confusion matrix
+        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+            MakeI32Const(out_layer->ConfusionMatrix()->Begin()),
+            MakeI32Const(out_layer->ConfusionMatrix()->Shape()[0]),
+            MakeI32Const(out_layer->ConfusionMatrix()->Shape()[1])
+        }));
+      } else {
+        assert(!"Not implemented");
+      }
     }
   });
 }

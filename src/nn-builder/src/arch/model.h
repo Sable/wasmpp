@@ -49,12 +49,6 @@ private:
   wabt::Var confusion_matrix_func_;
   wabt::Var count_correct_predictions_func_;
 
-  // Model feature arrays
-  ds::NDArray* true_matrix_ = nullptr;
-  ds::NDArray* pred_hardmax_matrix_ = nullptr;
-  ds::NDArray* cost_matrix_ = nullptr;
-  ds::NDArray* confusion_matrix_ = nullptr;
-
   // Training data
   std::vector<ds::NDArray*> training_;
   std::vector<ds::NDArray*> training_labels_;
@@ -108,7 +102,6 @@ private:
   wabt::Var GenerateCountCorrectPredictionsFunction();
 public:
   Model(ModelOptions options);
-  ~Model();
   wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
   std::vector<layer::Layer*> Layers() const { return layers_; }
   void SetLayers(std::vector<layer::Layer*> layers);

@@ -173,8 +173,8 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, std::vector
 
 void FullyConnectedLayer::AllocateMemory() {
   ALLOCATE_MEMORY(A_, Nodes(), NetworkModel()->BatchSize());
-  ALLOCATE_MEMORY(inverted_dropout_, Nodes(), NetworkModel()->BatchSize());
-  if(LayerIndex() > 0) {
+  if(Position()!= Input) {
+    assert(LayerIndex() > 0);
     ALLOCATE_MEMORY(Z_, Nodes(), NetworkModel()->BatchSize());
     ALLOCATE_MEMORY(dZ_, Nodes(), NetworkModel()->BatchSize());
     ALLOCATE_MEMORY(dA_, Nodes(), NetworkModel()->BatchSize());
@@ -189,6 +189,13 @@ void FullyConnectedLayer::AllocateMemory() {
     } else {
       assert(!"Not implemented!");
     }
+  }
+  if(Position() != Output) {
+    ALLOCATE_MEMORY(inverted_dropout_, Nodes(), NetworkModel()->BatchSize());
+  }
+  if(Position() == Output) {
+    ALLOCATE_MEMORY(A_hardmax_, Nodes(), NetworkModel()->BatchSize());
+    ALLOCATE_MEMORY(confusion_matrix_, Nodes(), Nodes());
   }
 }
 
@@ -276,6 +283,48 @@ FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
   ERROR_EXIT("Dense output layer cannot have a keep probability value "
              "because dropout regularization does not apply to it");
   return this;
+}
+
+wabt::ExprList* DenseOutputLayer::HardmaxPredictions(std::vector<Var> locals) {
+  return NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(), PredictionsHardmax(), locals);
+}
+
+wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(wabt::Var target_begin, std::vector<wabt::Var> locals) {
+  assert(locals.size() == 6);
+  auto vi32_1 = locals[0];
+  auto vi32_2 = locals[1];
+  auto vi32_3 = locals[2];
+  auto vi32_4 = locals[3];
+  auto vi32_5 = locals[4];
+  auto vi32_6 = locals[5];
+
+  wabt::ExprList *e = new ExprList();
+  // First apply hardmax
+  Merge(e, HardmaxPredictions({vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  // Second update confusion matrix
+  Merge(e, NetworkModel()->Snippets().analysis->ConfusionMatrixUpdate(ConfusionMatrix(), PredictionsHardmax(),
+                                                                      snippet::RelocMat(Predictions(), target_begin),
+                                                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5,
+                                                                       vi32_6}));
+  return e;
+}
+
+wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(Var target_begin, Var result, std::vector<Var> locals) {
+  assert(locals.size() == 5);
+  auto vi32_1 = locals[0];
+  auto vi32_2 = locals[1];
+  auto vi32_3 = locals[2];
+  auto vi32_4 = locals[3];
+  auto vi32_5 = locals[4];
+
+  wabt::ExprList* e = new ExprList();
+  // First apply hardmax
+  Merge(e, HardmaxPredictions({vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  // Second count correct predictions
+  Merge(e, NetworkModel()->Snippets().analysis->CorrectPredictions(PredictionsHardmax(),
+                                                                   snippet::RelocMat(Predictions(), target_begin),
+                                                                   result, {vi32_1, vi32_2, vi32_3}));
+  return e;
 }
 
 } // namespace layer
