@@ -93,14 +93,14 @@ void Model::AllocateTraining() {
     // Training data
     ds::NDArray* training_array = nullptr;
     ALLOCATE_MATRIX(training_array, (uint32_t) training_vals_[0].size(), TrainingBatchSize());
-    training_.push_back(training_array);
+    training_batch_.push_back(training_array);
   }
 
   for(uint32_t b=0; b < training_labels_vals_.size(); b += TrainingBatchSize()) {
     // Training labels
     ds::NDArray* labels_array = nullptr;
     ALLOCATE_MATRIX(labels_array, (uint32_t) training_labels_vals_[0].size(), TrainingBatchSize());
-    training_labels_.push_back(labels_array);
+    training_labels_batch_.push_back(labels_array);
   }
 }
 
@@ -112,14 +112,14 @@ void Model::AllocateTest() {
     // Testing data
     ds::NDArray* testing_array = nullptr;
     ALLOCATE_MATRIX(testing_array, (uint32_t) testing_vals_[0].size(), TestingBatchSize());
-    testing_.push_back(testing_array);
+    testing_batch_.push_back(testing_array);
   }
 
   for(uint32_t b=0; b < testing_labels_vals_.size(); b += TestingBatchSize()) {
     // Testing labels
     ds::NDArray* labels_array = nullptr;
     ALLOCATE_MATRIX(labels_array, (uint32_t) testing_labels_vals_[0].size(), TestingBatchSize());
-    testing_labels_.push_back(labels_array);
+    testing_labels_batch_.push_back(labels_array);
   }
 }
 
@@ -134,36 +134,36 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
 }
 
 void Model::MakeTrainingData(wabt::Var memory) {
-  for(uint32_t i=0; i < training_.size(); ++i) {
+  for(uint32_t i=0; i < training_batch_.size(); ++i) {
     // Training data
     auto training_begin = training_vals_.begin() + (i * TrainingBatchSize());
     std::vector<std::vector<float>> sub_input(training_begin, training_begin + TrainingBatchSize());
-    module_manager_.MakeData(memory, training_[i]->Memory()->Begin(), MakeTransposeData(training_[i], sub_input));
+    module_manager_.MakeData(memory, training_batch_[i]->Memory()->Begin(), MakeTransposeData(training_batch_[i], sub_input));
   }
 
-  for(uint32_t i=0; i < training_labels_.size(); ++i) {
+  for(uint32_t i=0; i < training_labels_batch_.size(); ++i) {
     // Training labels
     auto labels_begin = training_labels_vals_.begin() + (i * TrainingBatchSize());
     std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TrainingBatchSize());
-    module_manager_.MakeData(memory, training_labels_[i]->Memory()->Begin(),
-                             MakeTransposeData(training_labels_[i], sub_labels));
+    module_manager_.MakeData(memory, training_labels_batch_[i]->Memory()->Begin(),
+                             MakeTransposeData(training_labels_batch_[i], sub_labels));
   }
 }
 
 void Model::MakeTestingData(wabt::Var memory) {
-  for(uint32_t i=0; i < testing_.size(); ++i) {
+  for(uint32_t i=0; i < testing_batch_.size(); ++i) {
     // Testing data
     auto testing_begin = testing_vals_.begin() + (i * TestingBatchSize());
     std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + TestingBatchSize());
-    module_manager_.MakeData(memory, testing_[i]->Memory()->Begin(), MakeTransposeData(testing_[i], sub_input));
+    module_manager_.MakeData(memory, testing_batch_[i]->Memory()->Begin(), MakeTransposeData(testing_batch_[i], sub_input));
   }
 
-  for(uint32_t i=0; i < testing_labels_.size(); ++i) {
+  for(uint32_t i=0; i < testing_labels_batch_.size(); ++i) {
     // Testing labels
     auto labels_begin = testing_labels_vals_.begin() + (i * TestingBatchSize());
     std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TestingBatchSize());
-    module_manager_.MakeData(memory, testing_labels_[i]->Memory()->Begin(),
-                             MakeTransposeData(testing_labels_[i], sub_labels));
+    module_manager_.MakeData(memory, testing_labels_batch_[i]->Memory()->Begin(),
+                             MakeTransposeData(testing_labels_batch_[i], sub_labels));
   }
 }
 
@@ -318,7 +318,6 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
   std::vector<Type> locals_type = {Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
-
     // Set learning rate
     f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
 
@@ -332,11 +331,11 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
     auto vi32_1 = locals[6];
     auto vi32_2 = locals[7];
 
-    auto train_begin = training_.front()->Memory()->Begin();
-    auto train_end = training_.back()->Memory()->End();
-    auto train_size = training_.front()->Memory()->Bytes();
-    auto label_begin = training_labels_.front()->Memory()->Begin();
-    auto label_size = training_labels_.front()->Memory()->Bytes();
+    auto train_begin = training_batch_.front()->Memory()->Begin();
+    auto train_end = training_batch_.back()->Memory()->End();
+    auto train_size = training_batch_.front()->Memory()->Bytes();
+    auto label_begin = training_labels_batch_.front()->Memory()->Begin();
+    auto label_size = training_labels_batch_.front()->Memory()->Bytes();
 
     if(options_.log_training_time) {
       // Start training timer
@@ -388,7 +387,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
         // Log training error
         b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {
           MakeLocalGet(epoch),
-          MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(training_.size()))
+          MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(training_batch_.size()))
         }));
       }
 
@@ -446,11 +445,11 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     auto vi32_1 = locals[5];
     auto vi32_2 = locals[6];
 
-    auto test_begin = testing_.front()->Memory()->Begin();
-    auto test_end = testing_.back()->Memory()->End();
-    auto test_size = testing_.front()->Memory()->Bytes();
-    auto label_begin = testing_labels_.front()->Memory()->Begin();
-    auto label_size = testing_labels_.front()->Memory()->Bytes();
+    auto test_begin = testing_batch_.front()->Memory()->Begin();
+    auto test_end = testing_batch_.back()->Memory()->End();
+    auto test_size = testing_batch_.front()->Memory()->Bytes();
+    auto label_begin = testing_labels_batch_.front()->Memory()->Begin();
+    auto label_size = testing_labels_batch_.front()->Memory()->Bytes();
 
     if(options_.log_testing_time) {
       // Start testing timer
@@ -493,7 +492,7 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
     if(options_.log_testing_error) {
       // Log testing error
       f.Insert(MakeCall(builtins_.message.LogTestingError(), {
-        MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(testing_.size()))
+        MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(testing_batch_.size()))
       }));
     }
 

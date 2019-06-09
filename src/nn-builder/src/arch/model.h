@@ -57,14 +57,14 @@ private:
   wabt::Var count_correct_predictions_testing_func_;
 
   // Training data
-  std::vector<ds::NDArray*> training_;
-  std::vector<ds::NDArray*> training_labels_;
+  std::vector<ds::NDArray*> training_batch_;
+  std::vector<ds::NDArray*> training_labels_batch_;
   std::vector<std::vector<float>> training_vals_;
   std::vector<std::vector<float>> training_labels_vals_;
 
   // Test data
-  std::vector<ds::NDArray*> testing_;
-  std::vector<ds::NDArray*> testing_labels_;
+  std::vector<ds::NDArray*> testing_batch_;
+  std::vector<ds::NDArray*> testing_labels_batch_;
   std::vector<std::vector<float>> testing_vals_;
   std::vector<std::vector<float>> testing_labels_vals_;
 
