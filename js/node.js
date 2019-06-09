@@ -52,6 +52,22 @@ const imports = {
   }
 }
 
+function InsertData(buffer, data, batch_size, offset) {
+  if(data.length == 0 || batch_size != data.length) {
+    console.error("Data size should match the batch size");
+    return false;
+  }
+
+  var index = 0;
+  let memory = new Float32Array(buffer, offset, data[0].length * batch_size);
+  for(var c=0; c < data[0].length; c++) {
+    for(var r=0; r < data.length; r++) {
+      memory[index] = data[r][c];
+    }
+  }
+  return true;
+}
+
 if(process.argv.length > 2) {
     const buf = fs.readFileSync(process.argv[2]);
     const lib = WebAssembly.instantiate(new Uint8Array(buf), imports);
@@ -59,10 +75,21 @@ if(process.argv.length > 2) {
       g_wasm = wasm;
       console.log('WASM Ready.');
       if(wasm.instance.exports.train != undefined) {
+        console.log("Training ...");
         console.log(wasm.instance.exports.train())
       }
       if(wasm.instance.exports.test != undefined) {
+        console.log("Testing ...");
         console.log(wasm.instance.exports.test())
+      }
+      if(wasm.instance.exports.predict) {
+        console.log("Predicting ...");
+        let offset = wasm.instance.exports.prediction_input_offset();
+        let batch_size = wasm.instance.exports.prediction_batch_size();
+        let data = [[0, 0], [0, 1],[1,0],[1,1]];
+        if(InsertData(wasm.instance.exports.memory.buffer, data, batch_size, offset)) {
+          wasm.instance.exports.predict();
+        }
       }
       Object.keys(wasm.instance.exports).forEach((func) => {
         if(func.startsWith("test_")) {

@@ -304,7 +304,7 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_s
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
+void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
                             const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
@@ -423,7 +423,7 @@ void Model::CompileTraining(uint32_t epochs, float learning_rate, const std::vec
   });
 }
 
-void Model::CompileTesting(const std::vector<std::vector<float>> &input,
+void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
                            const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(!input.empty(), "test input cannot be empty");
   ERROR_UNLESS(input.size() == labels.size(), "testing and labels size should match");
@@ -522,6 +522,48 @@ void Model::CompileTesting(const std::vector<std::vector<float>> &input,
       } else {
         assert(!"Not implemented");
       }
+    }
+  });
+}
+
+void Model::CompilePredictionFunctions() {
+  // Create a function to export the prediction input offset
+  auto prediction_input_offset = module_manager_.MakeFunction("prediction_input_offset", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(layers_.front()->Position() == Input);
+    if(layers_.front()->Type() == FullyConnected) {
+      f.Insert(MakeI32Const(static_cast<DenseInputLayer*>(layers_.front())->InputData(Mode::Prediction)->Begin()));
+    } else {
+      assert(!"No implemented!");
+    }
+  });
+
+  // Create a function to export the prediction batch size
+  module_manager_.MakeFunction("prediction_batch_size", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(PredictionBatchSize()));
+  });
+
+  // TODO add options for hardmax and softmax
+  // Create prediction function
+  module_manager_.MakeFunction("predict", {}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    // Apply forward algorithm
+    f.Insert(MakeCall(forward_prediction_func_, {
+      MakeCall(prediction_input_offset, {})
+    }));
+
+    // Print predictions
+    assert(layers_.back()->Position() == Output);
+    if(layers_.back()->Type() == FullyConnected) {
+      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+      f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
+        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
+        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
+      }));
+    } else {
+      assert(!"Not implemented!");
     }
   });
 }

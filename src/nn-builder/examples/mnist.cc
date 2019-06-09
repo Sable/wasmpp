@@ -145,8 +145,9 @@ int main(int argc, char *argv[]) {
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.MeanSquaredError();
   model.CompileLayers(training_batch_size, testing_batch_size, prediction_batch_size, loss);
-  model.CompileTraining(epoch, learning_rate, train_data, train_labels);
-  model.CompileTesting(test_data, test_labels);
+  model.CompileTrainingFunction(epoch, learning_rate, train_data, train_labels);
+  model.CompileTestingFunction(test_data, test_labels);
+  model.CompilePredictionFunctions();
   model.CompileInitialization();
 
   assert(model.Validate());

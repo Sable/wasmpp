@@ -369,6 +369,11 @@ ds::NDArray* DenseOutputLayer::ConfusionMatrix(uint8_t mode_index) const {
   return confusion_matrix_[mode_index];
 }
 
+ds::NDArray* DenseInputLayer::InputData(uint8_t mode_index) const {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  return A_[mode_index];
+}
+
 } // namespace layer
 } // namespace arch
 } // namespace nn
