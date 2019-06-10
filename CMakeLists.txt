@@ -39,7 +39,11 @@ target_link_libraries(${NN_BUILDER} ${WASMPP})
 if(EMSCRIPTEN)
 add_executable(${NN_BUILDER_JS} src/nn-builder/emscripten/bindings.cc)
 target_link_libraries(${NN_BUILDER_JS} ${NN_BUILDER})
-set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "--bind -s NO_EXIT_RUNTIME=0")
+set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "      \
+--bind                                                              \
+--pre-js ${PROJECT_SOURCE_DIR}/src/nn-builder/emscripten/utils.js   \
+-s NO_EXIT_RUNTIME=0                                                \
+")
 endif()
 
 # Create test cases

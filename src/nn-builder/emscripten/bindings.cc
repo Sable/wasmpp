@@ -136,6 +136,16 @@ public:
   void SetLayers() {
     model_.SetLayers(layers_);
   }
+  void CompileTrainingFunction(uint32_t epoch, float learning_rate, std::vector<std::vector<float>> input,
+                       std::vector<std::vector<float>> labels) {
+    model_.CompileTrainingFunction(epoch, learning_rate, input, labels);
+  }
+  void CompileTestingFunction(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
+    model_.CompileTestingFunction(input, labels);
+  }
+  void CompilePredictionFunctions() {
+    model_.CompilePredictionFunctions();
+  }
 };
 
 EMSCRIPTEN_BINDINGS(model_options) {
@@ -163,6 +173,10 @@ EMSCRIPTEN_BINDINGS(model_options) {
       .function("AddDenseInputLayer", &ModelWrapper::AddDenseInputLayer)
       .function("AddDenseHiddenLayer", &ModelWrapper::AddDenseHiddenLayer)
       .function("AddDenseOutputLayer", &ModelWrapper::AddDenseOutputLayer)
+      .function("CompileTrainingFunction", &ModelWrapper::CompileTrainingFunction)
+      .function("CompileTestingFunction", &ModelWrapper::CompileTestingFunction)
+      .function("CompilePredictionFunctions", &ModelWrapper::CompilePredictionFunctions)
+      .function("CompileLayers", &ModelWrapper::CompileLayers)
       .function("CompileInitialization", &ModelWrapper::CompileInitialization);
 
   class_<DenseInputLayerDescriptor>("DenseInputLayerDescriptor")
@@ -187,16 +201,7 @@ EMSCRIPTEN_BINDINGS(model_options) {
     .function("SetWeightType", &DenseOutputLayerDescriptor::SetWeightType)
     .function("GetWeightType", &DenseOutputLayerDescriptor::GetWeightType);
 
-}
-
-
-int main() {
-  EM_ASM(
-      // Code to allow "require('...')" in NodeJs
-      var module = module || {};
-      var Module = {};
-      module.export = Module;
-  );
-  return 0;
+  register_vector<float>("F32Array");
+  register_vector<std::vector<float>>("F32Matrix");
 }
 
