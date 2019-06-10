@@ -20,6 +20,7 @@ include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
 set(WABT wabt)
 set(WASMPP wasmpp)
 set(NN_BUILDER nnb)
+set(NN_BUILDER_JS nnb_js)
 set(NN_TEST nn-test)
 set(LOGIC logic)
 set(MNIST mnist)
@@ -30,9 +31,16 @@ add_library(${WASMPP} ${WASMPP_FILES})
 target_link_libraries(${WASMPP} ${WABT})
 
 # Create neural network library
-file(GLOB_RECURSE NN_BUILDER_FILES src/nn-builder/*/*.cc)
+file(GLOB_RECURSE NN_BUILDER_FILES src/nn-builder/src/*/*.cc)
 add_library(${NN_BUILDER} ${NN_BUILDER_FILES})
 target_link_libraries(${NN_BUILDER} ${WASMPP})
+
+# Create emscripten bindings
+if(EMSCRIPTEN)
+add_executable(${NN_BUILDER_JS} src/nn-builder/emscripten/bindings.cc)
+target_link_libraries(${NN_BUILDER_JS} ${NN_BUILDER})
+set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "--bind -s NO_EXIT_RUNTIME=0")
+endif()
 
 # Create test cases
 file(GLOB_RECURSE NN_TEST_FILES src/nn-builder/tests/*.cc)
@@ -40,11 +48,9 @@ add_executable(${NN_TEST} ${NN_TEST_FILES})
 target_link_libraries(${NN_TEST} ${NN_BUILDER})
 
 # Create logic example
-file(GLOB_RECURSE LOGIC_FILES src/nn-builder/examples/logic.cc)
-add_executable(${LOGIC} ${LOGIC_FILES})
+add_executable(${LOGIC} src/nn-builder/examples/logic.cc)
 target_link_libraries(${LOGIC} ${NN_BUILDER})
 
 # Create mnist example
-file(GLOB_RECURSE MNIST_FILES src/nn-builder/examples/mnist.cc)
-add_executable(${MNIST} ${MNIST_FILES})
+add_executable(${MNIST} src/nn-builder/examples/mnist.cc)
 target_link_libraries(${MNIST} ${NN_BUILDER})
