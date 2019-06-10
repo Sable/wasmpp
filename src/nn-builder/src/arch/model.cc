@@ -546,24 +546,40 @@ void Model::CompilePredictionFunctions() {
 
   // TODO add options for hardmax and softmax
   // Create prediction function
-  module_manager_.MakeFunction("predict", {}, {},
+  module_manager_.MakeFunction("predict", {}, {Type::F64},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(locals.size() == 1);
+    auto time = locals[0];
+
+    if(options_.log_prediction_time) {
+      // Start prediction timer
+      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
+    }
+
     // Apply forward algorithm
     f.Insert(MakeCall(forward_prediction_func_, {
       MakeCall(prediction_input_offset, {})
     }));
 
-    // Print predictions
-    assert(layers_.back()->Position() == Output);
-    if(layers_.back()->Type() == FullyConnected) {
-      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-      f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
-        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
-        MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
-      }));
-    } else {
-      assert(!"Not implemented!");
+    if(options_.log_prediction_time) {
+      // Log prediction time
+      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
+      f.Insert(MakeCall(builtins_.message.LogPredictionTime(), {MakeLocalGet(time)}));
+    }
+
+    if(options_.log_prediction_results) {
+      // Print predictions
+      assert(layers_.back()->Position() == Output);
+      if(layers_.back()->Type() == FullyConnected) {
+        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
+            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
+            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
+        }));
+      } else {
+        assert(!"Not implemented!");
+      }
     }
   });
 }

@@ -70,6 +70,9 @@ int main(int argc, char *argv[]) {
   options.log_testing_error = true;
   options.log_testing_time = true;
   options.log_testing_confusion_matrix = true;
+  options.log_prediction_results = true;
+  options.log_prediction_time = true;
+  options.use_simd = false;
   Model model(options);
   model.SetLayers({
      NewLayer<DenseInputLayer>(2)->WeightType(XavierNormal),

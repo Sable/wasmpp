@@ -16,6 +16,7 @@ void Message::InitImports(arch::Model* model, wasmpp::ModuleManager* module_mana
   log_testing_accuracy_ = module_manager->MakeFuncImport(module_name, "log_testing_accuracy", {{Type::F32}, {}});
   log_testing_time_ = module_manager->MakeFuncImport(module_name, "log_testing_time", {{Type::F64}, {}});
   log_testing_error_ = module_manager->MakeFuncImport(module_name, "log_testing_error", {{Type::F32}, {}});
+  log_prediction_time_ = module_manager->MakeFuncImport(module_name, "log_prediction_time", {{Type::F64}, {}});
 }
 
 void Message::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_manager) {

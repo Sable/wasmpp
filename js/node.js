@@ -20,6 +20,7 @@ const imports = {
     log_testing_accuracy: (acc) => {
       console.log("Testing Accuracy:", Math.round(acc * 10000) / 10000);
     },
+    log_prediction_time: (time) => {console.log("Prediction time:", time, "ms");},
   },
   "System": {
     print: console.log,
