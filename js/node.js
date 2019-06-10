@@ -62,7 +62,7 @@ function InsertData(buffer, data, batch_size, offset) {
   let memory = new Float32Array(buffer, offset, data[0].length * batch_size);
   for(var c=0; c < data[0].length; c++) {
     for(var r=0; r < data.length; r++) {
-      memory[index] = data[r][c];
+      memory[index++] = data[r][c];
     }
   }
   return true;
