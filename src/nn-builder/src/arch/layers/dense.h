@@ -50,6 +50,8 @@ public:
   FullyConnectedLayer* WeightType(WeightDistributionType type);
   uint32_t WeightOffset() const;
   uint32_t WeightSizeInBytes() const;
+  uint32_t BiasOffset() const;
+  uint32_t BiasSizeInBytes() const;
 };
 
 class DenseHiddenLayer : public FullyConnectedLayer {

@@ -4,40 +4,49 @@
 class LayerWeights {
   #layer;
   #weights;
+  #bias;
   constructor(layer) {
     this.#layer = layer;
   }
-  Layer() {
-    return this.#layer;
+  _Float32ArrayFromBuffer(buffer, offset, byte_size) {
+    return new Float32Array(buffer, offset, byte_size / Float32Array.BYTES_PER_ELEMENT);
   }
-  Weights() {
-    return this.#weights;
+  _Float32ArrayFromArray(array) {
+    return new Float32Array(array);
   }
   ImportWeightsFromBuffer(buffer, offset, byte_size) {
-    this.#weights = new Float32Array(buffer, offset, byte_size / Float32Array.BYTES_PER_ELEMENT);
+    this.#weights = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
   }
   ImportWeightsFromArray(array) {
-    this.#weights = new Float32Array(array);
+    this.#weights = this._Float32ArrayFromArray(array);
+  }
+  ImportBiasFromBuffer(buffer, offset, byte_size) {
+    this.#bias = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
+  }
+  ImportBiasFromArray(array) {
+    this.#bias = this._Float32ArrayFromArray(array);
   }
   CopyWeights(layer_weights) {
-    if(this.Layer() === layer_weights.Layer()) {
-      if(this.#weights.length === layer_weights.#weights.length) {
+    if(this.#layer === layer_weights.#layer) {
+      if(this.#weights.length === layer_weights.#weights.length && this.#bias.length === layer_weights.#bias.length) {
         this.#weights.set(layer_weights.#weights);
+        this.#bias.set(layer_weights.#bias);
       } else {
-        console.error("Failed to copy weights: arrays size are different (%d != %d)",
-          this.#weights.length, layer_weights.#weights.length);
+        console.error("Failed to copy weights/bias: arrays size are different (Weights: %d and %d), (Bias: %d and %d)",
+          this.#weights.length, layer_weights.#weights.length, this.#bias.length, layer_weights.#bias.length);
         return false;
       }
     } else {
-      console.error("Failed to copy weights: layer id are different (%d != %d)", this.Layer(), layer_weights.Layer());
+      console.error("Failed to copy weights: layer id are different (%d != %d)", this.#layer, layer_weights.#layer);
       return false;
     }
     return true;
   }
   ToJson() {
     return {
-      layer: this.Layer(),
-      weights: Array.from(this.Weights())
+      layer: this.#layer,
+      weights: Array.from(this.#weights),
+      bias: Array.from(this.#bias)
     }
   }
 }
@@ -131,9 +140,11 @@ class CompiledModel {
     if (this.Exports() != null) {
       for (let l = 0; l < this._TotalLayers(); l++) {
         let weight_info = this._WeightInfo(l);
-        if (weight_info != null) {
+        let bias_info = this._BiasInfo(l);
+        if (weight_info != null && bias_info != null) {
           let layer_weight = new LayerWeights(l);
           layer_weight.ImportWeightsFromBuffer(this.Exports().memory.buffer, weight_info.offset, weight_info.byte_size);
+          layer_weight.ImportBiasFromBuffer(this.Exports().memory.buffer, bias_info.offset, bias_info.byte_size);
           weights.push(layer_weight.ToJson());
         }
       }
@@ -142,27 +153,31 @@ class CompiledModel {
   }
 
   ImportWeights(weights_array) {
-    weights_array.forEach((weights) => {
+    for(var i=0; i < weights_array.length; i++) {
       // Wrap JSON in a LayerWeight object
-      let imported_layer_weights = new LayerWeights(weights.layer);
-      imported_layer_weights.ImportWeightsFromArray(weights.weights);
+      let imported_layer_weights = new LayerWeights(weights_array[i].layer);
+      imported_layer_weights.ImportWeightsFromArray(weights_array[i].weights);
+      imported_layer_weights.ImportBiasFromArray(weights_array[i].bias);
       // Load model weights info
-      let weights_info = this._WeightInfo(weights.layer);
-      if(weights_info != null) {
+      let weights_info = this._WeightInfo(weights_array[i].layer);
+      let bias_info = this._BiasInfo(weights_array[i].layer);
+      if (weights_info != null && bias_info != null) {
         // Wrap Wasm model weight in a LayerWeight object
-        let model_layer_weights = new LayerWeights(weights.layer);
+        let model_layer_weights = new LayerWeights(weights_array[i].layer);
         model_layer_weights.ImportWeightsFromBuffer(this.Exports().memory.buffer,
           weights_info.offset, weights_info.byte_size);
+        model_layer_weights.ImportBiasFromBuffer(this.Exports().memory.buffer,
+          bias_info.offset, bias_info.byte_size);
         // Set weights
-        if(!model_layer_weights.CopyWeights(imported_layer_weights)) {
+        if (!model_layer_weights.CopyWeights(imported_layer_weights)) {
           console.log("Import failed!");
           return false;
         }
       } else {
-        console.error("Import failed: Layer %d does not exists!", layer_weight.Layer());
+        console.error("Import failed: Layer %d does not exists!", weights_array[i].layer);
         return false;
       }
-    });
+    };
     return true;
   }
 
@@ -190,6 +205,20 @@ class CompiledModel {
   _WeightInfo(layer_index) {
     let offset_func = 'weight_offset_' + layer_index;
     let length_func = 'weight_byte_size_' + layer_index;
+    if(this.Exports() != null
+      && this.Exports()[offset_func] !== undefined
+      && this.Exports()[length_func] !== undefined) {
+      return {
+        offset: this.Exports()[offset_func](),
+        byte_size: this.Exports()[length_func]()
+      }
+    }
+    return null;
+  }
+
+  _BiasInfo(layer_index) {
+    let offset_func = 'bias_offset_' + layer_index;
+    let length_func = 'bias_byte_size_' + layer_index;
     if(this.Exports() != null
       && this.Exports()[offset_func] !== undefined
       && this.Exports()[length_func] !== undefined) {

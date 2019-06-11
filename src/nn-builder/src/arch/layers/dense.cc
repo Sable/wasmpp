@@ -28,6 +28,14 @@ uint32_t FullyConnectedLayer::WeightSizeInBytes() const {
   return W_->Memory()->Bytes();
 }
 
+uint32_t FullyConnectedLayer::BiasOffset() const {
+  return b_->Begin();
+}
+
+uint32_t FullyConnectedLayer::BiasSizeInBytes() const {
+  return b_->Memory()->Bytes();
+}
+
 wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   assert(locals.size() == 6);

@@ -592,26 +592,40 @@ void Model::CompilePredictionFunctions() {
 }
 
 void Model::CompileWeightsFunctions() {
-  // Create functions for each layer to get the weight
-  // offset and weight number of bytes
+  // Create functions for each layer to get the weight/bias
+  // offset and weight/bias number of bytes
   for(auto l=0; l < layers_.size(); l++) {
     if(layers_[l]->Type() == FullyConnected) {
       // Fully Connected Input layer does not weights
       if(layers_[l]->Position() != Input) {
-        std::stringstream offset_func_name;
-        std::stringstream size_func_name;
-        offset_func_name << "weight_offset_" << l;
-        size_func_name << "weight_byte_size_" << l;
+        std::stringstream w_offset_func_name;
+        std::stringstream w_size_func_name;
+        std::stringstream b_offset_func_name;
+        std::stringstream b_size_func_name;
+        w_offset_func_name << "weight_offset_" << l;
+        w_size_func_name << "weight_byte_size_" << l;
+        b_offset_func_name << "bias_offset_" << l;
+        b_size_func_name << "bias_byte_size_" << l;
         auto fc_layer = static_cast<FullyConnectedLayer*>(layers_[l]);
-        // Offset function
-        module_manager_.MakeFunction(offset_func_name.str().c_str(), {{},{Type::I32}}, {},
+        // Weights offset function
+        module_manager_.MakeFunction(w_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
           f.Insert(MakeI32Const(fc_layer->WeightOffset()));
         });
-        // Size function
-        module_manager_.MakeFunction(size_func_name.str().c_str(), {{},{Type::I32}}, {},
+        // Weights size function
+        module_manager_.MakeFunction(w_size_func_name.str().c_str(), {{},{Type::I32}}, {},
                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
           f.Insert(MakeI32Const(fc_layer->WeightSizeInBytes()));
+        });
+        // Bias offset function
+        module_manager_.MakeFunction(b_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+          f.Insert(MakeI32Const(fc_layer->BiasOffset()));
+        });
+        // Bias size function
+        module_manager_.MakeFunction(b_size_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+          f.Insert(MakeI32Const(fc_layer->BiasSizeInBytes()));
         });
       }
     } else {

@@ -56,6 +56,7 @@ nnb.onRuntimeInitialized = function() {
   model.CompileTrainingFunction(epoch, learning_rate, data, labels);
   model.CompileTestingFunction(data, labels);
   model.CompilePredictionFunctions();
+  model.CompileWeightsFunctions();
   model.CompileInitialization();
   if(model.Validate()) {
     let buffer = nnb.ToUint8Array(model.ToWasm());
