@@ -2,11 +2,11 @@
 // this is useful for extracting trained model weights
 // or importing pre-trained model weights
 class LayerWeights {
-  #layer;
-  #weights;
-  #bias;
+  _layer;
+  _weights;
+  _bias;
   constructor(layer) {
-    this.#layer = layer;
+    this._layer = layer;
   }
   _Float32ArrayFromBuffer(buffer, offset, byte_size) {
     return new Float32Array(buffer, offset, byte_size / Float32Array.BYTES_PER_ELEMENT);
@@ -15,38 +15,38 @@ class LayerWeights {
     return new Float32Array(array);
   }
   ImportWeightsFromBuffer(buffer, offset, byte_size) {
-    this.#weights = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
+    this._weights = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
   }
   ImportWeightsFromArray(array) {
-    this.#weights = this._Float32ArrayFromArray(array);
+    this._weights = this._Float32ArrayFromArray(array);
   }
   ImportBiasFromBuffer(buffer, offset, byte_size) {
-    this.#bias = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
+    this._bias = this._Float32ArrayFromBuffer(buffer, offset, byte_size);
   }
   ImportBiasFromArray(array) {
-    this.#bias = this._Float32ArrayFromArray(array);
+    this._bias = this._Float32ArrayFromArray(array);
   }
   CopyWeights(layer_weights) {
-    if(this.#layer === layer_weights.#layer) {
-      if(this.#weights.length === layer_weights.#weights.length && this.#bias.length === layer_weights.#bias.length) {
-        this.#weights.set(layer_weights.#weights);
-        this.#bias.set(layer_weights.#bias);
+    if(this._layer === layer_weights._layer) {
+      if(this._weights.length === layer_weights._weights.length && this._bias.length === layer_weights._bias.length) {
+        this._weights.set(layer_weights._weights);
+        this._bias.set(layer_weights._bias);
       } else {
         console.error("Failed to copy weights/bias: arrays size are different (Weights: %d and %d), (Bias: %d and %d)",
-          this.#weights.length, layer_weights.#weights.length, this.#bias.length, layer_weights.#bias.length);
+          this._weights.length, layer_weights._weights.length, this._bias.length, layer_weights._bias.length);
         return false;
       }
     } else {
-      console.error("Failed to copy weights: layer id are different (%d != %d)", this.#layer, layer_weights.#layer);
+      console.error("Failed to copy weights: layer id are different (%d != %d)", this._layer, layer_weights._layer);
       return false;
     }
     return true;
   }
   ToJson() {
     return {
-      layer: this.#layer,
-      weights: Array.from(this.#weights),
-      bias: Array.from(this.#bias)
+      layer: this._layer,
+      weights: Array.from(this._weights),
+      bias: Array.from(this._bias)
     }
   }
 }
@@ -57,30 +57,30 @@ class LayerWeights {
 // but some might process the arguments in order to pass
 // them correctly to Wasm functions
 class CompiledModel {
-  #wasm = null;
-  #imports = {};
+  _wasm = null;
+  _imports = {};
 
   constructor() {
-    this.#imports = this._InitImports();
+    this._imports = this._InitImports();
   }
 
   // Set the wasm instance
   SetWasm(wasm) {
-    this.#wasm = wasm;
+    this._wasm = wasm;
   }
 
   // Get exports from Wasm to JS
   Exports() {
-    if (this.#wasm == null) {
+    if (this._wasm == null) {
       console.error("Wasm instance was not set");
       return null;
     }
-    return this.#wasm.instance.exports;
+    return this._wasm.instance.exports;
   }
 
   // Get imports from JS to Wasm
   Imports() {
-    return this.#imports;
+    return this._imports;
   }
 
   // Run train Wasm function
