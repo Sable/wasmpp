@@ -101,9 +101,8 @@ public:
   std::string ToWat(bool folded, bool inlined) {
     return model_.ModuleManager().ToWat(folded, inlined);
   }
-  std::string ToWasm() {
-    auto data = model_.ModuleManager().ToWasm().data;
-    return std::string(data.begin(), data.end());
+  std::vector<uint8_t> ToWasm() {
+    return model_.ModuleManager().ToWasm().data;
   }
   bool Validate() {
     return model_.Validate();
@@ -203,5 +202,6 @@ EMSCRIPTEN_BINDINGS(model_options) {
 
   register_vector<float>("F32Array");
   register_vector<std::vector<float>>("F32Matrix");
+  register_vector<uint8_t>("ByteArray");
 }
 
