@@ -116,7 +116,7 @@ public:
     if(loss == "cross-entropy") {
       loss_func = model_.Builtins().loss.CrossEntropy();
     }
-    model_.CompileLayers(prediction_batch, testing_batch, prediction_batch, loss_func);
+    model_.CompileLayers(training_batch, testing_batch, prediction_batch, loss_func);
     return true;
   }
   void AddDenseInputLayer(DenseInputLayerDescriptor desc) {
