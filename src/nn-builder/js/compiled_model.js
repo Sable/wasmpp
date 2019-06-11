@@ -1,3 +1,9 @@
+// This class is a wrapper for the generated Wasm model
+// It also contains the import functions from JS to Wasm
+// Most functions simply calls the Wasm exported functions
+// but some might process the arguments in order to pass
+// them correctly to Wasm functions
+
 class CompiledModel {
   #wasm = null;
   #imports = {};

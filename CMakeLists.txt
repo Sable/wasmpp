@@ -52,9 +52,9 @@ add_executable(${NN_TEST} ${NN_TEST_FILES})
 target_link_libraries(${NN_TEST} ${NN_BUILDER})
 
 # Create logic example
-add_executable(${LOGIC} src/nn-builder/examples/logic.cc)
+add_executable(${LOGIC} src/nn-builder/examples/cpp/logic.cc)
 target_link_libraries(${LOGIC} ${NN_BUILDER})
 
 # Create mnist example
-add_executable(${MNIST} src/nn-builder/examples/mnist.cc)
+add_executable(${MNIST} src/nn-builder/examples/cpp/mnist.cc)
 target_link_libraries(${MNIST} ${NN_BUILDER})
