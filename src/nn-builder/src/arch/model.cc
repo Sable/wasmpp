@@ -12,6 +12,8 @@ using namespace wasmpp;
 using namespace wabt;
 using namespace layer;
 
+#define V128_IF_SIMD(t) (options_.use_simd ? Type::V128 : (t))
+
 wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
   assert(learning_rate != nullptr);
   return MakeF32Store(MakeI32Const(learning_rate->Begin()), val);
@@ -206,7 +208,8 @@ Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
 }
 
 wabt::Var Model::BackwardAlgorithmFunction() {
-  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128};
+  std::vector<Type> locals_type = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32,
+                                   V128_IF_SIMD(Type::I32)};
   return module_manager_.MakeFunction(nullptr, {{Type::I32, Type::I32},{}}, locals_type,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(locals.size() == 7);
