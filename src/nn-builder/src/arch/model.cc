@@ -36,6 +36,12 @@ void Model::SetLayers(std::vector<Layer *> layers) {
     layers[index]->SetModel(this);
     layers_.push_back(layers[index]);
   }
+
+  // Create function to get the total number of layers function
+  module_manager_.MakeFunction("total_layers", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeI32Const((uint32_t)layers_.size()));
+  });
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
@@ -586,12 +592,6 @@ void Model::CompilePredictionFunctions() {
 }
 
 void Model::CompileWeightsFunctions() {
-  // Create function to get the total number of layers function
-  module_manager_.MakeFunction("total_layers", {{},{Type::I32}}, {},
-                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    f.Insert(MakeI32Const((uint32_t)layers_.size()));
-  });
-
   // Create functions for each layer to get the weight
   // offset and weight number of bytes
   for(auto l=0; l < layers_.size(); l++) {

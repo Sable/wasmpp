@@ -145,6 +145,9 @@ public:
   void CompilePredictionFunctions() {
     model_.CompilePredictionFunctions();
   }
+  void CompileWeightsFunctions() {
+    model_.CompileWeightsFunctions();
+  }
 };
 
 EMSCRIPTEN_BINDINGS(model_options) {
@@ -176,6 +179,7 @@ EMSCRIPTEN_BINDINGS(model_options) {
       .function("CompileTestingFunction", &ModelWrapper::CompileTestingFunction)
       .function("CompilePredictionFunctions", &ModelWrapper::CompilePredictionFunctions)
       .function("CompileLayers", &ModelWrapper::CompileLayers)
+      .function("CompileWeightsFunctions", &ModelWrapper::CompileWeightsFunctions)
       .function("CompileInitialization", &ModelWrapper::CompileInitialization);
 
   class_<DenseInputLayerDescriptor>("DenseInputLayerDescriptor")
