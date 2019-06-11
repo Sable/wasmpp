@@ -20,6 +20,14 @@ FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributio
   return this;
 }
 
+uint32_t FullyConnectedLayer::WeightOffset() const {
+  return W_->Begin();
+}
+
+uint32_t FullyConnectedLayer::WeightSizeInBytes() const {
+  return W_->Memory()->Bytes();
+}
+
 wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   assert(locals.size() == 6);

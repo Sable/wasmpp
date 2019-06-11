@@ -3,6 +3,7 @@
 #include <src/nn-builder/src/snippet/matrix.h>
 #include <src/nn-builder/src/arch/initializers.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
+#include <sstream>
 
 namespace nn {
 namespace arch {
@@ -582,6 +583,41 @@ void Model::CompilePredictionFunctions() {
       }
     }
   });
+}
+
+void Model::CompileWeightsFunctions() {
+  // Create function to get the total number of layers function
+  module_manager_.MakeFunction("total_layers", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeI32Const((uint32_t)layers_.size()));
+  });
+
+  // Create functions for each layer to get the weight
+  // offset and weight number of bytes
+  for(auto l=0; l < layers_.size(); l++) {
+    if(layers_[l]->Type() == FullyConnected) {
+      // Fully Connected Input layer does not weights
+      if(layers_[l]->Position() != Input) {
+        std::stringstream offset_func_name;
+        std::stringstream size_func_name;
+        offset_func_name << "weight_offset_" << l;
+        size_func_name << "weight_byte_size_" << l;
+        auto fc_layer = static_cast<FullyConnectedLayer*>(layers_[l]);
+        // Offset function
+        module_manager_.MakeFunction(offset_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+          f.Insert(MakeI32Const(fc_layer->WeightOffset()));
+        });
+        // Size function
+        module_manager_.MakeFunction(size_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+          f.Insert(MakeI32Const(fc_layer->WeightSizeInBytes()));
+        });
+      }
+    } else {
+      assert(!"Not implemented!");
+    }
+  }
 }
 
 bool Model::Validate() {

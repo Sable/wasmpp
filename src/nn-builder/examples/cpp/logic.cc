@@ -104,6 +104,7 @@ int main(int argc, char *argv[]) {
   model.CompileTrainingFunction(epoch, learning_rate, train, labels);
   model.CompileTestingFunction(train, labels);
   model.CompilePredictionFunctions();
+  model.CompileWeightsFunctions();
   model.CompileInitialization();
 
   assert(model.Validate());

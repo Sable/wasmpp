@@ -48,6 +48,8 @@ public:
   // Layer configuration
   virtual FullyConnectedLayer* KeepProb(float keep_prob);
   FullyConnectedLayer* WeightType(WeightDistributionType type);
+  uint32_t WeightOffset() const;
+  uint32_t WeightSizeInBytes() const;
 };
 
 class DenseHiddenLayer : public FullyConnectedLayer {
