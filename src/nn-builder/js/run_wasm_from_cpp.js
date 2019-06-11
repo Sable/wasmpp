@@ -2,7 +2,8 @@ const fs = require('fs');
 const {CompiledModel} = require('./compiled_model');
 
 process.on('unhandledRejection', error => {
-  console.log("Make sure SIMD is enabled (e.g. nodejs --experimental-wasm-simd)");
+  console.error(">> Make sure SIMD is enabled (e.g. nodejs --experimental-wasm-simd)");
+  console.error(">> Error message:", error);
 });
 
 if(process.argv.length > 2) {
