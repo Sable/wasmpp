@@ -45,6 +45,9 @@ private:
   uint32_t testing_batch_size_;
   uint32_t prediction_batch_size_;
 
+  // Limits
+  const uint32_t MAX_FLOAT_PER_DATA = 1048576; // 2^20
+
   // Model members
   wasmpp::Memory* learning_rate = nullptr;
 
@@ -100,6 +103,9 @@ private:
   void AllocateTest();
 
   // Date generation
+  void MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals,
+                std::vector<std::vector<float>> labels_vals, std::vector<ds::NDArray*> data_batch,
+                std::vector<ds::NDArray*> labels_batch, uint32_t batch_size);
   void MakeTrainingData(wabt::Var memory);
   void MakeTestingData(wabt::Var memory);
   void MakeLayersData(wabt::Var memory);

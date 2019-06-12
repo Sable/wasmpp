@@ -142,38 +142,58 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
   return entries;
 }
 
-void Model::MakeTrainingData(wabt::Var memory) {
-  for(uint32_t i=0; i < training_batch_.size(); ++i) {
-    // Training data
-    auto training_begin = training_vals_.begin() + (i * TrainingBatchSize());
-    std::vector<std::vector<float>> sub_input(training_begin, training_begin + TrainingBatchSize());
-    module_manager_.MakeData(memory, training_batch_[i]->Memory()->Begin(), MakeTransposeData(training_batch_[i], sub_input));
+void Model::MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals,
+                     std::vector<std::vector<float>> labels_vals, std::vector<ds::NDArray*> data_batch,
+                     std::vector<ds::NDArray*> labels_batch, uint32_t batch_size) {
+  // Store all data in one vector
+  std::vector<DataEntry> data_entries;
+  for(uint32_t i=0; i < data_batch.size(); ++i) {
+    auto training_begin = data_vals.begin() + (i * batch_size);
+    std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size);
+    auto entry = MakeTransposeData(data_batch[i], sub_input);
+    data_entries.insert(data_entries.end(), entry.begin(), entry.end());
+  }
+  // Split data into chunks
+  auto total_data_chunks = 1 + ((data_entries.size() - 1) / MAX_FLOAT_PER_DATA);
+  for(uint32_t i=0; i < total_data_chunks; i++) {
+    auto begin = data_entries.begin() + (i * MAX_FLOAT_PER_DATA);
+    auto end = begin + MAX_FLOAT_PER_DATA;
+    if(end > data_entries.end()) {
+      end = data_entries.end();
+    }
+    auto sub_data = std::vector<DataEntry>(begin, end);
+    auto memory_begin = data_batch.front()->Memory()->Begin() + (i * MAX_FLOAT_PER_DATA * TypeSize(Type::F32));
+    module_manager_.MakeData(memory, memory_begin, sub_data);
   }
 
-  for(uint32_t i=0; i < training_labels_batch_.size(); ++i) {
-    // Training labels
-    auto labels_begin = training_labels_vals_.begin() + (i * TrainingBatchSize());
-    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TrainingBatchSize());
-    module_manager_.MakeData(memory, training_labels_batch_[i]->Memory()->Begin(),
-                             MakeTransposeData(training_labels_batch_[i], sub_labels));
+  // Store all labels in one vector
+  std::vector<DataEntry> labels_entries;
+  for(uint32_t i=0; i < labels_batch.size(); ++i) {
+    auto labels_begin = labels_vals.begin() + (i * batch_size);
+    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size);
+    auto entry = MakeTransposeData(labels_batch[i], sub_labels);
+    labels_entries.insert(labels_entries.end(), entry.begin(), entry.end());
+  }
+  // Split labels into chunks
+  auto total_labels_chunks = 1 + ((labels_entries.size() - 1) / MAX_FLOAT_PER_DATA);
+  for(uint32_t i=0; i < total_labels_chunks; i++) {
+    auto begin = labels_entries.begin() + (i * MAX_FLOAT_PER_DATA);
+    auto end = begin + MAX_FLOAT_PER_DATA;
+    if(end > labels_entries.end()) {
+      end = labels_entries.end();
+    }
+    auto sub_labels = std::vector<DataEntry>(begin, end);
+    auto memory_begin = labels_batch.front()->Memory()->Begin() + (i * MAX_FLOAT_PER_DATA * TypeSize(Type::F32));
+    module_manager_.MakeData(memory, memory_begin, sub_labels);
   }
 }
 
-void Model::MakeTestingData(wabt::Var memory) {
-  for(uint32_t i=0; i < testing_batch_.size(); ++i) {
-    // Testing data
-    auto testing_begin = testing_vals_.begin() + (i * TestingBatchSize());
-    std::vector<std::vector<float>> sub_input(testing_begin, testing_begin + TestingBatchSize());
-    module_manager_.MakeData(memory, testing_batch_[i]->Memory()->Begin(), MakeTransposeData(testing_batch_[i], sub_input));
-  }
+void Model::MakeTrainingData(wabt::Var memory) {
+  MakeData(memory, training_vals_, training_labels_vals_, training_batch_, training_labels_batch_, TrainingBatchSize());
+}
 
-  for(uint32_t i=0; i < testing_labels_batch_.size(); ++i) {
-    // Testing labels
-    auto labels_begin = testing_labels_vals_.begin() + (i * TestingBatchSize());
-    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + TestingBatchSize());
-    module_manager_.MakeData(memory, testing_labels_batch_[i]->Memory()->Begin(),
-                             MakeTransposeData(testing_labels_batch_[i], sub_labels));
-  }
+void Model::MakeTestingData(wabt::Var memory) {
+  MakeData(memory, testing_vals_, testing_labels_vals_, testing_batch_, testing_labels_batch_, TestingBatchSize());
 }
 
 void Model::MakeLayersData(wabt::Var memory) {
