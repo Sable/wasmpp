@@ -41,7 +41,8 @@ target_link_libraries(${NN_BUILDER_JS} ${NN_BUILDER})
 set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "      \
 --bind                                                              \
 --pre-js ${PROJECT_SOURCE_DIR}/src/nn-builder/emscripten/utils.js   \
--s WASM=1                                                              \
+-s WASM=1                                                           \
+-s ALLOW_MEMORY_GROWTH=1                                            \
 -s NO_EXIT_RUNTIME=0                                                \
 ")
 # Create distribution directory

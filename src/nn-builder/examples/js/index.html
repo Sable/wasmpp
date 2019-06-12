@@ -125,7 +125,7 @@ model.AddDenseOutputLayer(l2);</textarea>
       <p><b>B - Training function</b></p>
       <div class="form-group">
         <div class="row">
-          <div class="col-xs-3">
+          <div class="col-xs-12">
             <label class="checkbox-inline">
               <input type="checkbox" id="train_compile" checked="checked">Compile this function
             </label>
@@ -145,6 +145,11 @@ model.AddDenseOutputLayer(l2);</textarea>
         </div>
       </div>
       <div class="form-group">
+        <button type="button" class="btn btn-primary btn-md" onclick="LoadMnistExample()">MNIST example</button>
+        <button type="button" class="btn btn-primary btn-md" onclick="LoadLogicExample()">Logic example</button>
+        <button type="button" class="btn btn-secondary btn-md" onclick="ClearExample()">Clear</button>
+      </div>
+      <div class="form-group">
         <label for="train_data">Training data</label>
         <textarea class="form-control" id="train_data" rows="4"></textarea>
       </div>
@@ -152,27 +157,13 @@ model.AddDenseOutputLayer(l2);</textarea>
         <label for="train_labels">Training label</label>
         <textarea class="form-control" id="train_labels" rows="4"></textarea>
       </div>
-      <div class="form-group">
-        <label>Example data and labels for learning OR logic function</label>
-        <textarea class="form-control" rows="4" title="data" disabled>
-0 0
-0 1
-1 0
-1 1</textarea>
-        <p></p>
-        <textarea class="form-control" rows="4" title="labels" disabled>
-1 0
-0 1
-0 1
-0 1</textarea>
-      </div>
     </div>
 
     <div class="panel-body">
       <p><b>C - Testing function</b></p>
       <div class="form-group">
         <div class="row">
-          <div class="col-xs-3">
+          <div class="col-xs-12">
             <label class="checkbox-inline">
               <input type="checkbox" id="test_compile" checked="checked">Compile this function
             </label>
@@ -262,6 +253,9 @@ model.AddDenseOutputLayer(l2);</textarea>
   </div>
 </div>
 
+<!--Script for the examples-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mnist/1.1.0/mnist.js"></script>
+<!--Script required for the Neural Network Library -->
 <script src="./compiled_model.js"></script>
 <script src="./nnb_js.js"></script>
 <script>
@@ -457,6 +451,54 @@ model.AddDenseOutputLayer(l2);</textarea>
       msg_obj.innerText = "Build model before importing weights";
       msg_obj.className = "alert alert-danger";
     }
+  }
+
+  function ClearExample() {
+    document.getElementById('train_data').value = "";
+    document.getElementById('train_labels').value = "";
+  }
+
+  function LoadMnistExample() {
+    let mnist_data = mnist.set(2000, 500);
+    // Load training
+    let train_data_str = "";
+    let train_labels_str = "";
+    mnist_data.training.forEach((entry) => {
+      if(train_data_str.length !== 0) {
+        train_data_str += "\n";
+        train_labels_str += "\n";
+      }
+      train_data_str += entry.input.join(" ");
+      train_labels_str += entry.output.join(" ");
+    });
+    // Load testing
+    let test_data_str = "";
+    let test_labels_str = "";
+    mnist_data.test.forEach((entry) => {
+      if(test_data_str.length !== 0) {
+        test_data_str += "\n";
+        test_labels_str += "\n";
+      }
+      test_data_str += entry.input.join(" ");
+      test_labels_str += entry.output.join(" ");
+    });
+    // Update training fields
+    document.getElementById('train_data').value = train_data_str;
+    document.getElementById('train_labels').value = train_labels_str;
+    // Update testing fields
+    document.getElementById('test_data').value = test_data_str;
+    document.getElementById('test_labels').value = test_labels_str;
+  }
+
+  function LoadLogicExample() {
+    let data = "0 0\n0 1\n1 0\n1 1";
+    let labels = "1 0\n0 1\n0 1\n0 1";
+    // Update training fields
+    document.getElementById('train_data').value = data;
+    document.getElementById('train_labels').value = labels;
+    // Update testing fields
+    document.getElementById('test_data').value = data;
+    document.getElementById('test_labels').value = labels;
   }
 
 </script>
