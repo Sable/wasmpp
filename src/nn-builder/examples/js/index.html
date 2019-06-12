@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Neural Network Builder in WebAssembly</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+  <h2>Neural Network Builder in WebAssembly</h2>
+  <div class="alert alert-warning" role="alert">
+    <p>To run this demo, use a browser which has support for WebAssembly, and optionally SIMD if you checked that
+      option.</p>
+    <p>To use WebAssembly SIMD instructions on Google Chrome, open the application from the terminal and pass to it
+      <code>--js-flags="--experimental-wasm-simd"</code></p>
+    <p>Our experiments were done using Google Chrome 73.0.3683.86</p>
+  </div>
+  <div class="alert alert-info" role="alert">
+    <p>Open your browser console to see the model results.</p>
+  </div>
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">1 - Select model options</h3>
+    </div>
+    <div class="panel-body">
+        <div class="form-group">
+          <p><b>Training</b></p>
+          <label class="checkbox-inline"><input type="checkbox" id="train_err">log_training_error</label>
+          <label class="checkbox-inline"><input type="checkbox" id="train_acc">log_training_accuracy</label>
+          <label class="checkbox-inline"><input type="checkbox" id="train_time">log_training_time</label>
+        </div>
+      <div class="form-group">
+        <p><b>Testing</b></p>
+        <label class="checkbox-inline"><input type="checkbox" id="test_err">log_testing_error</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_acc">log_testing_accuracy</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_conf">log_testing_confusion_matrix</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_time">log_testing_time</label>
+      </div>
+      <div class="form-group">
+        <p><b>Prediction</b></p>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_res">log_prediction_results</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_time">log_prediction_time</label>
+      </div>
+      <div class="form-group">
+        <p><b>Other</b></p>
+        <label class="checkbox-inline"><input type="checkbox" id="use_simd">use_simd</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">2 - Create layers</h3>
+    </div>
+    <div class="panel-body">
+      <div class="form-group">
+        <label for="layers">Layers code</label>
+        <textarea class="form-control" id="layers" rows="10">
+let l0 = new nnb.DenseInputLayerDescriptor(2);
+l0.SetKeepProb(1.0);
+model.AddDenseInputLayer(l0);
+
+let l1 = new nnb.DenseHiddenLayerDescriptor(2, "sigmoid");
+l1.SetKeepProb(1.0);
+l1.SetWeightType("xavier_uniform");
+model.AddDenseHiddenLayer(l1);
+
+let l2 = new nnb.DenseOutputLayerDescriptor(2, "sigmoid");
+l2.SetWeightType("lecun_uniform");
+model.AddDenseOutputLayer(l2);</textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">3 - Select functions with their parameters to compile</h3>
+    </div>
+    <div class="panel-body">
+      <p><b>A - Layers functions (forward, backward, etc...) </b></p>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" checked="checked" disabled="disabled">Compile this function
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label for="train_batch">Training batch</label>
+            <input class="form-control" id="train_batch" type="number" value="1">
+          </div>
+          <div class="col-xs-3">
+            <label for="test_batch">Testing batch</label>
+            <input class="form-control" id="test_batch" type="number" value="1">
+          </div>
+          <div class="col-xs-3">
+            <label for="pred_batch">Prediction batch</label>
+            <input class="form-control" id="pred_batch" type="number" value="1">
+          </div>
+          <div class="col-xs-3">
+            <label for="loss_func">Loss function</label>
+            <select class="form-control" id="loss_func">
+              <option value="mean-squared-error">Mean Squared Error</option>
+              <option value="cross-entropy">Cross Entropy</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <p><b>B - Training function</b></p>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="train_compile" checked="checked">Compile this function
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="train_batch">Epoch</label>
+            <input class="form-control" id="epoch" type="number" value="1">
+          </div>
+          <div class="col-xs-6">
+            <label for="test_batch">Learning rate</label>
+            <input class="form-control" id="learning_rate" type="number" value="0.01">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="train_data">Training data</label>
+        <textarea class="form-control" id="train_data" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="train_label">Training label</label>
+        <textarea class="form-control" id="train_label" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Example data and labels for learning OR logic function</label>
+        <textarea class="form-control" rows="4" title="data" disabled>
+0 0
+0 1
+1 0
+1 1</textarea>
+        <p></p>
+        <textarea class="form-control" rows="4" title="labels" disabled>
+1 0
+0 1
+0 1
+0 1</textarea>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <p><b>C - Testing function</b></p>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="test_compile" checked="checked">Compile this function
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="test_data">Testing data</label>
+        <textarea class="form-control" id="test_data" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="test_label">Testing label</label>
+        <textarea class="form-control" id="test_label" rows="4"></textarea>
+      </div>
+    </div>
+
+    <div class="panel-body">
+      <p><b>D - Other functions</b></p>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="pred_compile" checked="checked">Compile predictions functions
+              <p><small><em>Functions to insert data into linear memory and predict</em></small></p>
+            </label>
+          </div>
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="weights_compile" checked="checked">Compile weights functions
+              <p><small><em>expose weights addresses through exported WebAssembly functions.
+                Useful for extracting and importing weights</em></small></p>
+            </label>
+          </div>
+          <div class="col-xs-3">
+            <label class="checkbox-inline">
+              <input type="checkbox" checked="checked" disabled="disabled">Compile initialization functions
+              <p><small><em>Generate "data" sections in WebAssebly</em></small></p>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">4 - Generate WebAssembly model</h3>
+    </div>
+    <div class="panel-body">
+      <div class="form-group">
+        <button type="button" class="btn btn-primary btn-md" onclick="">Build model</button>
+        <button type="button" class="btn btn-secondary btn-md" onclick="">Download wasm</button>
+        <button type="button" class="btn btn-secondary btn-md" oncancel="">Download wat</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel panel-default">
+    <div class="panel-heading">
+      <h3 class="panel-title">5 - Interact with WebAssembly model</h3>
+    </div>
+    <div class="panel-body">
+      <div class="form-group">
+        <button type="button" class="btn btn-info btn-md" onclick="">Run Training</button>
+        <button type="button" class="btn btn-info btn-md" onclick="">Run Testing</button>
+        <button type="button" class="btn btn-info btn-md" onclick="">Download weights</button>
+      </div>
+      <div class="form-group">
+        <div class="input-group">
+          <input type="text" class="form-control" id="import_weights" title="Import weights" placeholder="Optional">
+          <span class="input-group-btn">
+            <button class="btn btn-info" type="button">Import weights</button>
+          </span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="pred_data">Prediction data</label>
+        <textarea class="form-control" id="pred_data" rows="4"></textarea>
+      </div>
+      <div class="form-group">
+        <button type="button" class="btn btn-info btn-md" onclick="">Run Predict</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="./compiled_model.js"></script>
+<script src="./nnb_js.js"></script>
+<script>
+  /*
+  var nnb = Module;
+  nnb.onRuntimeInitialized = function() {
+    // Create model options
+    let options = new nnb.ModelOptions();
+    // options.log_training_error = true;
+    // options.log_training_accuracy = true;
+    options.log_training_time = true;
+    options.log_testing_error = true;
+    options.log_testing_accuracy = true;
+    options.log_testing_confusion_matrix = true;
+    options.log_testing_time = true;
+    options.log_prediction_results = true;
+    options.log_prediction_time = true;
+    options.use_simd = false;
+
+    // Create model
+    let model = new nnb.Model(options);
+
+    // Create layers
+    let l0 = new nnb.DenseInputLayerDescriptor(2);
+    l0.SetKeepProb(1.0);
+    model.AddDenseInputLayer(l0);
+
+    let l1 = new nnb.DenseHiddenLayerDescriptor(2, "sigmoid");
+    l1.SetKeepProb(1.0);
+    l1.SetWeightType("xavier_uniform");
+    model.AddDenseHiddenLayer(l1);
+
+    let l2 = new nnb.DenseOutputLayerDescriptor(2, "sigmoid");
+    l2.SetWeightType("lecun_uniform");
+    model.AddDenseOutputLayer(l2);
+
+    // Start compiling
+    let data = nnb.ToMatrix([[0, 0], [0, 1], [1, 0], [1, 1]]);
+    let labels = nnb.ToMatrix([[1, 0], [0, 1], [0, 1], [0, 1]]);
+    let epoch = 10000;
+    let training_batch = 1;
+    let testing_batch = 1;
+    let prediction_batch = 1;
+    let loss = "mean-squared-error";
+    let learning_rate = 0.02;
+    model.SetLayers();
+    model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);
+    model.CompileTrainingFunction(epoch, learning_rate, data, labels);
+    model.CompileTestingFunction(data, labels);
+    model.CompilePredictionFunctions();
+    model.CompileWeightsFunctions();
+    model.CompileInitialization();
+    if(model.Validate()) {
+      let buffer = nnb.ToUint8Array(model.ToWasm());
+      let compiled_model = new CompiledModel();
+      const lib = WebAssembly.instantiate(buffer, compiled_model.Imports());
+      lib.then(wasm => {
+        compiled_model.SetWasm(wasm);
+        console.log("Training ...");
+        compiled_model.Train();
+        console.log("Testing ...");
+        compiled_model.Test();
+        console.log("Predicting ...");
+        compiled_model.Predict([[0, 0]]);
+        compiled_model.Predict([[0, 1]]);
+        compiled_model.Predict([[1, 0]]);
+        compiled_model.Predict([[1, 1]]);
+      });
+    }
+  }
+  */
+</script>
+</body>
+</html>

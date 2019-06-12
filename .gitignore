@@ -2,4 +2,5 @@
 *.pyc
 .idea/
 build/
+dist/
 cmake-build-debug/
