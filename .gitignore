@@ -4,3 +4,5 @@
 build/
 dist/
 cmake-build-debug/
+package-lock.json
+node_modules/

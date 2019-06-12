@@ -9,7 +9,32 @@ process.on('unhandledRejection', error => {
 });
 
 const nnb  = require(process.argv[2]);
-const {CompiledModel} = require("../../js/compiled_model");
+const mnist = require('mnist');
+const {CompiledModel} = require("../../../js/compiled_model");
+
+function LoadMnist() {
+  let mnist_data = mnist.set(6000, 1000);
+  // Load training
+  let train_data = [];
+  let train_labels = [];
+  mnist_data.training.forEach((entry) => {
+    train_data.push(entry.input);
+    train_labels.push(entry.output);
+  });
+  // Load testing
+  let test_data = [];
+  let test_labels = [];
+  mnist_data.test.forEach((entry) => {
+    test_data.push(entry.input);
+    test_labels.push(entry.output);
+  });
+  return {
+    train_data: train_data,
+    train_labels: train_labels,
+    test_data: test_data,
+    test_labels: test_labels
+  }
+}
 
 nnb.onRuntimeInitialized = function() {
   // Create model options
@@ -29,32 +54,31 @@ nnb.onRuntimeInitialized = function() {
   let model = new nnb.Model(options);
 
   // Create layers
-  let l0 = new nnb.DenseInputLayerDescriptor(2);
+  let l0 = new nnb.DenseInputLayerDescriptor(784);
   l0.SetKeepProb(1.0);
   model.AddDenseInputLayer(l0);
 
-  let l1 = new nnb.DenseHiddenLayerDescriptor(2, "sigmoid");
+  let l1 = new nnb.DenseHiddenLayerDescriptor(100, "sigmoid");
   l1.SetKeepProb(1.0);
   l1.SetWeightType("xavier_uniform");
   model.AddDenseHiddenLayer(l1);
 
-  let l2 = new nnb.DenseOutputLayerDescriptor(2, "sigmoid");
+  let l2 = new nnb.DenseOutputLayerDescriptor(10, "sigmoid");
   l2.SetWeightType("lecun_uniform");
   model.AddDenseOutputLayer(l2);
 
   // Start compiling
-  let data = nnb.ToMatrix([[0, 0], [0, 1], [1, 0], [1, 1]]);
-  let labels = nnb.ToMatrix([[1, 0], [0, 1], [0, 1], [0, 1]]);
-  let epoch = 10000;
-  let training_batch = 1;
+  let data = LoadMnist();
+  let epoch = 10;
+  let training_batch = 4;
   let testing_batch = 1;
   let prediction_batch = 1;
   let loss = "mean-squared-error";
   let learning_rate = 0.02;
   model.SetLayers();
   model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);
-  model.CompileTrainingFunction(epoch, learning_rate, data, labels);
-  model.CompileTestingFunction(data, labels);
+  model.CompileTrainingFunction(epoch, learning_rate, nnb.ToMatrix(data.train_data), nnb.ToMatrix(data.train_labels));
+  model.CompileTestingFunction(nnb.ToMatrix(data.test_data), nnb.ToMatrix(data.test_labels));
   model.CompilePredictionFunctions();
   model.CompileWeightsFunctions();
   model.CompileInitialization();
@@ -68,11 +92,6 @@ nnb.onRuntimeInitialized = function() {
       compiled_model.Train();
       console.log("Testing ...");
       compiled_model.Test();
-      console.log("Predicting ...");
-      compiled_model.Predict([[0, 0]]);
-      compiled_model.Predict([[0, 1]]);
-      compiled_model.Predict([[1, 0]]);
-      compiled_model.Predict([[1, 1]]);
     });
   }
 }

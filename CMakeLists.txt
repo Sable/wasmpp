@@ -51,7 +51,7 @@ file(MAKE_DIRECTORY ${JS_OUT_DIR})
 add_custom_command(TARGET ${NN_BUILDER_JS} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/${NN_BUILDER_JS}.* ${JS_OUT_DIR}
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/js/compiled_model.js ${JS_OUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/examples/js/index.html ${JS_OUT_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/examples/js/nnb.html ${JS_OUT_DIR}
 )
 endif()
 
