@@ -12,6 +12,9 @@
 
 <div class="container">
   <h2>Neural Network Builder in WebAssembly</h2>
+  <div class="alert alert-danger" role="alert">
+    <span id="loading_msg">Loading the Neural Network Builder library. Please wait ...</span>
+  </div>
   <div class="alert alert-warning" role="alert">
     <p>To run this demo, use a browser which has support for WebAssembly, and optionally SIMD if you checked that
       option.</p>
@@ -29,25 +32,27 @@
     <div class="panel-body">
         <div class="form-group">
           <p><b>Training</b></p>
-          <label class="checkbox-inline"><input type="checkbox" id="train_err">log_training_error</label>
-          <label class="checkbox-inline"><input type="checkbox" id="train_acc">log_training_accuracy</label>
-          <label class="checkbox-inline"><input type="checkbox" id="train_time">log_training_time</label>
+          <label class="checkbox-inline"><input type="checkbox" id="train_err" checked>log_training_error</label>
+          <label class="checkbox-inline"><input type="checkbox" id="train_acc" checked>log_training_accuracy</label>
+          <label class="checkbox-inline"><input type="checkbox" id="train_time" checked>log_training_time</label>
         </div>
       <div class="form-group">
         <p><b>Testing</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="test_err">log_testing_error</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_acc">log_testing_accuracy</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_conf">log_testing_confusion_matrix</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_time">log_testing_time</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_err" checked>log_testing_error</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_acc" checked>log_testing_accuracy</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_conf" checked>log_testing_confusion_matrix</label>
+        <label class="checkbox-inline"><input type="checkbox" id="test_time" checked>log_testing_time</label>
       </div>
       <div class="form-group">
         <p><b>Prediction</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_res">log_prediction_results</label>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_time">log_prediction_time</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_res" checked>log_prediction_results</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_time" checked>log_prediction_time</label>
       </div>
       <div class="form-group">
         <p><b>Other</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="use_simd">use_simd</label>
+        <label class="checkbox-inline">
+          <input type="checkbox" id="use_simd">use_simd
+        </label>
       </div>
     </div>
   </div>
@@ -84,9 +89,9 @@ model.AddDenseOutputLayer(l2);</textarea>
       <p><b>A - Layers functions (forward, backward, etc...) </b></p>
       <div class="form-group">
         <div class="row">
-          <div class="col-xs-3">
+          <div class="col-xs-12">
             <label class="checkbox-inline">
-              <input type="checkbox" checked="checked" disabled="disabled">Compile this function
+              <input type="checkbox" checked="checked" disabled="disabled" id="layers_compile">Compile this function
             </label>
           </div>
         </div>
@@ -144,8 +149,8 @@ model.AddDenseOutputLayer(l2);</textarea>
         <textarea class="form-control" id="train_data" rows="4"></textarea>
       </div>
       <div class="form-group">
-        <label for="train_label">Training label</label>
-        <textarea class="form-control" id="train_label" rows="4"></textarea>
+        <label for="train_labels">Training label</label>
+        <textarea class="form-control" id="train_labels" rows="4"></textarea>
       </div>
       <div class="form-group">
         <label>Example data and labels for learning OR logic function</label>
@@ -179,8 +184,8 @@ model.AddDenseOutputLayer(l2);</textarea>
         <textarea class="form-control" id="test_data" rows="4"></textarea>
       </div>
       <div class="form-group">
-        <label for="test_label">Testing label</label>
-        <textarea class="form-control" id="test_label" rows="4"></textarea>
+        <label for="test_labels">Testing label</label>
+        <textarea class="form-control" id="test_labels" rows="4"></textarea>
       </div>
     </div>
 
@@ -203,7 +208,8 @@ model.AddDenseOutputLayer(l2);</textarea>
           </div>
           <div class="col-xs-3">
             <label class="checkbox-inline">
-              <input type="checkbox" checked="checked" disabled="disabled">Compile initialization functions
+              <input type="checkbox" checked="checked" disabled="disabled" id="init_compile">
+              Compile initialization functions
               <p><small><em>Generate "data" sections in WebAssebly</em></small></p>
             </label>
           </div>
@@ -218,10 +224,11 @@ model.AddDenseOutputLayer(l2);</textarea>
     </div>
     <div class="panel-body">
       <div class="form-group">
-        <button type="button" class="btn btn-primary btn-md" onclick="">Build model</button>
-        <button type="button" class="btn btn-secondary btn-md" onclick="">Download wasm</button>
-        <button type="button" class="btn btn-secondary btn-md" oncancel="">Download wat</button>
+        <button type="button" class="btn btn-primary btn-md" onclick="CreateModel()">Build model</button>
+        <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWasm()">Download wasm</button>
+        <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWat()">Download wat</button>
       </div>
+      <div class="" role="alert" id="build_msg"></div>
     </div>
   </div>
 
@@ -231,15 +238,15 @@ model.AddDenseOutputLayer(l2);</textarea>
     </div>
     <div class="panel-body">
       <div class="form-group">
-        <button type="button" class="btn btn-info btn-md" onclick="">Run Training</button>
-        <button type="button" class="btn btn-info btn-md" onclick="">Run Testing</button>
-        <button type="button" class="btn btn-info btn-md" onclick="">Download weights</button>
+        <button type="button" class="btn btn-info btn-md" onclick="RunTrain()">Run Training</button>
+        <button type="button" class="btn btn-info btn-md" onclick="RunTest()">Run Testing</button>
+        <button type="button" class="btn btn-info btn-md" onclick="DownloadWeights()">Download weights</button>
       </div>
       <div class="form-group">
         <div class="input-group">
           <input type="text" class="form-control" id="import_weights" title="Import weights" placeholder="Optional">
           <span class="input-group-btn">
-            <button class="btn btn-info" type="button">Import weights</button>
+            <button class="btn btn-info" type="button" onclick="ImportWeights()">Import weights</button>
           </span>
         </div>
       </div>
@@ -248,8 +255,9 @@ model.AddDenseOutputLayer(l2);</textarea>
         <textarea class="form-control" id="pred_data" rows="4"></textarea>
       </div>
       <div class="form-group">
-        <button type="button" class="btn btn-info btn-md" onclick="">Run Predict</button>
+        <button type="button" class="btn btn-info btn-md" onclick="RunPredictions()">Run Predict</button>
       </div>
+      <div class="" role="alert" id="use_msg"></div>
     </div>
   </div>
 </div>
@@ -257,74 +265,200 @@ model.AddDenseOutputLayer(l2);</textarea>
 <script src="./compiled_model.js"></script>
 <script src="./nnb_js.js"></script>
 <script>
-  /*
-  var nnb = Module;
+  // Variable for holding the final model and compiled_model
+  window.model = null;
+  window.compiled_model = null;
+
+  // Wait for the library to be loaded
+  let nnb = Module;
   nnb.onRuntimeInitialized = function() {
-    // Create model options
-    let options = new nnb.ModelOptions();
-    // options.log_training_error = true;
-    // options.log_training_accuracy = true;
-    options.log_training_time = true;
-    options.log_testing_error = true;
-    options.log_testing_accuracy = true;
-    options.log_testing_confusion_matrix = true;
-    options.log_testing_time = true;
-    options.log_prediction_results = true;
-    options.log_prediction_time = true;
-    options.use_simd = false;
+    // Update message
+    let load_msg_obj = document.getElementById('loading_msg');
+    load_msg_obj.innerText = "Library loaded, now you can use this demo page";
+    load_msg_obj.closest('div').className = "alert alert-success";
+  };
 
-    // Create model
-    let model = new nnb.Model(options);
-
-    // Create layers
-    let l0 = new nnb.DenseInputLayerDescriptor(2);
-    l0.SetKeepProb(1.0);
-    model.AddDenseInputLayer(l0);
-
-    let l1 = new nnb.DenseHiddenLayerDescriptor(2, "sigmoid");
-    l1.SetKeepProb(1.0);
-    l1.SetWeightType("xavier_uniform");
-    model.AddDenseHiddenLayer(l1);
-
-    let l2 = new nnb.DenseOutputLayerDescriptor(2, "sigmoid");
-    l2.SetWeightType("lecun_uniform");
-    model.AddDenseOutputLayer(l2);
-
-    // Start compiling
-    let data = nnb.ToMatrix([[0, 0], [0, 1], [1, 0], [1, 1]]);
-    let labels = nnb.ToMatrix([[1, 0], [0, 1], [0, 1], [0, 1]]);
-    let epoch = 10000;
-    let training_batch = 1;
-    let testing_batch = 1;
-    let prediction_batch = 1;
-    let loss = "mean-squared-error";
-    let learning_rate = 0.02;
-    model.SetLayers();
-    model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);
-    model.CompileTrainingFunction(epoch, learning_rate, data, labels);
-    model.CompileTestingFunction(data, labels);
-    model.CompilePredictionFunctions();
-    model.CompileWeightsFunctions();
-    model.CompileInitialization();
-    if(model.Validate()) {
-      let buffer = nnb.ToUint8Array(model.ToWasm());
-      let compiled_model = new CompiledModel();
-      const lib = WebAssembly.instantiate(buffer, compiled_model.Imports());
-      lib.then(wasm => {
-        compiled_model.SetWasm(wasm);
-        console.log("Training ...");
-        compiled_model.Train();
-        console.log("Testing ...");
-        compiled_model.Test();
-        console.log("Predicting ...");
-        compiled_model.Predict([[0, 0]]);
-        compiled_model.Predict([[0, 1]]);
-        compiled_model.Predict([[1, 0]]);
-        compiled_model.Predict([[1, 1]]);
+  function TextareaToF32Matrix(id) {
+    let textarea = document.getElementById(id);
+    let matrix = [];
+    textarea.value.split('\n').forEach((line) => {
+      let row = [];
+      line.split(' ').forEach((num) => {
+        row.push(parseFloat(num));
       });
+      matrix.push(row);
+    });
+    return matrix;
+  }
+
+  function Download(filename, text) {
+    let element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+    element.setAttribute('download', filename);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  }
+
+  function DownloadWasm() {
+    let msg_obj = document.getElementById('build_msg');
+    if(window.model != null) {
+      Download("model.wasm", window.model.ToWasm());
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build the model to download the wasm file";
+      msg_obj.className = "alert alert-danger";
     }
   }
-  */
+
+  function DownloadWat() {
+    let msg_obj = document.getElementById('build_msg');
+    if(window.model != null) {
+      Download("model.wat", window.model.ToWat(true, true));
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build the model to download the wat file";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
+  // Create model from the form values
+  function CreateModel() {
+    // Build message
+    let build_obj = document.getElementById('build_msg');
+    build_obj.innerText = "Building. Please wait ...";
+    build_obj.className = "alert alert-warning";
+
+    // Create model options
+    let options = new nnb.ModelOptions();
+    options.log_training_error            = document.getElementById('train_err').checked;
+    options.log_training_accuracy         = document.getElementById('train_acc').checked;
+    options.log_training_time             = document.getElementById('train_time').checked;
+    options.log_testing_error             = document.getElementById('test_err').checked;
+    options.log_testing_accuracy          = document.getElementById('test_acc').checked;
+    options.log_testing_confusion_matrix  = document.getElementById('test_conf').checked;
+    options.log_testing_time              = document.getElementById('test_time').checked;
+    options.log_prediction_results        = document.getElementById('pred_res').checked;
+    options.log_prediction_time           = document.getElementById('pred_time').checked;
+    options.use_simd                      = document.getElementById('use_simd').checked;
+
+    // Create model
+    window.model = new nnb.Model(options);
+
+    // Create layers
+    eval(document.getElementById('layers').value);
+    window.model.SetLayers();
+
+    // Load data
+    let train_data = TextareaToF32Matrix('train_data');
+    let train_labels = TextareaToF32Matrix('train_labels');
+    let test_data = TextareaToF32Matrix('test_data');
+    let test_labels = TextareaToF32Matrix('test_labels');
+    let epoch = parseInt(document.getElementById('epoch').value);
+    let training_batch = parseInt(document.getElementById('train_batch').value);
+    let testing_batch = parseInt(document.getElementById('test_batch').value);
+    let prediction_batch = parseInt(document.getElementById('pred_batch').value);
+    let loss = document.getElementById('loss_func').value;
+    let learning_rate = parseFloat(document.getElementById('learning_rate').value);
+
+    if(document.getElementById('layers_compile').checked) {
+      window.model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);
+    }
+    if(document.getElementById('train_compile').checked) {
+      window.model.CompileTrainingFunction(epoch, learning_rate, nnb.ToMatrix(train_data), nnb.ToMatrix(train_labels));
+    }
+    if(document.getElementById('test_compile').checked) {
+      window.model.CompileTestingFunction(nnb.ToMatrix(test_data), nnb.ToMatrix(test_labels));
+    }
+    if(document.getElementById('pred_compile').checked) {
+      window.model.CompilePredictionFunctions();
+    }
+    if(document.getElementById('weights_compile').checked) {
+      window.model.CompileWeightsFunctions();
+    }
+    if(document.getElementById('init_compile').checked) {
+      window.model.CompileInitialization();
+    }
+
+    if(window.model.Validate()) {
+      let buffer = nnb.ToUint8Array(window.model.ToWasm());
+      window.compiled_model = new CompiledModel();
+      const lib = WebAssembly.instantiate(buffer, window.compiled_model.Imports());
+      lib.then(wasm => {
+        window.compiled_model.SetWasm(wasm);
+        build_obj.innerText = "Build successful!";
+        build_obj.className = "alert alert-success";
+      });
+    } else {
+      build_obj.innerText = "Build failed, the generated wasm is not valid. Please report this issue.";
+      build_obj.className = "alert alert-danger";
+    }
+  }
+
+  function RunTrain() {
+    let msg_obj = document.getElementById('use_msg');
+    if(window.compiled_model != null) {
+      window.compiled_model.Train();
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build model before training";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
+  function RunTest() {
+    let msg_obj = document.getElementById('use_msg');
+    if(window.compiled_model != null) {
+      window.compiled_model.Test();
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build model before testing";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
+  function RunPredictions() {
+    let msg_obj = document.getElementById('use_msg');
+    if(window.compiled_model != null) {
+      window.compiled_model.Predict(TextareaToF32Matrix('pred_data'));
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build model before predicting";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
+  function DownloadWeights() {
+    let msg_obj = document.getElementById('use_msg');
+    if(window.compiled_model != null) {
+      Download("weights.json", JSON.stringify(window.compiled_model.ExtractWeights()));
+      msg_obj.innerText = "";
+      msg_obj.className = "";
+    } else {
+      msg_obj.innerText = "Build model before downloading weights";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
+  function ImportWeights() {
+    let msg_obj = document.getElementById('use_msg');
+    let weights = document.getElementById('import_weights');
+    if(window.compiled_model != null) {
+      window.compiled_model.ImportWeights(JSON.parse(weights.value))
+      msg_obj.innerText = "Weights imported successfully!";
+      msg_obj.className = "alert alert-success";
+    } else {
+      msg_obj.innerText = "Build model before importing weights";
+      msg_obj.className = "alert alert-danger";
+    }
+  }
+
 </script>
 </body>
 </html>
