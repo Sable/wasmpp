@@ -369,21 +369,22 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
   training_labels_vals_ = labels;
   AllocateTraining();
 
-  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     // Set learning rate
     f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
 
-    assert(locals.size() == 8);
-    auto time = locals[0];
-    auto cost_mean = locals[1];
-    auto accuracy = locals[2];
-    auto epoch = locals[3];
-    auto train_addr = locals[4];
-    auto label_addr = locals[5];
-    auto vi32_1 = locals[6];
-    auto vi32_2 = locals[7];
+    assert(locals.size() == 9);
+    auto time_total = locals[0];
+    auto time_epoch = locals[1];
+    auto cost_mean = locals[2];
+    auto accuracy = locals[3];
+    auto epoch = locals[4];
+    auto train_addr = locals[5];
+    auto label_addr = locals[6];
+    auto vi32_1 = locals[7];
+    auto vi32_2 = locals[8];
 
     auto train_begin = training_batch_.front()->Memory()->Begin();
     auto train_end = training_batch_.back()->Memory()->End();
@@ -391,11 +392,11 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
     auto label_begin = training_labels_batch_.front()->Memory()->Begin();
     auto label_size = training_labels_batch_.front()->Memory()->Bytes();
 
-    if(options_.log_training_time) {
-      // Start training timer
-      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
-    }
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
+      if(options_.log_training_time) {
+        // Start epoch training timer
+        b1->Insert(MakeLocalSet(time_epoch, MakeCall(builtins_.system.TimeF64(), {})));
+      }
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
       b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
       b1->Insert(MakeLocalSet(accuracy, MakeF32Const(0)));
@@ -452,13 +453,18 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
             MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(training_vals_.size()))
         }));
       }
+      if(options_.log_training_time) {
+        // Log training time
+        b1->Insert(MakeLocalSet(time_epoch, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time_epoch))));
+        b1->Insert(GenerateCompoundAssignment(time_total, Opcode::F64Add, MakeLocalGet(time_epoch)));
+        b1->Insert(MakeCall(builtins_.message.LogTrainingTime(), {
+          MakeLocalGet(epoch),
+          MakeLocalGet(time_epoch),
+          MakeLocalGet(time_total)
+        }));
+      }
     }));
 
-    if(options_.log_training_time) {
-      // Log training time
-      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
-      f.Insert(MakeCall(builtins_.message.LogTrainingTime(), {MakeLocalGet(time)}));
-    }
 
     if(options_.log_training_confusion_matrix) {
       assert(layers_.back()->Position() == Output);

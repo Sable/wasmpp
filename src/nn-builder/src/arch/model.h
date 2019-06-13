@@ -62,9 +62,21 @@ private:
   uint32_t prediction_batch_size_;
 
   // Limits
+  // MAX_FLOAT_PER_DATA value is arbitrary, but large
+  // enough to have a total number of data segments
+  // less than 100K which is currently the limit
+  // for WebAssembly engines.
+  // To see how this number is affecting the generated
+  // wasm, generate the wat format, and count the number
+  // of data segments "(data ..."
   const uint32_t MAX_FLOAT_PER_DATA = 1048576; // 2^20
 
   // Model members
+  // TODO Ideally time, accuracy, etc... should all be
+  //       members of the model. And instead of printing them
+  //       from the generated wasm, we should expose their values
+  //       using exported functions so that the user of the wasm
+  //       decides when, how and where to print them.
   wasmpp::Memory* learning_rate = nullptr;
 
   // Model functions
