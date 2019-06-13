@@ -226,13 +226,6 @@ void FullyConnectedLayer::AllocateMemory() {
   if(Position() != Output) {
     ALLOCATE_MEMORY(inverted_dropout_, Nodes(), NetworkModel()->TrainingBatchSize());
   }
-  if(Position() == Output) {
-    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
-    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
-    ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
-    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Training], Nodes(), Nodes());
-    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Testing], Nodes(), Nodes());
-  }
 }
 
 void FullyConnectedLayer::MakeData(wabt::Var memory) {
@@ -321,10 +314,47 @@ FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
   return this;
 }
 
-wabt::ExprList* DenseOutputLayer::HardmaxPredictions(uint8_t mode_index, std::vector<Var> locals) {
+DenseOutputLayer* DenseOutputLayer::Softmax(uint8_t mode_index) {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  return NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(mode_index),
-                                                                PredictionsHardmax(mode_index), locals);
+  softmax_[mode_index] = true;
+  return this;
+}
+
+DenseOutputLayer* DenseOutputLayer::Hardmax(uint8_t mode_index) {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  hardmax_[mode_index] = true;
+  return this;
+}
+
+wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) {
+  // Not need to assert the mode_index because it is done
+  // when calling the parent function
+
+  assert(locals.size() == 7);
+  auto vi32_1 = locals[0];
+  auto vi32_2 = locals[1];
+  auto vi32_3 = locals[2];
+  auto vi32_4 = locals[3];
+  auto vi32_5 = locals[4];
+  auto vf32_1 = locals[5];
+  auto vf32_2 = locals[6];
+
+  ExprList* e = new ExprList();
+  Merge(e, FullyConnectedLayer::Forward(mode_index, input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+
+  // Apply softmax
+  if(softmax_[mode_index]) {
+    Merge(e, NetworkModel()->Snippets().matrix->MatrixColumnSoftmax(Predictions(mode_index),
+                                                                    PredictionsSoftmax(mode_index),
+                                                                    {vi32_1, vi32_2, vi32_3, vf32_1, vf32_2}));
+  }
+  // Apply hardmax
+  if(hardmax_[mode_index]) {
+    Merge(e, NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(mode_index),
+                                                                    PredictionsHardmax(mode_index),
+                                                                    {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  }
+  return e;
 }
 
 wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals) {
@@ -338,8 +368,7 @@ wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt
   auto vi32_6 = locals[5];
 
   wabt::ExprList *e = new ExprList();
-  // First apply hardmax
-  Merge(e, HardmaxPredictions(mode_index, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  assert(hardmax_[mode_index]);
   // Second update confusion matrix
   Merge(e, NetworkModel()->Snippets().analysis->ConfusionMatrixUpdate(ConfusionMatrix(mode_index),
                                                                       PredictionsHardmax(mode_index),
@@ -360,14 +389,25 @@ wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(uint8_t mode_index, Va
   auto vi32_5 = locals[4];
 
   wabt::ExprList* e = new ExprList();
-  // First apply hardmax
-  Merge(e, HardmaxPredictions(mode_index, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+  assert(hardmax_[mode_index]);
   // Second count correct predictions
   Merge(e, NetworkModel()->Snippets().analysis->CorrectPredictions(PredictionsHardmax(mode_index),
                                                                    snippet::RelocMat(Predictions(mode_index),
                                                                                      target_begin), result,
                                                                    {vi32_1, vi32_2, vi32_3}));
   return e;
+}
+
+void DenseOutputLayer::AllocateMemory() {
+  FullyConnectedLayer::AllocateMemory();
+  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
+  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
+  ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Training], Nodes(), Nodes());
+  ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Testing], Nodes(), Nodes());
 }
 
 ds::NDArray* DenseOutputLayer::Predictions(uint8_t mode_index) const {
@@ -378,6 +418,11 @@ ds::NDArray* DenseOutputLayer::Predictions(uint8_t mode_index) const {
 ds::NDArray* DenseOutputLayer::PredictionsHardmax(uint8_t mode_index) const {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   return A_hardmax_[mode_index];
+}
+
+ds::NDArray* DenseOutputLayer::PredictionsSoftmax(uint8_t mode_index) const {
+  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
+  return A_softmax_[mode_index];
 }
 
 ds::NDArray* DenseOutputLayer::ConfusionMatrix(uint8_t mode_index) const {

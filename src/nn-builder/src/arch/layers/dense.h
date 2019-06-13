@@ -31,19 +31,16 @@ protected:
   ds::NDArray* db_ = nullptr;
   // Regularization
   ds::NDArray* inverted_dropout_ = nullptr;
-  // Other
-  ds::NDArray* A_hardmax_[3]; // Training, Testing, Prediction
-  ds::NDArray* confusion_matrix_[2]; // Training, Testing
 public:
   FullyConnectedLayer(LayerPosition position, uint32_t nodes, builtins::ActivationFunction act_func) :
       TypedLayer(position), nodes_(nodes), activation_func_(act_func) {}
   uint32_t Nodes() const { return nodes_; }
-  wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals);
-  wabt::ExprList* Backward(wabt::Var input_begin, wabt::Var taget_begin, std::vector<wabt::Var> locals);
+  wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) override;
+  wabt::ExprList* Backward(wabt::Var input_begin, wabt::Var taget_begin, std::vector<wabt::Var> locals) override;
 
   // Memory functions
-  void AllocateMemory();
-  void MakeData(wabt::Var memory);
+  void AllocateMemory() override ;
+  void MakeData(wabt::Var memory) override ;
 
   // Layer configuration
   virtual FullyConnectedLayer* KeepProb(float keep_prob);
@@ -64,20 +61,34 @@ class DenseOutputLayer : public FullyConnectedLayer {
 public:
   DenseOutputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
       FullyConnectedLayer(Output, nodes, act_func) {}
+  // Allocate memory
+  void AllocateMemory() override ;
   // Get arrays
   ds::NDArray* Predictions(uint8_t mode_index) const;
   ds::NDArray* PredictionsHardmax(uint8_t mode_index) const;
+  ds::NDArray* PredictionsSoftmax(uint8_t mode_index) const;
   ds::NDArray* ConfusionMatrix(uint8_t mode_index) const;
   // Error out on keep probability on the output layer
-  FullyConnectedLayer* KeepProb(float keep_prob);
+  FullyConnectedLayer* KeepProb(float keep_prob) override ;
+  // Apply softmax to predictions
+  DenseOutputLayer* Softmax(uint8_t mode_index);
+  // Apply hardmax to predictions
+  DenseOutputLayer* Hardmax(uint8_t mode_index);
+  // Augment forward algorithm
+  wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
+
   // Compute cost value
   wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);
-  // Perform hardmax on the predictions
-  wabt::ExprList* HardmaxPredictions(uint8_t mode_index, std::vector<wabt::Var> locals);
   // Update confusion matrix
   wabt::ExprList* UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals);
   // Count number of correct predictions
   wabt::ExprList* CountCorrectPredictions(uint8_t mode_index, wabt::Var target_begin, wabt::Var result, std::vector<wabt::Var> locals);
+private:
+  bool softmax_[3] = {false, false, false}; // Training, Testing, Prediction
+  bool hardmax_[3] = {false, false, false}; // Training, Testing, Prediction
+  ds::NDArray* A_hardmax_[3]; // Training, Testing, Prediction
+  ds::NDArray* A_softmax_[3]; // Training, Testing, Prediction
+  ds::NDArray* confusion_matrix_[2]; // Training, Testing
 };
 
 class DenseInputLayer : public FullyConnectedLayer {

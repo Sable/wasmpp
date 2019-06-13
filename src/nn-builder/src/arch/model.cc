@@ -44,6 +44,19 @@ void Model::SetLayers(std::vector<Layer *> layers) {
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     f.Insert(MakeI32Const((uint32_t)layers_.size()));
   });
+
+  // Overwrite some configuration as needed
+  if(layers.back()->Type() == FullyConnected) {
+    auto out_layer = static_cast<DenseOutputLayer*>(layers.back());
+    if(options_.log_training_confusion_matrix || options_.log_training_accuracy) {
+      out_layer->Hardmax(Training);
+    }
+    if(options_.log_testing_confusion_matrix || options_.log_testing_accuracy) {
+      out_layer->Hardmax(Testing);
+    }
+  } else {
+    assert(!"Not implemented!");
+  }
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
@@ -203,23 +216,28 @@ void Model::MakeLayersData(wabt::Var memory) {
 }
 
 Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
-  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32};
+  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32};
   return module_manager_.MakeFunction(nullptr, {{Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    assert(locals.size() == 6);
+    assert(locals.size() == 7);
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
     auto vi32_4 = locals[3];
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
+    auto vf32_2 = locals[6];
 
     assert(params.size() == 1);
     auto input_begin = params[0];
 
     for(int l=0; l < layers_.size(); ++l) {
       if(layers_[l]->Type() == FullyConnected) {
-        f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+        if(layers_[l]->Position() == Output) {
+          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1,vf32_2}));
+        } else {
+          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+        }
       } else {
         assert(!"Not implemented!");
       }
