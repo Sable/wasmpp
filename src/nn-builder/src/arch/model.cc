@@ -501,14 +501,14 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
 
     if(options_.log_forward) {
 #define LOG_TIME_MEMBER(name) \
-  f.Insert(MakeCall(builtins_.system.PrintF64(), { dense_forward_logging_members_.Get##name()}));
+  f.Insert(MakeCall(builtins_.message.LogForward##name(), { dense_forward_logging_members_.Get##name()}));
   DENSE_FORWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
 #undef LOG_TIME_MEMBER
     }
 
     if(options_.log_backward) {
 #define LOG_TIME_MEMBER(name) \
-  f.Insert(MakeCall(builtins_.system.PrintF64(), { dense_backward_logging_members_.Get##name()}));
+  f.Insert(MakeCall(builtins_.message.LogBackward##name(), { dense_backward_logging_members_.Get##name()}));
       DENSE_BACKWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
 #undef LOG_TIME_MEMBER
     }

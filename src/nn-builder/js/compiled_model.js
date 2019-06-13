@@ -262,6 +262,65 @@ class CompiledModel {
       log_prediction_time: (time) => {
         console.log("Prediction time:", time, "ms");
       },
+      // Forward timing
+      log_forward_Time: () => {
+        console.log("\n>> Forward algorithm steps time:");
+      },
+      log_forward_A_1: (time) => {
+        console.log("A) Z[l] = W[l] . A[l-1] + b[l]");
+        console.log("    1) Z[l] = W[l] . A[l-1]:", time);
+      },
+      log_forward_A_2: (time) => {
+        console.log("    2) Z[l] = Z[l] + b[l]:", time);
+      },
+      log_forward_B: (time) => {
+        console.log("B) A[l] = g[l](Z[l]):", time);
+      },
+      // Backward timing
+      log_backward_Time: () => {
+        console.log("\n>> Backward algorithm steps time:");
+      },
+      log_backward_A: (time) => {
+        console.log("A) dA[L] = L(T, A[L]):", time);
+      },
+      log_backward_B_1: (time) => {
+        console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
+        console.log("    1) dZ[l] = g'[l](Z[l]):", time);
+      },
+      log_backward_B_2: (time) => {
+        console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
+      },
+      log_backward_C_1: (time) => {
+        console.log("C) dW[l] = (1/m) dZ[l] . A[l-1]^T");
+        console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
+      },
+      log_backward_C_2: (time) => {
+        console.log("    2) dW[l] = (1/m) dW[l]:", time);
+      },
+      log_backward_D_1: (time) => {
+        console.log("D) db[l] = (1/m) dZ[l]");
+        console.log("    1) db[l] = SUM(dZ[l], row wise):", time);
+      },
+      log_backward_D_2: (time) => {
+        console.log("    2) db[l] = (1/m) db[l]:", time);
+      },
+      log_backward_E: (time) => {
+        console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
+      },
+      log_backward_F_1: (time) => {
+        console.log("F) W[l] = W[l] - alpha * dW[l]");
+        console.log("    1) dW[l] = alpha * dW[l]:", time);
+      },
+      log_backward_F_2: (time) => {
+        console.log("    2) W[l] = W[l] - dW[l]:", time);
+      },
+      log_backward_G_1: (time) => {
+        console.log("G) b[l] = b[l] - alpha * db[l]");
+        console.log("    1) db[l] = alpha * db[l]:", time);
+      },
+      log_backward_G_2: (time) => {
+        console.log("    2) b[l] = b[l] - db[l]:", time);
+      },
     };
 
     let system_imports = {
