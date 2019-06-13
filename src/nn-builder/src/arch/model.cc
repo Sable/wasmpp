@@ -629,19 +629,33 @@ void Model::CompilePredictionFunctions() {
       f.Insert(MakeCall(builtins_.message.LogPredictionTime(), {MakeLocalGet(time)}));
     }
 
-    if(options_.log_prediction_results) {
-      // Print predictions
-      assert(layers_.back()->Position() == Output);
-      if(layers_.back()->Type() == FullyConnected) {
-        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+    // Print predictions
+    assert(layers_.back()->Position() == Output);
+    if(layers_.back()->Type() == FullyConnected) {
+      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+      if(options_.log_prediction_results) {
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
         }));
-      } else {
-        assert(!"Not implemented!");
       }
+      if(options_.log_prediction_results_softmax) {
+        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Begin()),
+            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[0]),
+            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[1])
+        }));
+      }
+      if(options_.log_prediction_results_hardmax) {
+        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
+            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Begin()),
+            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Shape()[0]),
+            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Shape()[1])
+        }));
+      }
+    } else {
+      assert(!"Not implemented!");
     }
   });
 }

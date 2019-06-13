@@ -355,7 +355,7 @@ wabt::ExprList* MatrixSnippet::MatrixColumnSoftmax(NDArray* src, NDArray* dst, s
           MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeI32Const(src->Begin())));
       // Compute dst current cell address
       auto dst_curr_addr = MakeBinary(Opcode::I32Add,
-          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeI32Const(src->Begin())));
+          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeI32Const(dst->Begin())));
       // Compute exp(x) and store it in a local
       b2->Insert(MakeLocalSet(cell_exp, MakeCall(builtins_->math.Exp(), {
         MakeF32Load(src_curr_addr)
@@ -372,7 +372,7 @@ wabt::ExprList* MatrixSnippet::MatrixColumnSoftmax(NDArray* src, NDArray* dst, s
     b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
       // Compute dst current cell address and cache it in a local
       b2->Insert(MakeLocalSet(cell_addr, MakeBinary(Opcode::I32Add,
-          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(src->Begin())))));
+          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(dst->Begin())))));
       // Divide value by SUM(exp(x[i]))
       b2->Insert(MakeF32Store(MakeLocalGet(cell_addr),
                               MakeBinary(Opcode::F32Div, MakeF32Load(MakeLocalGet(cell_addr)),
