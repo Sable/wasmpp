@@ -240,7 +240,7 @@ class CompiledModel {
 
     let message_imports = {
       log_training_time: (epoch, time_epoch, time_total) => {
-        console.log("Training time at epoch", epoch, "is", time_epoch, "ms", 
+        console.log("Training time at epoch", epoch + 1, "is", time_epoch, "ms", 
           "and total time so far is", time_total, "ms");
       },
       log_training_error: (epoch, error) => {
