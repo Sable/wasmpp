@@ -51,7 +51,7 @@ protected:
                                                       ds::NDArray* dst_matrix, std::vector<wabt::Var> locals);
 
 public:
-  MatrixSnippet(wasmpp::LabelManager* label_manager) : Snippet(label_manager) {}
+  MatrixSnippet(wasmpp::LabelManager* label_manager, arch::BuiltinFunctions* builtins) : Snippet(label_manager, builtins) {}
 
   // Dot product of two matrices
   virtual wabt::ExprList* MatrixDot(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals);
@@ -91,6 +91,9 @@ public:
   // Apply hard-max on each matrix column
   virtual wabt::ExprList* MatrixColumnHardmax(ds::NDArray* src, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
+  // Apply soft-max on each matrix column
+  virtual wabt::ExprList* MatrixColumnSoftmax(ds::NDArray* src, ds::NDArray* dst, std::vector<wabt::Var> locals);
+
   // Sum row values and store them in destination vector
   virtual wabt::ExprList* MatrixHorizontalSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals);
 };
@@ -103,7 +106,8 @@ private:
   wabt::ExprList* MatrixVectorBinaryOperation(wabt::Opcode op, ds::NDArray* matrix, ds::NDArray* vector,
                                               ds::NDArray* dst_matrix, std::vector<wabt::Var> locals) override;
 public:
-  explicit MatrixSnippetSimd(wasmpp::LabelManager* label_manager) : MatrixSnippet(label_manager) {}
+  explicit MatrixSnippetSimd(wasmpp::LabelManager* label_manager, arch::BuiltinFunctions* builtins) :
+      MatrixSnippet(label_manager, builtins) {}
 
   wabt::ExprList* MatrixScalar(ds::NDArray* src, wabt::ExprList* scalar, ds::NDArray* dst,
                                std::vector<wabt::Var> locals) override ;

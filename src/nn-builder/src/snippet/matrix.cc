@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/snippet/matrix.h>
 #include <src/wasmpp/wasm-instructions-gen.h>
+#include <src/nn-builder/src/arch/model.h>
 
 namespace nn {
 namespace snippet {
@@ -321,6 +322,61 @@ wabt::ExprList* MatrixSnippet::MatrixColumnHardmax(NDArray* src, NDArray* dst, s
       }, [&](BlockBody f) {
         f.Insert(MakeF32Store(MakeLocalGet(curr_addr), MakeF32Const(0)));
       }));
+    }));
+  }));
+  return e;
+}
+
+wabt::ExprList* MatrixSnippet::MatrixColumnSoftmax(NDArray* src, NDArray* dst, std::vector<Var> locals) {
+  MATRIX_CHECK(src);
+  MATRIX_CHECK(dst);
+  MATRIX_SAME_SHAPE(src, dst);
+  assert(locals.size() == 5);
+
+  auto row = locals[0];
+  auto col = locals[1];
+  auto cell_addr = locals[2];
+  auto total_exp = locals[3];
+  auto cell_exp = locals[4];
+
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t width_bytes = src->Shape()[1] * type_size;
+  uint32_t height_bytes = src->Shape()[0] * width_bytes;
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, GenerateRangeLoop(label_manager_, col, 0, width_bytes, type_size, {}, [&](BlockBody* b1) {
+    b1->Insert(MakeLocalSet(total_exp, MakeF32Const(0)));
+    // First compute the e(x[i]) column wise
+    // store the result of each cell in the destination matrix
+    // keep track of the total SUM(exp(x[i]))
+    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
+      // Compute src current cell address
+      auto src_curr_addr = MakeBinary(Opcode::I32Add,
+          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeI32Const(src->Begin())));
+      // Compute dst current cell address
+      auto dst_curr_addr = MakeBinary(Opcode::I32Add,
+          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeI32Const(src->Begin())));
+      // Compute exp(x) and store it in a local
+      b2->Insert(MakeLocalSet(cell_exp, MakeCall(builtins_->math.Exp(), {
+        MakeF32Load(src_curr_addr)
+      })));
+      // Store exp(x) at the destination cell
+      b2->Insert(MakeF32Store(dst_curr_addr, MakeLocalGet(cell_exp)));
+      // Add exp(x) to the local storing the total
+      b2->Insert(GenerateCompoundAssignment(total_exp, Opcode::F32Add, MakeLocalGet(cell_exp)));
+    }));
+
+    // Now that we have all the exp(x[i]) for a column
+    // in the destination matrix, divide them by
+    // SUM(exp(e[i]))
+    b1->Insert(GenerateRangeLoop(label_manager_, row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
+      // Compute dst current cell address and cache it in a local
+      b2->Insert(MakeLocalSet(cell_addr, MakeBinary(Opcode::I32Add,
+          MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeI32Const(src->Begin())))));
+      // Divide value by SUM(exp(x[i]))
+      b2->Insert(MakeF32Store(MakeLocalGet(cell_addr),
+                              MakeBinary(Opcode::F32Div, MakeF32Load(MakeLocalGet(cell_addr)),
+                                         MakeLocalGet(total_exp))));
     }));
   }));
   return e;

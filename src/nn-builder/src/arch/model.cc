@@ -72,11 +72,11 @@ void Model::InitBuiltinDefinitions() {
 
 void Model::InitSnippets() {
   if(options_.use_simd) {
-    snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label());
-    snippets_.analysis = new snippet::AnalysisSnippet(&module_manager_.Label());
+    snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label(), &builtins_);
+    snippets_.analysis = new snippet::AnalysisSnippet(&module_manager_.Label(), &builtins_);
   } else {
-    snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label());
-    snippets_.analysis = new snippet::AnalysisSnippetSimd(&module_manager_.Label());
+    snippets_.matrix = new snippet::MatrixSnippet(&module_manager_.Label(), &builtins_);
+    snippets_.analysis = new snippet::AnalysisSnippetSimd(&module_manager_.Label(), &builtins_);
   }
 }
 
@@ -576,10 +576,18 @@ void Model::CompilePredictionFunctions() {
 
   // TODO add options for hardmax and softmax
   // Create prediction function
-  module_manager_.MakeFunction("predict", {}, {Type::F64},
+  auto local_types = {Type::F64, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32};
+  module_manager_.MakeFunction("predict", {}, local_types,
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    assert(locals.size() == 1);
+    assert(locals.size() == 8);
     auto time = locals[0];
+    auto vi32_1 = locals[1];
+    auto vi32_2 = locals[2];
+    auto vi32_3 = locals[3];
+    auto vi32_4 = locals[4];
+    auto vi32_5 = locals[5];
+    auto vf32_1 = locals[6];
+    auto vf32_2 = locals[7];
 
     if(options_.log_prediction_time) {
       // Start prediction timer
@@ -602,6 +610,12 @@ void Model::CompilePredictionFunctions() {
       assert(layers_.back()->Position() == Output);
       if(layers_.back()->Type() == FullyConnected) {
         auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
+//        f.Insert(snippets_.matrix->MatrixColumnHardmax(out_layer->Predictions(Prediction),
+//                                                       out_layer->Predictions(Prediction),
+//                                                       {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
+//        f.Insert(snippets_.matrix->MatrixColumnSoftmax(out_layer->Predictions(Prediction),
+//                                                       out_layer->Predictions(Prediction),
+//                                                       {vi32_1, vi32_2, vi32_3, vf32_1, vf32_2}));
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),

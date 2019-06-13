@@ -35,6 +35,20 @@ struct ModelOptions {
   WeightDistributionOptions weights_options;
 };
 
+struct BuiltinFunctions {
+  BuiltinFunctions(builtins::ActivationOptions activation_options) : activation(activation_options) {}
+  builtins::Activation activation;
+  builtins::Loss loss;
+  builtins::Math math;
+  builtins::System system;
+  builtins::Message message;
+};
+
+struct SnippetCode {
+  snippet::MatrixSnippet* matrix;
+  snippet::AnalysisSnippet* analysis;
+};
+
 class Model {
 private:
   ModelOptions options_;
@@ -74,20 +88,10 @@ private:
   std::vector<std::vector<float>> testing_labels_vals_;
 
   // Builtin functions
-  struct Builtins {
-    Builtins(builtins::ActivationOptions activation_options) : activation(activation_options) {}
-    builtins::Activation activation;
-    builtins::Loss loss;
-    builtins::Math math;
-    builtins::System system;
-    builtins::Message message;
-  } builtins_;
+  BuiltinFunctions builtins_;
 
   // Snippet codes
-  struct Snippets {
-    snippet::MatrixSnippet* matrix;
-    snippet::AnalysisSnippet* analysis;
-  } snippets_;
+  SnippetCode snippets_;
 
   // Initialize builtins
   void InitBuiltinImports();
@@ -136,8 +140,8 @@ public:
   wabt::ExprList* GetLearningRate();
 
   bool Validate();
-  const Builtins& Builtins() const { return builtins_; }
-  const Snippets& Snippets() const { return snippets_; }
+  const BuiltinFunctions& Builtins() const { return builtins_; }
+  const SnippetCode& Snippets() const { return snippets_; }
   uint32_t TrainingBatchSize() const { return training_batch_size_; }
   uint32_t TestingBatchSize() const { return testing_batch_size_; }
   uint32_t PredictionBatchSize() const { return prediction_batch_size_; }

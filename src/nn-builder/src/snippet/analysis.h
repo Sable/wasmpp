@@ -8,7 +8,8 @@ namespace snippet {
 
 class AnalysisSnippet : public Snippet {
 public:
-  AnalysisSnippet(wasmpp::LabelManager* label_manager) : Snippet(label_manager) {}
+  AnalysisSnippet(wasmpp::LabelManager* label_manager, arch::BuiltinFunctions* builtins) :
+      Snippet(label_manager, builtins) {}
 
   // Update confusion matrix
   // This function expects the prediction to be hard-maxed already
@@ -23,7 +24,8 @@ public:
 
 class AnalysisSnippetSimd : public AnalysisSnippet {
 public:
-  AnalysisSnippetSimd(wasmpp::LabelManager* label_manager) : AnalysisSnippet(label_manager) {}
+  AnalysisSnippetSimd(wasmpp::LabelManager* label_manager, arch::BuiltinFunctions* builtins) :
+      AnalysisSnippet(label_manager, builtins) {}
 };
 
 } // namespace snippet
