@@ -29,6 +29,8 @@ struct ModelOptions {
   bool log_testing_time = false;
   bool log_testing_confusion_matrix = false;
   bool log_prediction_results = false;
+  bool log_prediction_results_softmax = false;
+  bool log_prediction_results_hardmax = false;
   bool log_prediction_time = false;
   bool use_simd = false;
   builtins::ActivationOptions activation_options;

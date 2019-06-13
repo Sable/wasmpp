@@ -54,6 +54,12 @@ void Model::SetLayers(std::vector<Layer *> layers) {
     if(options_.log_testing_confusion_matrix || options_.log_testing_accuracy) {
       out_layer->Hardmax(Testing);
     }
+    if(options_.log_prediction_results_softmax) {
+      out_layer->Softmax(Prediction);
+    }
+    if(options_.log_prediction_results_hardmax) {
+      out_layer->Hardmax(Prediction);
+    }
   } else {
     assert(!"Not implemented!");
   }
@@ -628,12 +634,6 @@ void Model::CompilePredictionFunctions() {
       assert(layers_.back()->Position() == Output);
       if(layers_.back()->Type() == FullyConnected) {
         auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-//        f.Insert(snippets_.matrix->MatrixColumnHardmax(out_layer->Predictions(Prediction),
-//                                                       out_layer->Predictions(Prediction),
-//                                                       {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
-//        f.Insert(snippets_.matrix->MatrixColumnSoftmax(out_layer->Predictions(Prediction),
-//                                                       out_layer->Predictions(Prediction),
-//                                                       {vi32_1, vi32_2, vi32_3, vf32_1, vf32_2}));
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
