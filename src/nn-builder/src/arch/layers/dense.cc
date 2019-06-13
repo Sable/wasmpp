@@ -36,6 +36,20 @@ uint32_t FullyConnectedLayer::BiasSizeInBytes() const {
   return b_->Memory()->Bytes();
 }
 
+#define START_TIME() \
+  Merge(e, NetworkModel()->DenseForwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));
+
+#define END_TIME(name)                                                                                  \
+    if(NetworkModel()->Options().log_forward) {                                                         \
+      Merge(e, NetworkModel()->DenseForwardTime()                                                       \
+      .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
+                         NetworkModel()->DenseForwardTime().GetTime())));                               \
+      Merge(e, NetworkModel()->DenseForwardTime()                                                       \
+      .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseForwardTime().GetTime(),               \
+                         NetworkModel()->DenseForwardTime().Get##name())));                             \
+    }
+
+
 wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   assert(locals.size() == 6);
@@ -52,19 +66,25 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
     auto prev_layer = NetworkModel()->Layers()[LayerIndex() - 1];
     if(prev_layer->Type() == FullyConnected) {
       auto prev_fc_layer = static_cast<FullyConnectedLayer*>(prev_layer);
-      // Z[l] = W[l] . A[l-1] + b[l]
-      // 1) Z[l] = W[l] . A[l-1]
-      // 2) Z[l] = Z[l] + b[l]
+      // A) Z[l] = W[l] . A[l-1] + b[l]
+      //    1) Z[l] = W[l] . A[l-1]
+      //    2) Z[l] = Z[l] + b[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDot(W_, (LayerIndex() == 1) ?
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index], input_begin) :
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index]), Z_[mode_index],
                                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+      END_TIME(A_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixVectorAddition(Z_[mode_index], b_, Z_[mode_index],
                                                                              {vi32_1, vi32_2, vi32_3, vi32_4}));
+      END_TIME(A_2)
 
-      // A[l] = g(Z[l])
+      // B) A[l] = g(Z[l])
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
                                                                    {vi32_1, vi32_2}, false));
+      END_TIME(B)
     } else {
       assert(!"Not implemented!");
     }
@@ -108,6 +128,22 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
   });
 }
 
+#undef START_TIME
+#undef END_TIME
+
+#define START_TIME() \
+  Merge(e, NetworkModel()->DenseBackwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));
+
+#define END_TIME(name)                                                                                  \
+    if(NetworkModel()->Options().log_backward) {                                                        \
+      Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
+      .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
+                         NetworkModel()->DenseBackwardTime().GetTime())));                              \
+      Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
+      .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseBackwardTime().GetTime(),              \
+                         NetworkModel()->DenseBackwardTime().Get##name())));                            \
+    }
+
 wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var target_begin,
                                               std::vector<wabt::Var> locals) {
   assert(locals.size() == 7);
@@ -124,7 +160,8 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
     assert(LayerIndex() > 0);
 
     if(Position() == Output) {
-      // dA[L] = L(T, A[L])
+      START_TIME()
+      // A) dA[L] = L(T, A[L])
       Merge(e, MakeCall(NetworkModel()->Loss().loss, {
           MakeLocalGet(target_begin),
           MakeI32Const(A_[Model::Mode::Training]->Begin()),
@@ -132,58 +169,81 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
           MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
           MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
       }));
+      END_TIME(A)
     }
 
     auto prev_layer = NetworkModel()->Layers()[LayerIndex()-1];
     if(prev_layer->Type() == FullyConnected) {
       auto prev_fc_layer = static_cast<FullyConnectedLayer*>(prev_layer);
-      // dZ[l] = dA[l] * g'(Z[l])
-      // 1) dZ[l] = g'(Z[l])
-      // 2) dZ[l] = dA[l] * dZ[l]
+      // B) dZ[l] = dA[l] * g'(Z[l])
+      //    1) dZ[l] = g'(Z[l])
+      //    2) dZ[l] = dA[l] * dZ[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
                                                                    activation_func_, dZ_, {vi32_1, vi32_2}, true));
+      END_TIME(B_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
+      END_TIME(B_2)
 
-      // dW[l] = (1/m) dZ[l] . A[l-1]^T
-      // 1) dW[l] = dZ[l] . A[l-1]^T
-      // 2) dW[l] = (1/m) dW[l]
+      // C) dW[l] = (1/m) dZ[l] . A[l-1]^T
+      //    1) dW[l] = dZ[l] . A[l-1]^T
+      //    2) dW[l] = (1/m) dW[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDotRT(dZ_, (LayerIndex() == 1) ?
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training],
                                                                                      input_begin) :
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training]), dW_,
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
+      END_TIME(C_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_,
                                                                MakeF32Const(1.0f/ NetworkModel()->TrainingBatchSize()), dW_,
                                                                {vi32_1, vi32_2, vf32_1}));
+      END_TIME(C_2)
 
-      // db[l] = (1/m) dZ[l]
-      // 1) db[l] = SUM(dZ[l], row wise)
-      // 2) db[l] = (1/m) db[l]
+      // D) db[l] = (1/m) dZ[l]
+      //    1) db[l] = SUM(dZ[l], row wise)
+      //    2) db[l] = (1/m) db[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixHorizontalSum(dZ_, db_,
                                                                       {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
+      END_TIME(D_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_,
                                                                MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
                                                                db_, {vi32_1, vi32_2, vf32_1}));
+      END_TIME(D_2)
 
       if(LayerIndex() > 1) {
-        // dA[l-1] = W[l]^T . dZ[l]
+        // E) dA[l-1] = W[l]^T . dZ[l]
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixDotLT(W_, dZ_, prev_fc_layer->dA_,
                                                                 {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+        END_TIME(E)
       }
 
-      // W[l] = W[l] - alpha * dW[l]
-      // 1) dW[l] = alpha * dW[l]
-      // 2) W[l] = W[l] - dW[l]
+      // F) W[l] = W[l] - alpha * dW[l]
+      //    1) dW[l] = alpha * dW[l]
+      //    2) W[l] = W[l] - dW[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, NetworkModel()->GetLearningRate(), dW_,
                                                                {vi32_1, vi32_2, vf32_1}));
+      END_TIME(F_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(W_, dW_, W_, {vi32_1, vi32_2}));
+      END_TIME(F_2)
 
-      // b[l] = b[l] - alpha * db[l]
-      // 1) db[l] = alpha * db[l]
-      // 2) b[l] = b[l] - db[l]
+      // G) b[l] = b[l] - alpha * db[l]
+      //    1) db[l] = alpha * db[l]
+      //    2) b[l] = b[l] - db[l]
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, NetworkModel()->GetLearningRate(), db_,
                                                                {vi32_1, vi32_2, vf32_1}));
+      END_TIME(G_1)
+      START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(b_, db_, b_, {vi32_1, vi32_2}));
+      END_TIME(G_2)
     } else {
       assert(!"Not implemented!");
     }

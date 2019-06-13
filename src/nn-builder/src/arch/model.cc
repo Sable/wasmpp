@@ -14,6 +14,30 @@ using namespace layer;
 
 #define V128_IF_SIMD(t) (options_.use_simd ? Type::V128 : (t))
 
+#define DEFINE_TIME_MEMBERS(name)                                     \
+ExprList* DenseForwardTimeMembers::Get##name() {                      \
+  assert(name != nullptr);                                            \
+  return MakeF64Load(MakeI32Const(name->Begin()));                    \
+}                                                                     \
+ExprList* DenseForwardTimeMembers::Set##name(wabt::ExprList *value) { \
+  assert(name != nullptr);                                            \
+  return MakeF64Store(MakeI32Const(name->Begin()), value);            \
+}
+DENSE_FORWARD_TIME_MEMBERS(DEFINE_TIME_MEMBERS)
+#undef DEFINE_TIME_MEMBERS
+
+#define DEFINE_TIME_MEMBERS(name)                                       \
+ExprList* DenseBackwardTimeMembers::Get##name() {                       \
+  assert(name != nullptr);                                              \
+  return MakeF64Load(MakeI32Const(name->Begin()));                      \
+}                                                                       \
+ExprList* DenseBackwardTimeMembers::Set##name(wabt::ExprList *value) {  \
+  assert(name != nullptr);                                              \
+  return MakeF64Store(MakeI32Const(name->Begin()), value);              \
+}
+DENSE_BACKWARD_TIME_MEMBERS(DEFINE_TIME_MEMBERS)
+#undef DEFINE_TIME_MEMBERS
+
 wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
   assert(learning_rate != nullptr);
   return MakeF32Store(MakeI32Const(learning_rate->Begin()), val);
@@ -105,7 +129,16 @@ void Model::InitSnippets() {
 
 void Model::AllocateMembers() {
   learning_rate = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-}
+#define ALLOCATE_TIME_MEMBERS(name) \
+  dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
+  DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
+#undef ALLOCATE_TIME_MEMBERS
+
+#define ALLOCATE_TIME_MEMBERS(name) \
+  dense_backward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
+  DENSE_BACKWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
+#undef ALLOCATE_TIME_MEMBERS
+  }
 
 void Model::AllocateLayers() {
   for(auto l = 0; l < layers_.size(); ++l) {
@@ -453,6 +486,7 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
             MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(training_vals_.size()))
         }));
       }
+
       if(options_.log_training_time) {
         // Log training time
         b1->Insert(MakeLocalSet(time_epoch, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time_epoch))));
@@ -465,6 +499,19 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
       }
     }));
 
+    if(options_.log_forward) {
+#define LOG_TIME_MEMBER(name) \
+  f.Insert(MakeCall(builtins_.system.PrintF64(), { dense_forward_logging_members_.Get##name()}));
+  DENSE_FORWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
+#undef LOG_TIME_MEMBER
+    }
+
+    if(options_.log_backward) {
+#define LOG_TIME_MEMBER(name) \
+  f.Insert(MakeCall(builtins_.system.PrintF64(), { dense_backward_logging_members_.Get##name()}));
+      DENSE_BACKWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
+#undef LOG_TIME_MEMBER
+    }
 
     if(options_.log_training_confusion_matrix) {
       assert(layers_.back()->Position() == Output);

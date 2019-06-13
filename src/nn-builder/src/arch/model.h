@@ -32,6 +32,8 @@ struct ModelOptions {
   bool log_prediction_results_softmax = false;
   bool log_prediction_results_hardmax = false;
   bool log_prediction_time = false;
+  bool log_forward = false;
+  bool log_backward = false;
   bool use_simd = false;
   builtins::ActivationOptions activation_options;
   WeightDistributionOptions weights_options;
@@ -50,6 +52,46 @@ struct SnippetCode {
   snippet::MatrixSnippet* matrix;
   snippet::AnalysisSnippet* analysis;
 };
+
+// The fields in the below structs correspond
+// to the forward and backward algorithm steps
+// in a fully connected layer
+// read the comment to associate each
+// field to its function
+// The fields are used for logging the time
+// it takes to compute each step of the neural
+// network algorithms
+#define DEFINE_MEMBERS(name)                        \
+  wasmpp::Memory* name = nullptr;                   \
+  wabt::ExprList* Get##name();                      \
+  wabt::ExprList* Set##name(wabt::ExprList* value);
+#define DENSE_FORWARD_TIME_MEMBERS(V) \
+  V(Time)                             \
+  V(A_1)                              \
+  V(A_2)                              \
+  V(B)
+struct DenseForwardTimeMembers {
+  DENSE_FORWARD_TIME_MEMBERS(DEFINE_MEMBERS)
+};
+
+#define DENSE_BACKWARD_TIME_MEMBERS(V)  \
+  V(Time)                               \
+  V(A)                                  \
+  V(B_1)                                \
+  V(B_2)                                \
+  V(C_1)                                \
+  V(C_2)                                \
+  V(D_1)                                \
+  V(D_2)                                \
+  V(E)                                  \
+  V(F_1)                                \
+  V(F_2)                                \
+  V(G_1)                                \
+  V(G_2)
+struct DenseBackwardTimeMembers {
+  DENSE_BACKWARD_TIME_MEMBERS(DEFINE_MEMBERS)
+};
+#undef DEFINE_MEMBERS
 
 class Model {
 private:
@@ -78,6 +120,8 @@ private:
   //       using exported functions so that the user of the wasm
   //       decides when, how and where to print them.
   wasmpp::Memory* learning_rate = nullptr;
+  DenseForwardTimeMembers dense_forward_logging_members_;
+  DenseBackwardTimeMembers dense_backward_logging_members_;
 
   // Model functions
   wabt::Var forward_training_func_;
@@ -152,6 +196,8 @@ public:
   // Members accessors
   wabt::ExprList* SetLearningRate(wabt::ExprList* val);
   wabt::ExprList* GetLearningRate();
+  DenseForwardTimeMembers DenseForwardTime() const { return dense_forward_logging_members_; }
+  DenseBackwardTimeMembers DenseBackwardTime() const { return dense_backward_logging_members_; }
 
   bool Validate();
   const BuiltinFunctions& Builtins() const { return builtins_; }

@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  uint32_t training_limit = 6000;
+  uint32_t training_limit = 3000;
   uint32_t testing_limit = 1000;
   std::vector<std::vector<float>> train_data;
   std::vector<std::vector<float>> train_labels;
@@ -130,6 +130,8 @@ int main(int argc, char *argv[]) {
   options.log_testing_error = true;
   options.log_testing_time = true;
   options.log_testing_confusion_matrix = true;
+  options.log_forward = true;
+  options.log_backward = true;
   options.use_simd = true;
   Model model(options);
   model.SetLayers({
