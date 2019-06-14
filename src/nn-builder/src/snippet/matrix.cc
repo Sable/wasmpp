@@ -625,11 +625,6 @@ wabt::ExprList* MatrixSnippetSimd::MatrixDotRT(nn::ds::NDArray *lhs, nn::snippet
   uint32_t width_remainder = lhs_width_bytes % WASMPP_V128_SIZE;
   uint32_t simd_width_bytes = lhs_width_bytes - width_remainder;
 
-  // Cannot optimize if matrix width bytes is too small
-  if(lhs_width_bytes < WASMPP_V128_SIZE) {
-    return MatrixSnippet::MatrixDotRT(lhs, rhs, dst, locals);
-  }
-
   auto rhs_rows = locals[0];
   auto lhs_col_rhs_rows = locals[1];
   auto lhs_row_offset = locals[2];
@@ -638,7 +633,52 @@ wabt::ExprList* MatrixSnippetSimd::MatrixDotRT(nn::ds::NDArray *lhs, nn::snippet
   auto res_cell = locals[5];
   auto res_128 = locals[6];
 
+  // Handle special case where the number of columns is 1
+  // and rhs has more than 4 elements
   wabt::ExprList* e = new wabt::ExprList();
+  if(lhs->Shape()[1] == 1 && rhs_height_bytes >= WASMPP_V128_SIZE) {
+
+    uint32_t height_remainder = rhs_height_bytes % WASMPP_V128_SIZE;
+    uint32_t simd_height_bytes = rhs_height_bytes - height_remainder;
+
+    Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
+    Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
+      // Reset rhs pointer to top row
+      if(rhs.HasBeginVar()) {
+        b1->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
+      } else {
+        b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Memory()->Begin())));
+      }
+
+      // Apply SIMD while possible
+      b1->Insert(GenerateRangeLoop(label_manager_, rhs_rows, 0, simd_height_bytes, simd_type_size, {}, [&](BlockBody* b2) {
+        auto lhs_op = MakeUnary(Opcode::F32X4Splat, MakeF32Load(MakeLocalGet(lhs_row_offset)));
+        auto rhs_op = MakeV128Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_rows), MakeLocalGet(rhs_row_offset)));
+        auto dest_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(dst_row_offset), MakeLocalGet(rhs_rows));
+        b2->Insert(MakeV128Store(dest_addr, MakeBinary(Opcode::F32X4Mul, lhs_op, rhs_op)));
+      }));
+
+      // Fallback to regular computation
+      if(height_remainder > 0) {
+        b1->Insert(GenerateDoWhileLoop(label_manager_, rhs_rows, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
+          auto lhs_op = MakeF32Load(MakeLocalGet(lhs_row_offset));
+          auto rhs_op = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_rows), MakeLocalGet(rhs_row_offset)));
+          auto dest_addr = MakeBinary(Opcode::I32Add, MakeLocalGet(dst_row_offset), MakeLocalGet(rhs_rows));
+          b2->Insert(MakeF32Store(dest_addr, MakeBinary(Opcode::F32Mul, lhs_op, rhs_op)));
+        }));
+      }
+
+      // Move lhs pointer to next row
+      b1->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(lhs_width_bytes)));
+    }));
+    return e;
+  }
+
+  // Cannot optimize if matrix width bytes is too small
+  if(lhs_width_bytes < WASMPP_V128_SIZE) {
+    return MatrixSnippet::MatrixDotRT(lhs, rhs, dst, locals);
+  }
+
   Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
   Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), rhs_height_bytes, {}, [&](BlockBody* b1) {
     if(rhs.HasBeginVar()) {
