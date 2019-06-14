@@ -197,9 +197,10 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
       END_TIME(C_1)
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_,
-                                                               MakeF32Const(1.0f/ NetworkModel()->TrainingBatchSize()), dW_,
-                                                               {vi32_1, vi32_2, vf32_1}));
+      if(NetworkModel()->TrainingBatchSize() > 1) {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, MakeF32Const(1.0f / NetworkModel()->TrainingBatchSize()),
+                                                                 dW_, {vi32_1, vi32_2, vf32_1}));
+      }
       END_TIME(C_2)
 
       // D) db[l] = (1/m) dZ[l]
@@ -210,9 +211,10 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
                                                                       {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
       END_TIME(D_1)
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_,
-                                                               MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
-                                                               db_, {vi32_1, vi32_2, vf32_1}));
+      if(NetworkModel()->TrainingBatchSize() > 1) {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
+                                                                 db_, {vi32_1, vi32_2, vf32_1}));
+      }
       END_TIME(D_2)
 
       if(LayerIndex() > 1) {
