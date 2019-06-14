@@ -351,8 +351,8 @@ class CompiledModel {
           for (let i = 0; i < rows * cols; i++) {
             if (mat1[i] !== mat2[i]) {
               console.error("Matrix equality failed!");
-              imports.System.print_table_f32(mat1_index, rows, cols);
-              imports.System.print_table_f32(mat2_index, rows, cols);
+              system_imports.print_table_f32(mat1_index, rows, cols);
+              system_imports.print_table_f32(mat2_index, rows, cols);
               return;
             }
           }
