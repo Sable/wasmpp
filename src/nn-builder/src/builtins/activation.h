@@ -11,9 +11,9 @@ struct ActivationFunction {
   wabt::Var derivative;
 };
 struct ActivationOptions {
-  double linear_slope = 1;
-  double leaky_relu_slope = 0.01;
-  double elu_slope = 0.01;
+  float linear_slope = 1;
+  float leaky_relu_slope = 0.01;
+  float elu_slope = 0.01;
 };
 class Activation : public Builtin {
 private:
