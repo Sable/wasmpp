@@ -12,6 +12,7 @@ include_directories(${PROJECT_SOURCE_DIR})
 
 if(USE_WABT_EXPERIMENTAL)
     set(WABT_DIR_NAME "${WABT_DIR_NAME}-experimental")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWABT_EXPERIMENTAL")
 endif()
 
 # Include WABT
