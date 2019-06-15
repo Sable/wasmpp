@@ -1,3 +1,6 @@
 [submodule "third_party/wabt"]
 	path = third_party/wabt
 	url = https://github.com/WebAssembly/wabt
+[submodule "third_party/wabt-experimental"]
+	path = third_party/wabt-experimental
+	url = https://github.com/amirbawab/wabt-experimental

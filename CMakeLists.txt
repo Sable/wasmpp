@@ -1,18 +1,25 @@
 cmake_minimum_required(VERSION 3.5)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
-option(BUILD_TESTS "Build GTest-based tests" OFF)
+option(BUILD_TESTS "Build GTest-based tests (for wabt)" OFF)
+option(USE_WABT_EXPERIMENTAL "Use wabt-experimental instead of wabt" OFF)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
+set(WABT_DIR_NAME "wabt")
 include_directories(${PROJECT_SOURCE_DIR})
 
+if(USE_WABT_EXPERIMENTAL)
+    set(WABT_DIR_NAME "${WABT_DIR_NAME}-experimental")
+endif()
+
 # Include WABT
+message(">> Using ${WABT_DIR_NAME} for building the project")
 add_subdirectory(third_party/wabt)
 # Extra includes to use wabt
-include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt)
-include_directories(${PROJECT_SOURCE_DIR}/third_party/wabt/src)
+include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME})
+include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME}/src)
 include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
 
 # All targets
@@ -36,23 +43,23 @@ target_link_libraries(${NN_BUILDER} ${WASMPP})
 
 # Create emscripten bindings
 if(EMSCRIPTEN)
-add_executable(${NN_BUILDER_JS} src/nn-builder/emscripten/bindings.cc)
-target_link_libraries(${NN_BUILDER_JS} ${NN_BUILDER})
-set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "      \
---bind                                                              \
---pre-js ${PROJECT_SOURCE_DIR}/src/nn-builder/emscripten/utils.js   \
--s WASM=1                                                           \
--s ALLOW_MEMORY_GROWTH=1                                            \
--s NO_EXIT_RUNTIME=0                                                \
-")
-# Create distribution directory
-set(JS_OUT_DIR ${PROJECT_SOURCE_DIR}/dist/)
-file(MAKE_DIRECTORY ${JS_OUT_DIR})
-add_custom_command(TARGET ${NN_BUILDER_JS} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/${NN_BUILDER_JS}.* ${JS_OUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/js/compiled_model.js ${JS_OUT_DIR}
-    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/examples/js/nnb.html ${JS_OUT_DIR}
-)
+    add_executable(${NN_BUILDER_JS} src/nn-builder/emscripten/bindings.cc)
+    target_link_libraries(${NN_BUILDER_JS} ${NN_BUILDER})
+    set_target_properties(${NN_BUILDER_JS} PROPERTIES LINK_FLAGS "      \
+    --bind                                                              \
+    --pre-js ${PROJECT_SOURCE_DIR}/src/nn-builder/emscripten/utils.js   \
+    -s WASM=1                                                           \
+    -s ALLOW_MEMORY_GROWTH=1                                            \
+    -s NO_EXIT_RUNTIME=0                                                \
+    ")
+    # Create distribution directory
+    set(JS_OUT_DIR ${PROJECT_SOURCE_DIR}/dist/)
+    file(MAKE_DIRECTORY ${JS_OUT_DIR})
+    add_custom_command(TARGET ${NN_BUILDER_JS} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/${NN_BUILDER_JS}.* ${JS_OUT_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/js/compiled_model.js ${JS_OUT_DIR}
+        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/examples/js/nnb.html ${JS_OUT_DIR}
+    )
 endif()
 
 # Create test cases
