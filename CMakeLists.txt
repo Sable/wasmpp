@@ -21,7 +21,7 @@ add_subdirectory(third_party/${WABT_DIR_NAME})
 # Extra includes to use wabt
 include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME})
 include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME}/src)
-include_directories(${CMAKE_BINARY_DIR}/third_party/wabt/)
+include_directories(${CMAKE_BINARY_DIR}/third_party/${WABT_DIR_NAME})
 
 # All targets
 set(WABT wabt)
