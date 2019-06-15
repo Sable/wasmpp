@@ -161,7 +161,6 @@ wabt::ExprList* MakeLocalTree(wabt::Var var, wabt::ExprList* val) {
 wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args) {
   wabt::ExprList* e = new wabt::ExprList();
   for(auto arg : args) {
-    ERROR_UNLESS(arg != nullptr, "arg cannot be null");
     Merge(e, arg);
   }
   e->push_back(wabt::MakeUnique<wabt::CallExpr>(var));
@@ -204,5 +203,16 @@ wabt::ExprList* Make##opcode(wabt::ExprList* index, wabt::ExprList* val, wabt::A
 }
 STORE_INSTRUCTIONS_LIST(DEFINE_STORE)
 #undef DEFINE_STORE
+
+#ifdef WABT_EXPERIMENTAL
+wabt::ExprList* MakeNativeCall(wabt::Var var, std::vector<wabt::ExprList*> args) {
+  wabt::ExprList* e = new wabt::ExprList();
+  for(auto arg : args) {
+    Merge(e, arg);
+  }
+  e->push_back(wabt::MakeUnique<wabt::CallNativeExpr>(var));
+  return e;
+}
+#endif // WABT_EXPERIMENTAL
 
 } // namespace wasmpp

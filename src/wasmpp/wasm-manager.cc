@@ -190,6 +190,20 @@ wabt::Var ModuleManager::MakeFuncImport(std::string module, std::string function
   return import_name;
 }
 
+#ifdef WABT_EXPERIMENTAL
+wabt::Var ModuleManager::MakeNativeFunction(std::string function, wabt::FuncSignature sig) {
+  CheckImportOrdering();
+  wabt::Var native_name(label_manager_.Next());
+  auto field = wabt::MakeUnique<wabt::FuncNativeModuleField>();
+  field->func_native.var_name = native_name.name();
+  field->func_native.decl.sig = std::move(sig);
+  field->func_native.native_name = function;
+  ResolveImplicitlyDefinedFunctionType(field->func_native.decl);
+  module_.AppendField(std::move(field));
+  return native_name;
+}
+#endif // WABT_EXPERIMENTAL
+
 wabt::Var ModuleManager::MakeMemory(uint32_t init_page, uint32_t max, bool shared) {
   wabt::Var memory_name(label_manager_.Next());
   auto field = wabt::MakeUnique<wabt::MemoryModuleField>(wabt::Location(), memory_name.name());

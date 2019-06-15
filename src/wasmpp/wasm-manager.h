@@ -116,6 +116,9 @@ public:
   wabt::Var MakeMemory(uint32_t init_page, uint32_t max = 0, bool shared = false);
   void MakeData(wabt::Var var, uint32_t index, std::vector<DataEntry> entries);
   void MakeMemoryExport(std::string name, wabt::Var var);
+#ifdef WABT_EXPERIMENTAL
+  wabt::Var MakeNativeFunction(std::string function, wabt::FuncSignature sig);
+#endif // WABT_EXPERIMENTAL
 };
 
 } // namespace wasm
