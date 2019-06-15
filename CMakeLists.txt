@@ -17,7 +17,7 @@ endif()
 
 # Include WABT
 message(">> Using ${WABT_DIR_NAME} for building the project")
-add_subdirectory(third_party/wabt)
+add_subdirectory(third_party/${WABT_DIR_NAME})
 # Extra includes to use wabt
 include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME})
 include_directories(${PROJECT_SOURCE_DIR}/third_party/${WABT_DIR_NAME}/src)
