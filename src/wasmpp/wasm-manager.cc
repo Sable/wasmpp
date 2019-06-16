@@ -10,6 +10,7 @@
 #include <sstream>
 #include <stack>
 #include <algorithm>
+#include "wasm-manager.h"
 
 namespace wasmpp {
 
@@ -22,6 +23,41 @@ ContentManager::ContentManager(LabelManager* label_manager, wabt::ExprList *expr
   ERROR_UNLESS(expr_list != nullptr, "expr_list cannot be null");
   label_manager_ = label_manager;
   expr_list_ = expr_list;
+}
+
+DataEntry DataEntry::MakeI32(uint32_t val) {
+  DataEntry entry;
+  entry.val.i32 = val;
+  entry.kind = I32;
+  return entry;
+}
+
+DataEntry DataEntry::MakeI64(uint64_t val) {
+  DataEntry entry;
+  entry.val.i64 = val;
+  entry.kind = I64;
+  return entry;
+}
+
+DataEntry DataEntry::MakeF32(float val) {
+  DataEntry entry;
+  entry.val.f32 = val;
+  entry.kind = F32;
+  return entry;
+}
+
+DataEntry DataEntry::MakeF64(double val) {
+  DataEntry entry;
+  entry.val.f64 = val;
+  entry.kind = F64;
+  return entry;
+}
+
+DataEntry DataEntry::MakeByte(uint8_t val) {
+  DataEntry entry;
+  entry.val.byte = val;
+  entry.kind = Byte;
+  return entry;
 }
 
 Memory::Memory(uint32_t begin, uint32_t end) {

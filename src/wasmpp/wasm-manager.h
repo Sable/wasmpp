@@ -71,11 +71,11 @@ struct DataEntry {
     if(kind == F64) return WASMPP_F64_SIZE;
     assert(kind == Byte); return 1;
   }
-  static DataEntry MakeI32(uint32_t val) { return {{.i32 = val}, I32}; }
-  static DataEntry MakeI64(uint64_t val) { return {{.i64 = val}, I64}; }
-  static DataEntry MakeF32(float val) { return {{.f32 = val}, F32}; }
-  static DataEntry MakeF64(double val) { return {{.f64 = val}, F64}; }
-  static DataEntry MakeByte(uint8_t val) { return {{.byte = val}, Byte}; }
+  static DataEntry MakeI32(uint32_t val);
+  static DataEntry MakeI64(uint64_t val);
+  static DataEntry MakeF32(float val);
+  static DataEntry MakeF64(double val);
+  static DataEntry MakeByte(uint8_t val);
 };
 
 class LabelManager {
