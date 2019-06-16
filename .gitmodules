@@ -4,3 +4,9 @@
 [submodule "third_party/wabt-experimental"]
 	path = third_party/wabt-experimental
 	url = https://github.com/amirbawab/wabt-experimental
+[submodule "third_party/eigen-git-mirror"]
+	path = third_party/eigen-git-mirror
+	url = https://github.com/eigenteam/eigen-git-mirror
+[submodule "third_party/node"]
+	path = third_party/node
+	url = https://github.com/amirbawab/node
