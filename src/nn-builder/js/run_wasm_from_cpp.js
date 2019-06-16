@@ -1,6 +1,12 @@
 const fs = require('fs');
 const {CompiledModel} = require('./compiled_model');
 
+// This is a workaround to omit trap-handlers
+// in the generated machine code
+// Comment: https://github.com/nodejs/node/issues/14927#issuecomment-482919665
+require("../../../third_party/gyp/trap-handler/build/Release/th");
+
+// Warning to enable SIMD in Node
 process.on('unhandledRejection', error => {
   console.error(">> Make sure SIMD is enabled (e.g. nodejs --experimental-wasm-simd)");
   console.error(">> Error message:", error);
