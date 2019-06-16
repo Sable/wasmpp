@@ -122,17 +122,17 @@ int main(int argc, char *argv[]) {
   LoadValues(train_data, train_labels, test_data, test_labels, training_limit, testing_limit);
 
   ModelOptions options;
-  options.log_training_accuracy = true;
-  options.log_training_error = true;
-  options.log_training_time = true;
-  options.log_training_confusion_matrix = true;
-  options.log_testing_accuracy = true;
-  options.log_testing_error = true;
-  options.log_testing_time = true;
-  options.log_testing_confusion_matrix = true;
-  options.log_forward = true;
-  options.log_backward = true;
-  options.use_simd = true;
+  options.log_training_accuracy           = true;
+  options.log_training_error              = true;
+  options.log_training_time               = true;
+  options.log_training_confusion_matrix   = true;
+  options.log_testing_accuracy            = true;
+  options.log_testing_error               = true;
+  options.log_testing_time                = true;
+  options.log_testing_confusion_matrix    = true;
+  options.log_forward                     = true;
+  options.log_backward                    = true;
+  options.use_simd                        = true;
   Model model(options);
   model.SetLayers({
      NewLayer<DenseInputLayer>(784)->WeightType(XavierUniform)->KeepProb(1),

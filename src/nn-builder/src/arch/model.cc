@@ -91,6 +91,9 @@ void Model::SetLayers(std::vector<Layer *> layers) {
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
   AllocateMembers();
+#ifdef WABT_EXPERIMENTAL
+  InitNativeImports();
+#endif
   InitBuiltinImports();
   InitBuiltinDefinitions();
   InitSnippets();
@@ -122,6 +125,20 @@ void Model::InitSnippets() {
     snippets_.analysis = new snippet::AnalysisSnippetSimd(&module_manager_.Label(), &builtins_);
   }
 }
+
+#ifdef WABT_EXPERIMENTAL
+void Model::InitNativeImports() {
+  std::vector<Type> params = {
+      Type::I32, // lhs addr
+      Type::I32, // rhs addr
+      Type::I32, // dst addr
+      Type::I32, // lhs_rows
+      Type::I32, // lhs_cols
+      Type::I32  // rhs_cols
+  };
+  natives_.matrix_dot_product = module_manager_.MakeNativeFunction("matrix_dot_product", {params, {}});
+}
+#endif
 
 #define ALLOCATE_MATRIX(array, rows, cols) \
     array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \

@@ -53,6 +53,12 @@ struct SnippetCode {
   snippet::AnalysisSnippet* analysis;
 };
 
+#ifdef WABT_EXPERIMENTAL
+struct NativeFunctions {
+  wabt::Var matrix_dot_product;
+};
+#endif
+
 // The fields in the below structs correspond
 // to the forward and backward algorithm steps
 // in a fully connected layer
@@ -157,6 +163,14 @@ private:
 
   // Initialize snippets
   void InitSnippets();
+
+#ifdef WABT_EXPERIMENTAL
+  // Native functions
+  NativeFunctions natives_;
+
+  // Initialize native imports
+  void InitNativeImports();
+#endif
 
   // Memory allocation
   void AllocateMembers();
