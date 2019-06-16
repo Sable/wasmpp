@@ -216,6 +216,7 @@ public:
   bool Validate();
   const BuiltinFunctions& Builtins() const { return builtins_; }
   const SnippetCode& Snippets() const { return snippets_; }
+  const NativeFunctions& Natives() const { return natives_; }
   uint32_t TrainingBatchSize() const { return training_batch_size_; }
   uint32_t TestingBatchSize() const { return testing_batch_size_; }
   uint32_t PredictionBatchSize() const { return prediction_batch_size_; }

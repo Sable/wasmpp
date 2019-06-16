@@ -70,10 +70,21 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
       //    1) Z[l] = W[l] . A[l-1]
       //    2) Z[l] = Z[l] + b[l]
       START_TIME()
+#ifdef WABT_EXPERIMENTAL
+      Merge(e, MakeNativeCall(NetworkModel()->Natives().matrix_dot_product, {
+        MakeI32Const(W_->Begin()),
+        (LayerIndex() == 1) ? MakeLocalGet(input_begin) : MakeI32Const(prev_fc_layer->A_[mode_index]->Begin()),
+        MakeI32Const(Z_[mode_index]->Begin()),
+        MakeI32Const(W_->Shape()[0]),
+        MakeI32Const(W_->Shape()[1]),
+        MakeI32Const(prev_fc_layer->A_[mode_index]->Shape()[1])
+      }));
+#else
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDot(W_, (LayerIndex() == 1) ?
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index], input_begin) :
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index]), Z_[mode_index],
                                                             {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+#endif
       END_TIME(A_1)
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixVectorAddition(Z_[mode_index], b_, Z_[mode_index],
