@@ -37,17 +37,19 @@ uint32_t FullyConnectedLayer::BiasSizeInBytes() const {
 }
 
 #define START_TIME() \
-  Merge(e, NetworkModel()->DenseForwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));
+  if(NetworkModel()->Options().log_forward) {                                                                         \
+    Merge(e, NetworkModel()->DenseForwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));  \
+  }
 
-#define END_TIME(name)                                                                                  \
-    if(NetworkModel()->Options().log_forward) {                                                         \
-      Merge(e, NetworkModel()->DenseForwardTime()                                                       \
-      .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
-                         NetworkModel()->DenseForwardTime().GetTime())));                               \
-      Merge(e, NetworkModel()->DenseForwardTime()                                                       \
-      .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseForwardTime().GetTime(),               \
-                         NetworkModel()->DenseForwardTime().Get##name())));                             \
-    }
+#define END_TIME(name)                                                                                \
+  if(NetworkModel()->Options().log_forward) {                                                         \
+    Merge(e, NetworkModel()->DenseForwardTime()                                                       \
+    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
+                       NetworkModel()->DenseForwardTime().GetTime())));                               \
+    Merge(e, NetworkModel()->DenseForwardTime()                                                       \
+    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseForwardTime().GetTime(),               \
+                       NetworkModel()->DenseForwardTime().Get##name())));                             \
+  }
 
 
 wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
@@ -143,17 +145,19 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
 #undef END_TIME
 
 #define START_TIME() \
-  Merge(e, NetworkModel()->DenseBackwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));
+  if(NetworkModel()->Options().log_backward) {                                                                        \
+    Merge(e, NetworkModel()->DenseBackwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}))); \
+  }
 
-#define END_TIME(name)                                                                                  \
-    if(NetworkModel()->Options().log_backward) {                                                        \
-      Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
-      .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
-                         NetworkModel()->DenseBackwardTime().GetTime())));                              \
-      Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
-      .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseBackwardTime().GetTime(),              \
-                         NetworkModel()->DenseBackwardTime().Get##name())));                            \
-    }
+#define END_TIME(name)                                                                                \
+  if(NetworkModel()->Options().log_backward) {                                                        \
+    Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
+    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
+                       NetworkModel()->DenseBackwardTime().GetTime())));                              \
+    Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
+    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseBackwardTime().GetTime(),              \
+                       NetworkModel()->DenseBackwardTime().Get##name())));                            \
+  }
 
 wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var target_begin,
                                               std::vector<wabt::Var> locals) {
