@@ -10,7 +10,7 @@ struct TestBuiltins {
   wabt::Var assert_matrix_eq;
 };
 
-#define NN_TEST() \
+#define NN_TEST(desc) \
     auto _test_function = [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals)
 
 #define ADD_NN_TEST(module_manager, name, ...) \
