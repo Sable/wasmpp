@@ -16,7 +16,7 @@ wabt::ExprList* MatrixSnippet::MatrixDot(NDArray* lhs, RelocMat rhs, NDArray* ds
   ERROR_UNLESS(lhs->Shape()[1] == rhs.Array()->Shape()[0], "lhs and rhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
   ERROR_UNLESS(dst->Shape()[1] == rhs.Array()->Shape()[1], "dst and rhs matrices are not compatible");
-  assert(locals.size() == 6);
+  assert(locals.size() == 7);
 
   auto rhs_col = locals[0];
   auto lhs_col_rhs_rows = locals[1];
@@ -24,6 +24,7 @@ wabt::ExprList* MatrixSnippet::MatrixDot(NDArray* lhs, RelocMat rhs, NDArray* ds
   auto rhs_row_offset = locals[3];
   auto dst_row_offset = locals[4];
   auto res_cell = locals[5];
+  auto used_by_simd = locals[6];
 
   uint32_t type_size = TypeSize(Type::F32);
   uint32_t lhs_width_bytes = lhs->Shape()[1] * type_size;
@@ -712,6 +713,76 @@ wabt::ExprList* MatrixSnippetSimd::MatrixDotRT(nn::ds::NDArray *lhs, nn::snippet
     b1->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(lhs_width_bytes)));
   }));
   return e;
+}
+
+wabt::ExprList* MatrixSnippetSimd::MatrixDot(nn::ds::NDArray *lhs, nn::snippet::RelocMat rhs, nn::ds::NDArray *dst,
+                                             std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(lhs);
+  MATRIX_CHECK(rhs.Array());
+  MATRIX_CHECK(dst);
+  ERROR_UNLESS(lhs->Shape()[1] == rhs.Array()->Shape()[0], "lhs and rhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[0] == lhs->Shape()[0], "dst and lhs matrices are not compatible");
+  ERROR_UNLESS(dst->Shape()[1] == rhs.Array()->Shape()[1], "dst and rhs matrices are not compatible");
+
+  assert(locals.size() == 7);
+  auto rhs_col = locals[0];
+  auto lhs_col_rhs_rows = locals[1];
+  auto lhs_row_offset = locals[2];
+  auto rhs_row_offset = locals[3];
+  auto dst_row_offset = locals[4];
+  auto res_cell = locals[5];
+  auto res_128 = locals[6];
+
+  uint32_t simd_type_size = TypeSize(Type::V128);
+  uint32_t type_size = TypeSize(Type::F32);
+  uint32_t rhs_height_bytes = rhs.Array()->Shape()[0] * type_size;
+  uint32_t height_remainder = rhs_height_bytes % WASMPP_V128_SIZE;
+  uint32_t simd_height_bytes = rhs_height_bytes - height_remainder;
+
+  // Optimize if rhs is a vector
+  if(rhs.Array()->Shape()[1] == 1 && rhs_height_bytes >= WASMPP_V128_SIZE) {
+    wabt::ExprList* e = new wabt::ExprList();
+    Merge(e, MakeLocalSet(lhs_row_offset, MakeI32Const(lhs->Memory()->Begin())));
+    Merge(e, GenerateRangeLoop(label_manager_, dst_row_offset, dst->Memory()->Begin(), dst->Memory()->End(), type_size, {}, [&](BlockBody* b1) {
+      // Reset result local
+      b1->Insert(MakeLocalSet(res_128, MakeUnary(Opcode::F32X4Splat, MakeF32Const(0))));
+
+      // Reset rhs pointer
+      if(rhs.HasBeginVar()) {
+        b1->Insert(MakeLocalSet(rhs_row_offset, MakeLocalGet(rhs.Var())));
+      } else {
+        b1->Insert(MakeLocalSet(rhs_row_offset, MakeI32Const(rhs.Array()->Begin())));
+      }
+
+      // Use SIMD while possible
+      b1->Insert(GenerateRangeLoop(label_manager_, lhs_col_rhs_rows, 0, simd_height_bytes, simd_type_size, {}, [&](BlockBody* b2) {
+        auto lhs_cell = MakeV128Load(MakeLocalGet(lhs_row_offset));
+        auto rhs_cell = MakeV128Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
+        b2->Insert(GenerateCompoundAssignment(res_128, Opcode::F32X4Add, MakeBinary(Opcode::F32X4Mul, lhs_cell, rhs_cell)));
+        b2->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(simd_type_size)));
+      }));
+
+      // Compute result
+      b1->Insert(MakeLocalSet(res_cell, GenerateF32X4HorizontalLTRSum(res_128)));
+
+      // Fallback to regular computation
+      if(height_remainder > 0) {
+        b1->Insert(GenerateDoWhileLoop(label_manager_, lhs_col_rhs_rows, rhs_height_bytes, type_size, {}, [&](BlockBody* b2) {
+          auto lhs_cell = MakeF32Load(MakeLocalGet(lhs_row_offset));
+          auto rhs_cell = MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(rhs_row_offset), MakeLocalGet(lhs_col_rhs_rows)));
+          b2->Insert(GenerateCompoundAssignment(res_cell, Opcode::F32Add, MakeBinary(Opcode::F32Mul, lhs_cell, rhs_cell)));
+          b2->Insert(GenerateCompoundAssignment(lhs_row_offset, Opcode::I32Add, MakeI32Const(type_size)));
+        }));
+      }
+
+      // Store result in destination cell
+      b1->Insert(MakeF32Store(MakeLocalGet(dst_row_offset), MakeLocalGet(res_cell)));
+    }));
+    return e;
+  }
+
+  // Cannot optimize
+  return MatrixSnippet::MatrixDot(lhs, rhs, dst, locals);
 }
 
 } // namespace snippet

@@ -119,6 +119,10 @@ public:
   // The SIMD version of this function generates a result slightly different
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixDotRT(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) override;
+
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float addition
+  wabt::ExprList* MatrixDot(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) override ;
 };
 
 #define MATRIX_CHECK(x) \

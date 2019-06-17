@@ -272,10 +272,11 @@ void Model::MakeLayersData(wabt::Var memory) {
 }
 
 Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
-  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32};
+  std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32,
+                                    V128_IF_SIMD(Type::I32)};
   return module_manager_.MakeFunction(nullptr, {{Type::I32},{}}, locals_types,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-    assert(locals.size() == 7);
+    assert(locals.size() == 8);
     auto vi32_1 = locals[0];
     auto vi32_2 = locals[1];
     auto vi32_3 = locals[2];
@@ -283,6 +284,7 @@ Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
     auto vi32_5 = locals[4];
     auto vf32_1 = locals[5];
     auto vf32_2 = locals[6];
+    auto v128_1 = locals[7];
 
     assert(params.size() == 1);
     auto input_begin = params[0];
@@ -290,9 +292,9 @@ Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
     for(int l=0; l < layers_.size(); ++l) {
       if(layers_[l]->Type() == FullyConnected) {
         if(layers_[l]->Position() == Output) {
-          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1,vf32_2}));
+          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1,vf32_2, v128_1}));
         } else {
-          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1}));
+          f.Insert(layers_[l]->Forward(mode_index, input_begin, {vi32_1,vi32_2,vi32_3,vi32_4,vi32_5,vf32_1, v128_1}));
         }
       } else {
         assert(!"Not implemented!");

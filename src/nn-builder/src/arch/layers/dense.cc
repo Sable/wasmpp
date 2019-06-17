@@ -54,13 +54,14 @@ uint32_t FullyConnectedLayer::BiasSizeInBytes() const {
 
 wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin, std::vector<Var> locals) {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  assert(locals.size() == 6);
+  assert(locals.size() == 7);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
   auto vi32_3 = locals[2];
   auto vi32_4 = locals[3];
   auto vi32_5 = locals[4];
   auto vf32_1 = locals[5];
+  auto v128_1 = locals[6];
 
   ExprList* e = new ExprList();
   if(Position() != Input) {
@@ -85,7 +86,7 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDot(W_, (LayerIndex() == 1) ?
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index], input_begin) :
                                                                 snippet::RelocMat(prev_fc_layer->A_[mode_index]), Z_[mode_index],
-                                                            {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+                                                            {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
       END_TIME(A_1)
       START_TIME()
@@ -407,7 +408,7 @@ wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_be
   // Not need to assert the mode_index because it is done
   // when calling the parent function
 
-  assert(locals.size() == 7);
+  assert(locals.size() == 8);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
   auto vi32_3 = locals[2];
@@ -415,9 +416,10 @@ wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_be
   auto vi32_5 = locals[4];
   auto vf32_1 = locals[5];
   auto vf32_2 = locals[6];
+  auto v128_1 = locals[7];
 
   ExprList* e = new ExprList();
-  Merge(e, FullyConnectedLayer::Forward(mode_index, input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+  Merge(e, FullyConnectedLayer::Forward(mode_index, input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 
   // Apply softmax
   if(softmax_[mode_index]) {
