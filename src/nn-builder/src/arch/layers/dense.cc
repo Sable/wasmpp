@@ -74,7 +74,7 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
       //    2) Z[l] = Z[l] + b[l]
       START_TIME()
 #ifdef WABT_EXPERIMENTAL
-      Merge(e, MakeNativeCall(NetworkModel()->Natives().matrix_dot_product, {
+      Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product, {
         MakeI32Const(W_->Begin()),
         (LayerIndex() == 1) ? MakeLocalGet(input_begin) : MakeI32Const(prev_fc_layer->A_[mode_index]->Begin()),
         MakeI32Const(Z_[mode_index]->Begin()),
@@ -206,11 +206,22 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       //    1) dW[l] = dZ[l] . A[l-1]^T
       //    2) dW[l] = (1/m) dW[l]
       START_TIME()
+#ifdef WABT_EXPERIMENTAL
+      Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_rt, {
+          MakeI32Const(dZ_->Begin()),
+          (LayerIndex() == 1) ? MakeLocalGet(input_begin) : MakeI32Const(prev_fc_layer->A_[Model::Mode::Training]->Begin()),
+          MakeI32Const(dW_->Begin()),
+          MakeI32Const(dZ_->Shape()[0]),
+          MakeI32Const(dZ_->Shape()[1]),
+          MakeI32Const(prev_fc_layer->A_[Model::Mode::Training]->Shape()[0])
+      }));
+#else
       Merge(e, NetworkModel()->Snippets().matrix->MatrixDotRT(dZ_, (LayerIndex() == 1) ?
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training],
                                                                                      input_begin) :
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training]), dW_,
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
+#endif
       END_TIME(C_1)
       START_TIME()
       if(NetworkModel()->TrainingBatchSize() > 1) {
@@ -236,8 +247,19 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       if(LayerIndex() > 1) {
         // E) dA[l-1] = W[l]^T . dZ[l]
         START_TIME()
+#ifdef WABT_EXPERIMENTAL
+        Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_lt, {
+            MakeI32Const(W_->Begin()),
+            MakeI32Const(dZ_->Begin()),
+            MakeI32Const(prev_fc_layer->dA_->Begin()),
+            MakeI32Const(W_->Shape()[1]),
+            MakeI32Const(W_->Shape()[0]),
+            MakeI32Const(dZ_->Shape()[1])
+        }));
+#else
         Merge(e, NetworkModel()->Snippets().matrix->MatrixDotLT(W_, dZ_, prev_fc_layer->dA_,
                                                                 {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+#endif
         END_TIME(E)
       }
 

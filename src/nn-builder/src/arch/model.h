@@ -55,7 +55,9 @@ struct SnippetCode {
 
 #ifdef WABT_EXPERIMENTAL
 struct NativeFunctions {
-  wabt::Var matrix_dot_product;
+  wabt::Var dot_product;
+  wabt::Var dot_product_rt;
+  wabt::Var dot_product_lt;
 };
 #endif
 

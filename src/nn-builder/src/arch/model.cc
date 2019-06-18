@@ -136,7 +136,9 @@ void Model::InitNativeImports() {
       Type::I32, // lhs_cols
       Type::I32  // rhs_cols
   };
-  natives_.matrix_dot_product = module_manager_.MakeNativeFunction("dot_product_f32", {params, {}});
+  natives_.dot_product = module_manager_.MakeNativeFunction("dot_product_f32", {params, {}});
+  natives_.dot_product_rt = module_manager_.MakeNativeFunction("dot_product_rt_f32", {params, {}});
+  natives_.dot_product_lt = module_manager_.MakeNativeFunction("dot_product_lt_f32", {params, {}});
 }
 #endif
 
