@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
   matrix_snippet_simd_test.MatrixMultiplicationSimd_test_1();
   matrix_snippet_simd_test.MatrixScalarSimd_test_1();
   matrix_snippet_simd_test.MatrixDotSimd_test_1();
+  matrix_snippet_simd_test.MatrixDotLTSimd_test_1();
   matrix_snippet_simd_test.MatrixDotRTSimd_test_1();
   matrix_snippet_simd_test.MatrixDotRTSimd_test_2();
   matrix_snippet_simd_test.MatrixVectorAdditionSimd_test_1();

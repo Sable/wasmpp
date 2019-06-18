@@ -258,7 +258,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
         }));
 #else
         Merge(e, NetworkModel()->Snippets().matrix->MatrixDotLT(W_, dZ_, prev_fc_layer->dA_,
-                                                                {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1}));
+                                                                {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
         END_TIME(E)
       }
