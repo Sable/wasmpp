@@ -575,7 +575,7 @@ void MatrixSnippetSimdTest::MatrixHorizontalSumSimd_test_1() {
 }
 
 void MatrixSnippetSimdTest::MatrixDotRTSimd_test_1() {
-  NN_TEST() {
+  NN_TEST("Matrix . Matrix^T") {
     uint32_t lhs_rows = 57;
     uint32_t lhs_cols = 101;
     uint32_t rhs_rows = 73;
@@ -648,7 +648,7 @@ void MatrixSnippetSimdTest::MatrixDotRTSimd_test_1() {
 }
 
 void MatrixSnippetSimdTest::MatrixDotRTSimd_test_2() {
-  NN_TEST() {
+  NN_TEST("Vector . Vector^T") {
     uint32_t lhs_rows = 111;
     uint32_t lhs_cols = 1;
     uint32_t rhs_rows = 231;
@@ -832,7 +832,7 @@ void MatrixSnippetSimdTest::MatrixDotSimd_test_2() {
 }
 
 void MatrixSnippetSimdTest::MatrixDotLTSimd_test_1() {
-  NN_TEST() {
+  NN_TEST("Matrix^T . Matrix") {
     uint32_t lhs_rows = 103;
     uint32_t lhs_cols = 101;
     uint32_t rhs_rows = lhs_rows;
