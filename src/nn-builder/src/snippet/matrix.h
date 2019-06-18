@@ -120,8 +120,7 @@ public:
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixDotRT(ds::NDArray* lhs, RelocMat rhs, ds::NDArray* dst, std::vector<wabt::Var> locals) override;
 
-  // The SIMD version of this function generates a result slightly different
-  // than the non-SIMD one because of the order of float addition
+  // The SIMD version of this function generates exact results as the non-SIMD
   wabt::ExprList* MatrixDotLT(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
   // The SIMD version of this function generates a result slightly different

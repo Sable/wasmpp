@@ -708,7 +708,7 @@ void MatrixSnippetSimdTest::MatrixDotRTSimd_test_2() {
 }
 
 void MatrixSnippetSimdTest::MatrixDotSimd_test_1() {
-  NN_TEST("matrix dot vector") {
+  NN_TEST("Matrix . Vector") {
     uint32_t lhs_rows = 101;
     uint32_t lhs_cols = 103;
     uint32_t rhs_rows = lhs_cols;
@@ -777,6 +777,59 @@ void MatrixSnippetSimdTest::MatrixDotSimd_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixDotSimd_1", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128);
 }
 
+void MatrixSnippetSimdTest::MatrixDotSimd_test_2() {
+  NN_TEST("Matrix . Matrix") {
+    uint32_t lhs_rows = 101;
+    uint32_t lhs_cols = 103;
+    uint32_t rhs_rows = lhs_cols;
+    uint32_t rhs_cols = 107;
+
+    NEW_MATRIX(lhs, lhs_rows, lhs_cols);
+    NEW_MATRIX(rhs, rhs_rows, rhs_cols);
+    NEW_MATRIX(dst, lhs_rows, rhs_cols);
+    NEW_MATRIX(expected, lhs_rows, rhs_cols);
+
+    std::vector<std::vector<float>> mat1(lhs_rows, std::vector<float>(lhs_cols, 0));
+    std::vector<std::vector<float>> mat2(rhs_rows, std::vector<float>(rhs_cols, 0));
+    std::vector<std::vector<float>> res(lhs_rows, std::vector<float>(rhs_cols, 0));
+    float val = 1.2;
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < lhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat1[row][col] = val;
+        val++;
+      }
+    }
+    for (uint32_t row = 0; row < rhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        mat2[row][col] = val;
+        val++;
+      }
+    }
+    for (auto i = 0; i < lhs_rows; ++i) {
+      for (auto j = 0; j < rhs_cols; ++j) {
+        for (auto k = 0; k <lhs_cols; ++k) {
+          res[i][j] += mat1[i][k] * mat2[k][j];
+        }
+      }
+    }
+    for (uint32_t row = 0; row < lhs_rows; row++) {
+      for (uint32_t col = 0; col < rhs_cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(res[row][col])));
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixDot(lhs, snippet::RelocMat(rhs), dst, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixDotSimd_2", Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::V128);
+}
 
 void MatrixSnippetSimdTest::MatrixDotLTSimd_test_1() {
   NN_TEST() {
