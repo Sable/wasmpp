@@ -35,6 +35,8 @@
           <label class="checkbox-inline"><input type="checkbox" id="train_err" checked>log_training_error</label>
           <label class="checkbox-inline"><input type="checkbox" id="train_acc" checked>log_training_accuracy</label>
           <label class="checkbox-inline"><input type="checkbox" id="train_time" checked>log_training_time</label>
+          <label class="checkbox-inline"><input type="checkbox" id="forward" checked>log_forward</label>
+          <label class="checkbox-inline"><input type="checkbox" id="backward" checked>log_backward</label>
         </div>
       <div class="form-group">
         <p><b>Testing</b></p>
@@ -45,7 +47,9 @@
       </div>
       <div class="form-group">
         <p><b>Prediction</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_res" checked>log_prediction_results</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_res">log_prediction_results</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_res_softmax" checked>log_prediction_results_softmax</label>
+        <label class="checkbox-inline"><input type="checkbox" id="pred_res_hardmax">log_prediction_results_hardmax</label>
         <label class="checkbox-inline"><input type="checkbox" id="pred_time" checked>log_prediction_time</label>
       </div>
       <div class="form-group">
@@ -328,16 +332,20 @@ model.AddDenseOutputLayer(l2);</textarea>
 
     // Create model options
     let options = new nnb.ModelOptions();
-    options.log_training_error            = document.getElementById('train_err').checked;
-    options.log_training_accuracy         = document.getElementById('train_acc').checked;
-    options.log_training_time             = document.getElementById('train_time').checked;
-    options.log_testing_error             = document.getElementById('test_err').checked;
-    options.log_testing_accuracy          = document.getElementById('test_acc').checked;
-    options.log_testing_confusion_matrix  = document.getElementById('test_conf').checked;
-    options.log_testing_time              = document.getElementById('test_time').checked;
-    options.log_prediction_results        = document.getElementById('pred_res').checked;
-    options.log_prediction_time           = document.getElementById('pred_time').checked;
-    options.use_simd                      = document.getElementById('use_simd').checked;
+    options.log_training_error                = document.getElementById('train_err').checked;
+    options.log_training_accuracy             = document.getElementById('train_acc').checked;
+    options.log_training_time                 = document.getElementById('train_time').checked;
+    options.log_forward                       = document.getElementById('forward').checked;
+    options.log_backward                      = document.getElementById('backward').checked;
+    options.log_testing_error                 = document.getElementById('test_err').checked;
+    options.log_testing_accuracy              = document.getElementById('test_acc').checked;
+    options.log_testing_confusion_matrix      = document.getElementById('test_conf').checked;
+    options.log_testing_time                  = document.getElementById('test_time').checked;
+    options.log_prediction_results            = document.getElementById('pred_res').checked;
+    options.log_prediction_results_softmax    = document.getElementById('pred_res_softmax').checked;
+    options.log_prediction_results_hardmax    = document.getElementById('pred_res_hardmax').checked;
+    options.log_prediction_time               = document.getElementById('pred_time').checked;
+    options.use_simd                          = document.getElementById('use_simd').checked;
 
     // Create model
     window.model = new nnb.Model(options);
@@ -347,16 +355,16 @@ model.AddDenseOutputLayer(l2);</textarea>
     window.model.SetLayers();
 
     // Load data
-    let train_data = TextareaToF32Matrix('train_data');
-    let train_labels = TextareaToF32Matrix('train_labels');
-    let test_data = TextareaToF32Matrix('test_data');
-    let test_labels = TextareaToF32Matrix('test_labels');
-    let epoch = parseInt(document.getElementById('epoch').value);
-    let training_batch = parseInt(document.getElementById('train_batch').value);
-    let testing_batch = parseInt(document.getElementById('test_batch').value);
-    let prediction_batch = parseInt(document.getElementById('pred_batch').value);
-    let loss = document.getElementById('loss_func').value;
-    let learning_rate = parseFloat(document.getElementById('learning_rate').value);
+    let train_data              = TextareaToF32Matrix('train_data');
+    let train_labels            = TextareaToF32Matrix('train_labels');
+    let test_data               = TextareaToF32Matrix('test_data');
+    let test_labels             = TextareaToF32Matrix('test_labels');
+    let epoch                   = parseInt(document.getElementById('epoch').value);
+    let training_batch          = parseInt(document.getElementById('train_batch').value);
+    let testing_batch           = parseInt(document.getElementById('test_batch').value);
+    let prediction_batch        = parseInt(document.getElementById('pred_batch').value);
+    let loss                    = document.getElementById('loss_func').value;
+    let learning_rate           = parseFloat(document.getElementById('learning_rate').value);
 
     if(document.getElementById('layers_compile').checked) {
       window.model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);

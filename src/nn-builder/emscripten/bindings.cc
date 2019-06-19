@@ -163,7 +163,11 @@ EMSCRIPTEN_BINDINGS(model_options) {
       .property("log_testing_time", &ModelOptions::log_testing_time)
       .property("log_testing_confusion_matrix", &ModelOptions::log_testing_confusion_matrix)
       .property("log_prediction_results", &ModelOptions::log_prediction_results)
+      .property("log_prediction_results_softmax", &ModelOptions::log_prediction_results_softmax)
+      .property("log_prediction_results_hardmax", &ModelOptions::log_prediction_results_hardmax)
       .property("log_prediction_time", &ModelOptions::log_prediction_time)
+      .property("log_forward", &ModelOptions::log_forward)
+      .property("log_backward", &ModelOptions::log_backward)
       .property("use_simd", &ModelOptions::use_simd);
 
   class_<ModelWrapper>("Model")
