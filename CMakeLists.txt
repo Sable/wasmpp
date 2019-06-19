@@ -53,14 +53,6 @@ if(EMSCRIPTEN)
     -s ALLOW_MEMORY_GROWTH=1                                            \
     -s NO_EXIT_RUNTIME=0                                                \
     ")
-    # Create distribution directory
-    set(JS_OUT_DIR ${PROJECT_SOURCE_DIR}/dist/)
-    file(MAKE_DIRECTORY ${JS_OUT_DIR})
-    add_custom_command(TARGET ${NN_BUILDER_JS} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_BINARY_DIR}/bin/${NN_BUILDER_JS}.* ${JS_OUT_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/js/compiled_model.js ${JS_OUT_DIR}
-        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_SOURCE_DIR}/src/nn-builder/examples/js/nnb.html ${JS_OUT_DIR}
-    )
 endif()
 
 # Create test cases
