@@ -163,19 +163,29 @@ class CompiledModel {
   }
 
   LogTrainForward() {
+    let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_forward_")) {
         this._logger[func](this.Exports()[func]());
+        found = true;
       }
     });
+    if(!found) {
+      this._WarnNotFound("Forward functions were not found");
+    }
   }
 
   LogTrainBackward() {
+    let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_backward_")) {
         this._logger[func](this.Exports()[func]());
+        found = true;
       }
     });
+    if(!found) {
+      this._WarnNotFound("Backward functions were not found");
+    }
   }
 
   // Run unit test Wasm function
@@ -291,6 +301,10 @@ class CompiledModel {
       }
     }
     return null;
+  }
+
+  _WarnNotFound(pre_msg) {
+    console.log(pre_msg +". Make sure you compiled the model with the correct options.");
   }
 
   // Initialize imports
