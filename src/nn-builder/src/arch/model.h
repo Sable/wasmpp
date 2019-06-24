@@ -206,7 +206,6 @@ public:
                        const std::vector<std::vector<float>> &labels);
   void CompileTestingFunction(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompilePredictionFunctions();
-  void CompileWeightsFunctions();
   void CompileInitialization();
 
   // Members accessors

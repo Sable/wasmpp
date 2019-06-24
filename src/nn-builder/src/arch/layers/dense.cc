@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/arch/layers/dense.h>
 #include <src/nn-builder/src/arch/model.h>
+#include <sstream>
 
 namespace nn {
 namespace arch {
@@ -18,22 +19,6 @@ FullyConnectedLayer* FullyConnectedLayer::KeepProb(float keep_prob) {
 FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributionType type) {
   weight_type_ = type;
   return this;
-}
-
-uint32_t FullyConnectedLayer::WeightOffset() const {
-  return W_->Begin();
-}
-
-uint32_t FullyConnectedLayer::WeightSizeInBytes() const {
-  return W_->Memory()->Bytes();
-}
-
-uint32_t FullyConnectedLayer::BiasOffset() const {
-  return b_->Begin();
-}
-
-uint32_t FullyConnectedLayer::BiasSizeInBytes() const {
-  return b_->Memory()->Bytes();
 }
 
 #define START_TIME() \
@@ -408,6 +393,52 @@ void FullyConnectedLayer::MakeData(wabt::Var memory) {
   NetworkModel()->ModuleManager().MakeData(memory, b_->Memory()->Begin(), bias_entries);
 }
 
+void FullyConnectedLayer::MakeFunctions() {
+
+  // Create a function to get the number of nodes in this layer
+  std::stringstream ss;
+  ss << "layer_" << LayerIndex() << "_size";
+  NetworkModel()->ModuleManager().MakeFunction(ss.str().c_str(), {{},{Type::I32}},{},
+                                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(Nodes()));
+  });
+
+  // Create functions to get the weights offset and size in memory
+  if(Position() != Input) {
+    // Weights offset function
+    std::stringstream w_offset_func_name;
+    w_offset_func_name << "layer_" << LayerIndex() << "_weight_offset";
+    NetworkModel()->ModuleManager().MakeFunction(w_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(W_->Begin()));
+    });
+
+    // Weights size function
+    std::stringstream w_size_func_name;
+    w_size_func_name << "layer_" << LayerIndex() << "_weight_byte_size";
+    NetworkModel()->ModuleManager().MakeFunction(w_size_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(W_->Memory()->Bytes()));
+    });
+
+    // Bias offset function
+    std::stringstream b_offset_func_name;
+    b_offset_func_name << "layer_" << LayerIndex() << "_bias_offset";
+    NetworkModel()->ModuleManager().MakeFunction(b_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(b_->Begin()));
+    });
+
+    // Bias size function
+    std::stringstream b_size_func_name;
+    b_size_func_name << "layer_" << LayerIndex() << "_bias_byte_size";
+    NetworkModel()->ModuleManager().MakeFunction(b_size_func_name.str().c_str(), {{},{Type::I32}}, {},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(b_->Memory()->Bytes()));
+    });
+  }
+}
+
 FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
   ERROR_EXIT("Dense output layer cannot have a keep probability value "
              "because dropout regularization does not apply to it");
@@ -456,6 +487,19 @@ wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_be
                                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
   }
   return e;
+}
+
+void DenseOutputLayer::MakeFunctions() {
+  // Create functions defined in parent
+  FullyConnectedLayer::MakeFunctions();
+
+  // Create confusion matrix functions
+  if(NetworkModel()->Options().log_training_confusion_matrix) {
+    NetworkModel()->ModuleManager().MakeFunction("training_confusion_matrix_offset", {{},{Type::I32}},{},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(confusion_matrix_[Model::Mode::Training]->Begin()));
+    });
+  }
 }
 
 wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals) {

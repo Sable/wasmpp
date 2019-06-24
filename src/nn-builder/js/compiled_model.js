@@ -162,6 +162,7 @@ class CompiledModel {
     this.Exports().test();
   }
 
+  // Log training forward details
   LogTrainForward() {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
@@ -175,6 +176,7 @@ class CompiledModel {
     }
   }
 
+  // Log training backward details
   LogTrainBackward() {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
@@ -185,6 +187,17 @@ class CompiledModel {
     });
     if(!found) {
       this._WarnNotFound("Backward functions were not found");
+    }
+  }
+
+  PrintTrainingConfusionMatrix() {
+    let matrix_offset_key = "training_confusion_matrix_offset";
+    let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
+    let matrix_side = this.Exports()[output_size_key]();
+    if(!(matrix_offset_key in Object.keys(this.Exports()))) {
+      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+    } else {
+      this._WarnNotFound("Training confusion matrix function not found");
     }
   }
 
@@ -278,8 +291,8 @@ class CompiledModel {
   }
 
   _WeightInfo(layer_index) {
-    let offset_func = 'weight_offset_' + layer_index;
-    let length_func = 'weight_byte_size_' + layer_index;
+    let offset_func = 'layer_' + layer_index + '_weight_offset';
+    let length_func = 'layer_' + layer_index +'_weight_byte_size';
     if(this.Exports()[offset_func] !== undefined
       && this.Exports()[length_func] !== undefined) {
       return {
@@ -291,8 +304,8 @@ class CompiledModel {
   }
 
   _BiasInfo(layer_index) {
-    let offset_func = 'bias_offset_' + layer_index;
-    let length_func = 'bias_byte_size_' + layer_index;
+    let offset_func = 'layer_' + layer_index + '_bias_offset';
+    let length_func = 'layer_' + layer_index + '_bias_byte_size';
     if(this.Exports()[offset_func] !== undefined
       && this.Exports()[length_func] !== undefined) {
       return {
@@ -305,6 +318,18 @@ class CompiledModel {
 
   _WarnNotFound(pre_msg) {
     console.log(pre_msg +". Make sure you compiled the model with the correct options.");
+  }
+
+  _MakeF32Matrix(index, rows, cols) {
+    let view = new Float32Array(this.Memory().buffer, index);
+    let table = [];
+    for (let r = 0; r < rows; ++r) {
+      table.push([]);
+      for (let c = 0; c < cols; ++c) {
+        table[r].push(view[r * cols + c]);
+      }
+    }
+    return table;
   }
 
   // Initialize imports

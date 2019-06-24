@@ -401,7 +401,17 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_s
   testing_batch_size_ = testing_batch_size;
   prediction_batch_size_ = prediction_batch_size;
   loss_ = loss;
+
+  // Allocate layers should be called before create the model
+  // algorithms. Otherwise the addresses wouldn't be defined.
   AllocateLayers();
+
+  // Create layers specific functions
+  for(auto layer : layers_) {
+    layer->MakeFunctions();
+  }
+
+  // Create algorithms and export them
   forward_training_func_ = ForwardAlgorithmFunction(Mode::Training);
   forward_testing_func_ = ForwardAlgorithmFunction(Mode::Testing);
   forward_prediction_func_ = ForwardAlgorithmFunction(Mode::Prediction);
@@ -519,21 +529,6 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
         }));
       }
     }));
-
-    if(options_.log_training_confusion_matrix) {
-      assert(layers_.back()->Position() == Output);
-      if(layers_.back()->Type() == FullyConnected) {
-        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-        // Log confusion matrix
-        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Begin()),
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Shape()[0]),
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Training)->Shape()[1])
-        }));
-      } else {
-        assert(!"Not implemented");
-      }
-    }
   });
 
   // Create forward log functions
@@ -740,49 +735,6 @@ void Model::CompilePredictionFunctions() {
       assert(!"Not implemented!");
     }
   });
-}
-
-void Model::CompileWeightsFunctions() {
-  // Create functions for each layer to get the weight/bias
-  // offset and weight/bias number of bytes
-  for(auto l=0; l < layers_.size(); l++) {
-    if(layers_[l]->Type() == FullyConnected) {
-      // Fully Connected Input layer does not weights
-      if(layers_[l]->Position() != Input) {
-        std::stringstream w_offset_func_name;
-        std::stringstream w_size_func_name;
-        std::stringstream b_offset_func_name;
-        std::stringstream b_size_func_name;
-        w_offset_func_name << "weight_offset_" << l;
-        w_size_func_name << "weight_byte_size_" << l;
-        b_offset_func_name << "bias_offset_" << l;
-        b_size_func_name << "bias_byte_size_" << l;
-        auto fc_layer = static_cast<FullyConnectedLayer*>(layers_[l]);
-        // Weights offset function
-        module_manager_.MakeFunction(w_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
-                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-          f.Insert(MakeI32Const(fc_layer->WeightOffset()));
-        });
-        // Weights size function
-        module_manager_.MakeFunction(w_size_func_name.str().c_str(), {{},{Type::I32}}, {},
-                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-          f.Insert(MakeI32Const(fc_layer->WeightSizeInBytes()));
-        });
-        // Bias offset function
-        module_manager_.MakeFunction(b_offset_func_name.str().c_str(), {{},{Type::I32}}, {},
-                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-          f.Insert(MakeI32Const(fc_layer->BiasOffset()));
-        });
-        // Bias size function
-        module_manager_.MakeFunction(b_size_func_name.str().c_str(), {{},{Type::I32}}, {},
-                                     [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-          f.Insert(MakeI32Const(fc_layer->BiasSizeInBytes()));
-        });
-      }
-    } else {
-      assert(!"Not implemented!");
-    }
-  }
 }
 
 bool Model::Validate() {

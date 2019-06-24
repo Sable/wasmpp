@@ -42,13 +42,12 @@ public:
   void AllocateMemory() override ;
   void MakeData(wabt::Var memory) override ;
 
+  // Create functions
+  void MakeFunctions() override;
+
   // Layer configuration
   virtual FullyConnectedLayer* KeepProb(float keep_prob);
   FullyConnectedLayer* WeightType(WeightDistributionType type);
-  uint32_t WeightOffset() const;
-  uint32_t WeightSizeInBytes() const;
-  uint32_t BiasOffset() const;
-  uint32_t BiasSizeInBytes() const;
 };
 
 class DenseHiddenLayer : public FullyConnectedLayer {
@@ -76,6 +75,7 @@ public:
   DenseOutputLayer* Hardmax(uint8_t mode_index);
   // Augment forward algorithm
   wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
+  void MakeFunctions() override ;
 
   // Compute cost value
   wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);

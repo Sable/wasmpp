@@ -22,6 +22,7 @@ if(process.argv.length > 2) {
     compiled_model.Train();
     compiled_model.LogTrainForward();
     compiled_model.LogTrainBackward();
+    compiled_model.PrintTrainingConfusionMatrix();
 
     // console.log("Testing ...");
     // compiled_model.Test();

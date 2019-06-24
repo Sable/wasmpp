@@ -37,6 +37,7 @@ public:
   virtual wabt::ExprList* Backward(wabt::Var input_begin, wabt::Var target_begin, std::vector<wabt::Var> locals) = 0;
   virtual void AllocateMemory() = 0;
   virtual void MakeData(wabt::Var memory) = 0;
+  virtual void MakeFunctions() = 0;
 };
 
 template <LayerType type>

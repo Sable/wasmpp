@@ -150,7 +150,6 @@ int main(int argc, char *argv[]) {
   model.CompileTrainingFunction(epoch, learning_rate, train_data, train_labels);
   model.CompileTestingFunction(test_data, test_labels);
   model.CompilePredictionFunctions();
-  model.CompileWeightsFunctions();
   model.CompileInitialization();
 
   assert(model.Validate());
