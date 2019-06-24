@@ -22,7 +22,6 @@ namespace arch {
 struct ModelOptions {
   bool log_training_accuracy = false;
   bool log_training_error = false;
-  bool log_training_time = false;
   bool log_training_confusion_matrix = false;
   bool log_testing_accuracy = false;
   bool log_testing_error = false;
@@ -127,7 +126,9 @@ private:
   //       from the generated wasm, we should expose their values
   //       using exported functions so that the user of the wasm
   //       decides when, how and where to print them.
-  wasmpp::Memory* learning_rate = nullptr;
+  wasmpp::Memory* learning_rate_ = nullptr;
+  wasmpp::Memory* training_error_ = nullptr;
+  wasmpp::Memory* training_hits_ = nullptr;
   DenseForwardTimeMembers dense_forward_logging_members_;
   DenseBackwardTimeMembers dense_backward_logging_members_;
 
@@ -202,7 +203,7 @@ public:
   // Compile functions
   void CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_size, uint32_t prediction_batch_size,
                      builtins::LossFunction loss);
-  void CompileTrainingFunction(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
+  void CompileTrainingFunctions(uint32_t epoch, float learning_rate, const std::vector<std::vector<float>> &input,
                        const std::vector<std::vector<float>> &labels);
   void CompileTestingFunction(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompilePredictionFunctions();

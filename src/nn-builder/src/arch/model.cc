@@ -39,13 +39,13 @@ DENSE_BACKWARD_TIME_MEMBERS(DEFINE_TIME_MEMBERS)
 #undef DEFINE_TIME_MEMBERS
 
 wabt::ExprList* Model::SetLearningRate(wabt::ExprList *val) {
-  assert(learning_rate != nullptr);
-  return MakeF32Store(MakeI32Const(learning_rate->Begin()), val);
+  assert(learning_rate_ != nullptr);
+  return MakeF32Store(MakeI32Const(learning_rate_->Begin()), val);
 }
 
 wabt::ExprList* Model::GetLearningRate() {
-  assert(learning_rate != nullptr);
-  return MakeF32Load(MakeI32Const(learning_rate->Begin()));
+  assert(learning_rate_ != nullptr);
+  return MakeF32Load(MakeI32Const(learning_rate_->Begin()));
 }
 
 void Model::SetLayers(std::vector<Layer *> layers) {
@@ -147,7 +147,9 @@ void Model::InitNativeImports() {
                             {rows, cols}, TypeSize(Type::F32));
 
 void Model::AllocateMembers() {
-  learning_rate = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  learning_rate_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  training_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
 #define ALLOCATE_TIME_MEMBERS(name) \
   dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
@@ -422,7 +424,7 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_s
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
+void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
                             const std::vector<std::vector<float>> &labels) {
   ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
@@ -443,7 +445,7 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
     auto time_total = locals[0];
     auto time_epoch = locals[1];
     auto cost_mean = locals[2];
-    auto accuracy = locals[3];
+    auto hits = locals[3]; // TODO Change to Type::I32
     auto epoch = locals[4];
     auto train_addr = locals[5];
     auto label_addr = locals[6];
@@ -457,13 +459,9 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
     auto label_size = training_labels_batch_.front()->Memory()->Bytes();
 
     f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
-      if(options_.log_training_time) {
-        // Start epoch training timer
-        b1->Insert(MakeLocalSet(time_epoch, MakeCall(builtins_.system.TimeF64(), {})));
-      }
       b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
       b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
-      b1->Insert(MakeLocalSet(accuracy, MakeF32Const(0)));
+      b1->Insert(MakeLocalSet(hits, MakeF32Const(0)));
       b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
         // Forward algorithm
         b2->Insert(MakeCall(forward_training_func_, {
@@ -478,7 +476,7 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
 
         if(options_.log_training_accuracy) {
           // Count number of correct results
-          b2->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
+          b2->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
               MakeLocalGet(label_addr)
           })));
         }
@@ -499,6 +497,7 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
           b2->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
         }
 
+        // Move to the next label batch in memory
         b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
       }));
 
@@ -511,25 +510,18 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
       }
 
       if(options_.log_training_accuracy) {
-        // Log training accuracy
-        b1->Insert(MakeCall(builtins_.message.LogTrainingAccuracy(), {
-            MakeLocalGet(epoch),
-            MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(training_vals_.size()))
-        }));
-      }
-
-      if(options_.log_training_time) {
-        // Log training time
-        b1->Insert(MakeLocalSet(time_epoch, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time_epoch))));
-        b1->Insert(GenerateCompoundAssignment(time_total, Opcode::F64Add, MakeLocalGet(time_epoch)));
-        b1->Insert(MakeCall(builtins_.message.LogTrainingTime(), {
-          MakeLocalGet(epoch),
-          MakeLocalGet(time_epoch),
-          MakeLocalGet(time_total)
-        }));
+        // Store accuracy in memory
+        b1->Insert(MakeF32Store(MakeI32Const(training_hits_->Begin()), MakeLocalGet(hits)));
       }
     }));
   });
+
+  if(options_.log_training_accuracy) {
+    module_manager_.MakeFunction("training_batches_hits", {{},{Type::F32}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF32Load(MakeI32Const(training_hits_->Begin())));
+    });
+  }
 
   // Create forward log functions
   if(options_.log_forward) {

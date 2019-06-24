@@ -19,10 +19,13 @@ if(process.argv.length > 2) {
   lib.then( wasm => {
     compiled_model.SetWasm(wasm);
     console.log("Training ...");
-    compiled_model.Train();
-    compiled_model.LogTrainForward();
-    compiled_model.LogTrainBackward();
-    compiled_model.PrintTrainingConfusionMatrix();
+    compiled_model.Train({
+      log_accuracy: true,
+      epochs: 1
+    });
+    //compiled_model.LogTrainForward();
+    //compiled_model.LogTrainBackward();
+    //compiled_model.PrintTrainingConfusionMatrix();
 
     // console.log("Testing ...");
     // compiled_model.Test();

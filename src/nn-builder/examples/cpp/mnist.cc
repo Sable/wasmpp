@@ -124,7 +124,6 @@ int main(int argc, char *argv[]) {
   ModelOptions options;
   options.log_training_accuracy           = true;
   options.log_training_error              = true;
-  options.log_training_time               = true;
   options.log_training_confusion_matrix   = true;
   options.log_testing_accuracy            = true;
   options.log_testing_error               = true;
@@ -147,7 +146,7 @@ int main(int argc, char *argv[]) {
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.CrossEntropy();
   model.CompileLayers(training_batch_size, testing_batch_size, prediction_batch_size, loss);
-  model.CompileTrainingFunction(epoch, learning_rate, train_data, train_labels);
+  model.CompileTrainingFunctions(epoch, learning_rate, train_data, train_labels);
   model.CompileTestingFunction(test_data, test_labels);
   model.CompilePredictionFunctions();
   model.CompileInitialization();

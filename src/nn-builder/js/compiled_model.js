@@ -153,8 +153,35 @@ class CompiledModel {
   }
 
   // Run train Wasm function
-  Train() {
-    this.Exports().train();
+  Train(config) {
+    let total_hits = 0;
+    let batch_size = 0;
+    let batches_in_memory = 0;
+    let batches_in_memory_count = 1;
+    // Set configuration
+    config = config || {};
+    config.epochs = config.epochs || 0;
+
+    for(let e=0; e < config.epochs; e++) {
+      for(let i=0; i < batches_in_memory_count; i++) {
+        // Start training
+        this.Exports().train();
+        if("log_accuracy" in config) {
+           total_hits += this._TrainingBatchesAccuracy();
+        }
+      }
+      console.log("Training Accuracy in epoch", e,":", total_hits);
+    }
+  }
+
+  _TrainingBatchesAccuracy() {
+    let key = "training_batches_hits";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Training batches accuracy function not found");
+    }
+    return 0;
   }
 
   // Run test Wasm function
