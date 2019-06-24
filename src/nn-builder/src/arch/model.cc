@@ -520,20 +520,6 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
       }
     }));
 
-    if(options_.log_forward) {
-#define LOG_TIME_MEMBER(name) \
-  f.Insert(MakeCall(builtins_.message.LogForward##name(), { dense_forward_logging_members_.Get##name()}));
-  DENSE_FORWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
-#undef LOG_TIME_MEMBER
-    }
-
-    if(options_.log_backward) {
-#define LOG_TIME_MEMBER(name) \
-  f.Insert(MakeCall(builtins_.message.LogBackward##name(), { dense_backward_logging_members_.Get##name()}));
-      DENSE_BACKWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
-#undef LOG_TIME_MEMBER
-    }
-
     if(options_.log_training_confusion_matrix) {
       assert(layers_.back()->Position() == Output);
       if(layers_.back()->Type() == FullyConnected) {
@@ -549,6 +535,28 @@ void Model::CompileTrainingFunction(uint32_t epochs, float learning_rate, const 
       }
     }
   });
+
+  // Create forward log functions
+  if(options_.log_forward) {
+#define LOG_TIME_MEMBER(name)                                                                       \
+    module_manager_.MakeFunction("log_forward_" #name, {{}, {Type::F64}}, {},                       \
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
+      f.Insert(dense_forward_logging_members_.Get##name());                                         \
+    });
+    DENSE_FORWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
+#undef LOG_TIME_MEMBER
+  }
+
+  // Create backward log functions
+  if(options_.log_backward) {
+#define LOG_TIME_MEMBER(name)           \
+    module_manager_.MakeFunction("log_backward_" #name, {{}, {Type::F64}}, {},                      \
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
+      f.Insert(dense_backward_logging_members_.Get##name());                                        \
+    });
+    DENSE_BACKWARD_TIME_MEMBERS(LOG_TIME_MEMBER)
+#undef LOG_TIME_MEMBER
+  }
 }
 
 void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,

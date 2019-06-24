@@ -51,6 +51,70 @@ class LayerWeights {
   }
 }
 
+class ModelLogger {
+  constructor(){}
+  // Forward timing
+  log_forward_Time() {
+    console.log("\n>> Forward algorithm steps time:");
+  }
+  log_forward_A_1(time) {
+    console.log("A) Z[l] = W[l] . A[l-1] + b[l]");
+    console.log("    1) Z[l] = W[l] . A[l-1]:", time);
+  }
+  log_forward_A_2(time) {
+    console.log("    2) Z[l] = Z[l] + b[l]:", time);
+  }
+  log_forward_B(time) {
+    console.log("B) A[l] = g[l](Z[l]):", time);
+  }
+
+  // Backward timing
+  log_backward_Time() {
+    console.log("\n>> Backward algorithm steps time:");
+  }
+  log_backward_A(time) {
+    console.log("A) dA[L] = L(T, A[L]):", time);
+  }
+  log_backward_B_1(time) {
+    console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
+    console.log("    1) dZ[l] = g'[l](Z[l]):", time);
+  }
+  log_backward_B_2(time) {
+    console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
+  }
+  log_backward_C_1(time) {
+    console.log("C) dW[l] = (1/m) dZ[l] . A[l-1]^T");
+    console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
+  }
+  log_backward_C_2(time) {
+    console.log("    2) dW[l] = (1/m) dW[l]:", time);
+  }
+  log_backward_D_1(time) {
+    console.log("D) db[l] = (1/m) dZ[l]");
+    console.log("    1) db[l] = SUM(dZ[l], row wise):", time);
+  }
+  log_backward_D_2(time) {
+    console.log("    2) db[l] = (1/m) db[l]:", time);
+  }
+  log_backward_E(time) {
+    console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
+  }
+  log_backward_F_1(time) {
+    console.log("F) W[l] = W[l] - alpha * dW[l]");
+    console.log("    1) dW[l] = alpha * dW[l]:", time);
+  }
+  log_backward_F_2(time) {
+    console.log("    2) W[l] = W[l] - dW[l]:", time);
+  }
+  log_backward_G_1(time) {
+    console.log("G) b[l] = b[l] - alpha * db[l]");
+    console.log("    1) db[l] = alpha * db[l]:", time);
+  }
+  log_backward_G_2(time) {
+    console.log("    2) b[l] = b[l] - db[l]:", time);
+  }
+}
+
 // This class is a wrapper for the generated Wasm model
 // It also contains the import functions from JS to Wasm
 // Most functions simply calls the Wasm exported functions
@@ -59,6 +123,7 @@ class LayerWeights {
 class CompiledModel {
   _wasm = null;
   _imports = {};
+  _logger = new ModelLogger();
 
   constructor() {
     this._imports = this._InitImports();
@@ -83,73 +148,82 @@ class CompiledModel {
     return this._imports;
   }
 
+  Memory() {
+    return this.Exports().memory;
+  }
+
   // Run train Wasm function
   Train() {
-    if (this.Exports() != null) {
-      this.Exports().train();
-    }
+    this.Exports().train();
   }
 
   // Run test Wasm function
   Test() {
-    if (this.Exports() != null) {
-      this.Exports().test();
-    }
+    this.Exports().test();
+  }
+
+  LogTrainForward() {
+    Object.keys(this.Exports()).forEach((func) => {
+      if(func.startsWith("log_forward_")) {
+        this._logger[func](this.Exports()[func]());
+      }
+    });
+  }
+
+  LogTrainBackward() {
+    Object.keys(this.Exports()).forEach((func) => {
+      if(func.startsWith("log_backward_")) {
+        this._logger[func](this.Exports()[func]());
+      }
+    });
   }
 
   // Run unit test Wasm function
   UnitTest() {
-    if (this.Exports() != null) {
-      Object.keys(this.Exports()).forEach((func) => {
-        if (func.startsWith("test_")) {
-          console.log(">>  Testing function:", func);
-          console.time("    exectuion time");
-          this.Exports()[func]();
-          console.timeEnd("    exectuion time");
-        }
-      });
-    }
+    Object.keys(this.Exports()).forEach((func) => {
+      if (func.startsWith("test_")) {
+        console.log(">>  Testing function:", func);
+        console.time("    exectuion time");
+        this.Exports()[func]();
+        console.timeEnd("    exectuion time");
+      }
+    });
   }
 
   // Run predict Wasm function
   Predict(data) {
-    if (this.Exports() != null) {
-      let offset = this._PredictionInputOffset();
-      let batch_size = this._PredictionBatchSize();
+    let offset = this._PredictionInputOffset();
+    let batch_size = this._PredictionBatchSize();
 
-      if (data === undefined || data.length === 0 || batch_size !== data.length) {
-        console.error("Data size should match the batch size %d != %d", data.length, batch_size);
-        return false;
-      }
-
-      let index = 0;
-      let memory = new Float32Array(this.Exports().memory.buffer, offset, data[0].length * batch_size);
-      for (let c = 0; c < data[0].length; c++) {
-        for (let r = 0; r < data.length; r++) {
-          memory[index++] = data[r][c];
-        }
-      }
-      this.Exports().predict();
-      return true;
+    if (data === undefined || data.length === 0 || batch_size !== data.length) {
+      console.error("Data size should match the batch size %d != %d", data.length, batch_size);
+      return false;
     }
-    return false;
+
+    let index = 0;
+    let memory = new Float32Array(this.Memory().buffer, offset, data[0].length * batch_size);
+    for (let c = 0; c < data[0].length; c++) {
+      for (let r = 0; r < data.length; r++) {
+        memory[index++] = data[r][c];
+      }
+    }
+    this.Exports().predict();
+    return true;
   }
 
   ExtractWeights() {
     let weights = [];
-    if (this.Exports() != null) {
-      for (let l = 0; l < this._TotalLayers(); l++) {
-        let weight_info = this._WeightInfo(l);
-        let bias_info = this._BiasInfo(l);
-        if (weight_info != null && bias_info != null) {
-          let layer_weight = new LayerWeights(l);
-          layer_weight.ImportWeightsFromBuffer(this.Exports().memory.buffer, weight_info.offset, weight_info.byte_size);
-          layer_weight.ImportBiasFromBuffer(this.Exports().memory.buffer, bias_info.offset, bias_info.byte_size);
-          weights.push(layer_weight.ToJson());
-        }
+    for (let l = 0; l < this._TotalLayers(); l++) {
+      let weight_info = this._WeightInfo(l);
+      let bias_info = this._BiasInfo(l);
+      if (weight_info != null && bias_info != null) {
+        let layer_weight = new LayerWeights(l);
+        layer_weight.ImportWeightsFromBuffer(this.Memory().buffer, weight_info.offset, weight_info.byte_size);
+        layer_weight.ImportBiasFromBuffer(this.Memory().buffer, bias_info.offset, bias_info.byte_size);
+        weights.push(layer_weight.ToJson());
       }
-      return weights;
     }
+    return weights;
   }
 
   ImportWeights(weights_array) {
@@ -164,9 +238,9 @@ class CompiledModel {
       if (weights_info != null && bias_info != null) {
         // Wrap Wasm model weight in a LayerWeight object
         let model_layer_weights = new LayerWeights(weights_array[i].layer);
-        model_layer_weights.ImportWeightsFromBuffer(this.Exports().memory.buffer,
+        model_layer_weights.ImportWeightsFromBuffer(this.Memory().buffer,
           weights_info.offset, weights_info.byte_size);
-        model_layer_weights.ImportBiasFromBuffer(this.Exports().memory.buffer,
+        model_layer_weights.ImportBiasFromBuffer(this.Memory().buffer,
           bias_info.offset, bias_info.byte_size);
         // Set weights
         if (!model_layer_weights.CopyWeights(imported_layer_weights)) {
@@ -182,31 +256,21 @@ class CompiledModel {
   }
 
   _PredictionInputOffset() {
-    if(this.Exports() != null) {
-      return this.Exports().prediction_input_offset();
-    }
-    return false;
+    return this.Exports().prediction_input_offset();
   }
 
   _PredictionBatchSize() {
-    if(this.Exports() != null) {
-      return this.Exports().prediction_batch_size();
-    }
-    return false;
+    return this.Exports().prediction_batch_size();
   }
 
   _TotalLayers() {
-    if(this.Exports() != null) {
-      return this.Exports().total_layers();
-    }
-    return 0;
+    return this.Exports().total_layers();
   }
 
   _WeightInfo(layer_index) {
     let offset_func = 'weight_offset_' + layer_index;
     let length_func = 'weight_byte_size_' + layer_index;
-    if(this.Exports() != null
-      && this.Exports()[offset_func] !== undefined
+    if(this.Exports()[offset_func] !== undefined
       && this.Exports()[length_func] !== undefined) {
       return {
         offset: this.Exports()[offset_func](),
@@ -219,8 +283,7 @@ class CompiledModel {
   _BiasInfo(layer_index) {
     let offset_func = 'bias_offset_' + layer_index;
     let length_func = 'bias_byte_size_' + layer_index;
-    if(this.Exports() != null
-      && this.Exports()[offset_func] !== undefined
+    if(this.Exports()[offset_func] !== undefined
       && this.Exports()[length_func] !== undefined) {
       return {
         offset: this.Exports()[offset_func](),
@@ -262,65 +325,6 @@ class CompiledModel {
       log_prediction_time: (time) => {
         console.log("Prediction time:", time, "ms");
       },
-      // Forward timing
-      log_forward_Time: () => {
-        console.log("\n>> Forward algorithm steps time:");
-      },
-      log_forward_A_1: (time) => {
-        console.log("A) Z[l] = W[l] . A[l-1] + b[l]");
-        console.log("    1) Z[l] = W[l] . A[l-1]:", time);
-      },
-      log_forward_A_2: (time) => {
-        console.log("    2) Z[l] = Z[l] + b[l]:", time);
-      },
-      log_forward_B: (time) => {
-        console.log("B) A[l] = g[l](Z[l]):", time);
-      },
-      // Backward timing
-      log_backward_Time: () => {
-        console.log("\n>> Backward algorithm steps time:");
-      },
-      log_backward_A: (time) => {
-        console.log("A) dA[L] = L(T, A[L]):", time);
-      },
-      log_backward_B_1: (time) => {
-        console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
-        console.log("    1) dZ[l] = g'[l](Z[l]):", time);
-      },
-      log_backward_B_2: (time) => {
-        console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
-      },
-      log_backward_C_1: (time) => {
-        console.log("C) dW[l] = (1/m) dZ[l] . A[l-1]^T");
-        console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
-      },
-      log_backward_C_2: (time) => {
-        console.log("    2) dW[l] = (1/m) dW[l]:", time);
-      },
-      log_backward_D_1: (time) => {
-        console.log("D) db[l] = (1/m) dZ[l]");
-        console.log("    1) db[l] = SUM(dZ[l], row wise):", time);
-      },
-      log_backward_D_2: (time) => {
-        console.log("    2) db[l] = (1/m) db[l]:", time);
-      },
-      log_backward_E: (time) => {
-        console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
-      },
-      log_backward_F_1: (time) => {
-        console.log("F) W[l] = W[l] - alpha * dW[l]");
-        console.log("    1) dW[l] = alpha * dW[l]:", time);
-      },
-      log_backward_F_2: (time) => {
-        console.log("    2) W[l] = W[l] - dW[l]:", time);
-      },
-      log_backward_G_1: (time) => {
-        console.log("G) b[l] = b[l] - alpha * db[l]");
-        console.log("    1) db[l] = alpha * db[l]:", time);
-      },
-      log_backward_G_2: (time) => {
-        console.log("    2) b[l] = b[l] - db[l]:", time);
-      },
     };
 
     let system_imports = {
@@ -329,32 +333,28 @@ class CompiledModel {
         return new Date().getTime();
       },
       print_table_f32: (index, rows, cols) => {
-        if (this.Exports() != null) {
-          let view = new Float32Array(this.Exports().memory.buffer, index);
-          let table = [];
-          for (let r = 0; r < rows; ++r) {
-            table.push([]);
-            for (let c = 0; c < cols; ++c) {
-              table[r].push(view[r * cols + c]);
-            }
+        let view = new Float32Array(this.Memory().buffer, index);
+        let table = [];
+        for (let r = 0; r < rows; ++r) {
+          table.push([]);
+          for (let c = 0; c < cols; ++c) {
+            table[r].push(view[r * cols + c]);
           }
-          console.table(table);
         }
+        console.table(table);
       }
     };
 
     let test_imports = {
       assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
-        if (this.Exports() != null) {
-          let mat1 = new Float32Array(this.Exports().memory.buffer, mat1_index, rows * cols);
-          let mat2 = new Float32Array(this.Exports().memory.buffer, mat2_index, rows * cols);
-          for (let i = 0; i < rows * cols; i++) {
-            if (mat1[i] !== mat2[i]) {
-              console.error("Matrix equality failed!");
-              system_imports.print_table_f32(mat1_index, rows, cols);
-              system_imports.print_table_f32(mat2_index, rows, cols);
-              return;
-            }
+        let mat1 = new Float32Array(this.Memory().buffer, mat1_index, rows * cols);
+        let mat2 = new Float32Array(this.Memory().buffer, mat2_index, rows * cols);
+        for (let i = 0; i < rows * cols; i++) {
+          if (mat1[i] !== mat2[i]) {
+            console.error("Matrix equality failed!");
+            system_imports.print_table_f32(mat1_index, rows, cols);
+            system_imports.print_table_f32(mat2_index, rows, cols);
+            return;
           }
         }
       }

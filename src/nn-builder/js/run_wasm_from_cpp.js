@@ -20,9 +20,11 @@ if(process.argv.length > 2) {
     compiled_model.SetWasm(wasm);
     console.log("Training ...");
     compiled_model.Train();
+    compiled_model.LogTrainForward();
+    compiled_model.LogTrainBackward();
 
-    console.log("Testing ...");
-    compiled_model.Test();
+    // console.log("Testing ...");
+    // compiled_model.Test();
 
     // console.log("Predicting ...");
     // compiled_model.Predict(...);

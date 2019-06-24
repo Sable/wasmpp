@@ -113,8 +113,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  uint32_t training_limit = 6000;
-  uint32_t testing_limit = 1000;
+  uint32_t training_limit = 1000;
+  uint32_t testing_limit = 100;
   std::vector<std::vector<float>> train_data;
   std::vector<std::vector<float>> train_labels;
   std::vector<std::vector<float>> test_data;
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
      NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
   });
 
-  uint32_t epoch = 10;
+  uint32_t epoch = 5;
   uint32_t training_batch_size = 1;
   uint32_t testing_batch_size = 1;
   uint32_t prediction_batch_size = 1;
