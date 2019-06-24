@@ -22,6 +22,7 @@ if(process.argv.length > 2) {
     compiled_model.Train({
       log_accuracy: true,
       log_error: true,
+      log_time: true,
       epochs: 5
     });
     //compiled_model.LogTrainForward();

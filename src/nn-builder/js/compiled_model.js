@@ -154,6 +154,8 @@ class CompiledModel {
 
   // Run train Wasm function
   Train(config) {
+    // Register the total training time
+    let total_time = 0.0;
     // Model details
     let batch_size = 0;
     let batches_in_memory = 0;
@@ -162,23 +164,30 @@ class CompiledModel {
     config = config || {};
     config.log_accuracy = config.log_accuracy || false;
     config.log_error = config.log_error || false;
-    config.epochs = config.epochs || 0;
+    config.log_time = config.log_time || false;
     config.epochs = config.epochs || 0;
     for(let e=0; e < config.epochs; e++) {
       // Epoch results
       let total_hits = 0;
       let average_cost = 0.0;
+      let subtotal_time = 0.0;
       // Load new batches in memory and train
       for(let i=0; i < batches_in_memory_count; i++) {
         // Start training
+        let time = new Date().getTime();
         this.Exports().train();
+        subtotal_time += new Date().getTime() - time;
         // Update training details
         if(config.log_accuracy) total_hits    += this._TrainingBatchesAccuracy();
         if(config.log_error)    average_cost  += this._TrainingBatchesError();
       }
+      // Update total time
+      total_time += subtotal_time;
       // Log after end of epoch
       if(config.log_accuracy) console.log("Training Accuracy in epoch", e,":", total_hits);
       if(config.log_error)    console.log("Training Error in epoch", e,":", average_cost);
+      if(config.log_time)     console.log("Training Time in epoch", e,":", subtotal_time,
+                                      "ms. Total time:",total_time,"ms");
     }
   }
 
