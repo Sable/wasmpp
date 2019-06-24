@@ -154,23 +154,31 @@ class CompiledModel {
 
   // Run train Wasm function
   Train(config) {
-    let total_hits = 0;
+    // Model details
     let batch_size = 0;
     let batches_in_memory = 0;
     let batches_in_memory_count = 1;
     // Set configuration
     config = config || {};
+    config.log_accuracy = config.log_accuracy || false;
+    config.log_error = config.log_error || false;
     config.epochs = config.epochs || 0;
-
+    config.epochs = config.epochs || 0;
     for(let e=0; e < config.epochs; e++) {
+      // Epoch results
+      let total_hits = 0;
+      let average_cost = 0.0;
+      // Load new batches in memory and train
       for(let i=0; i < batches_in_memory_count; i++) {
         // Start training
         this.Exports().train();
-        if("log_accuracy" in config) {
-           total_hits += this._TrainingBatchesAccuracy();
-        }
+        // Update training details
+        if(config.log_accuracy) total_hits    += this._TrainingBatchesAccuracy();
+        if(config.log_error)    average_cost  += this._TrainingBatchesError();
       }
-      console.log("Training Accuracy in epoch", e,":", total_hits);
+      // Log after end of epoch
+      if(config.log_accuracy) console.log("Training Accuracy in epoch", e,":", total_hits);
+      if(config.log_error)    console.log("Training Error in epoch", e,":", average_cost);
     }
   }
 
@@ -180,6 +188,16 @@ class CompiledModel {
       return this.Exports()[key]();
     } else {
       this._WarnNotFound("Training batches accuracy function not found");
+    }
+    return 0;
+  }
+
+  _TrainingBatchesError() {
+    let key = "training_batches_error";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Training batches error function not found");
     }
     return 0;
   }

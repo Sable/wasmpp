@@ -10,7 +10,6 @@ using namespace wasmpp;
 void Message::InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) {
   assert(model != nullptr);
   assert(module_manager != nullptr);
-  log_training_error_ = module_manager->MakeFuncImport(module_name, "log_training_error", {{Type::I32, Type::F32}, {}});
   log_testing_accuracy_ = module_manager->MakeFuncImport(module_name, "log_testing_accuracy", {{Type::F32}, {}});
   log_testing_time_ = module_manager->MakeFuncImport(module_name, "log_testing_time", {{Type::F64}, {}});
   log_testing_error_ = module_manager->MakeFuncImport(module_name, "log_testing_error", {{Type::F32}, {}});

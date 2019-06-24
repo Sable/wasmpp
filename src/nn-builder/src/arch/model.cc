@@ -502,11 +502,8 @@ void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const
       }));
 
       if(options_.log_training_error) {
-        // Log training error
-        b1->Insert(MakeCall(builtins_.message.LogTrainingError(), {
-          MakeLocalGet(epoch),
-          MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(training_batch_.size()))
-        }));
+        // Store total cost error in memory
+        b1->Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost_mean)));
       }
 
       if(options_.log_training_accuracy) {
@@ -517,9 +514,18 @@ void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const
   });
 
   if(options_.log_training_accuracy) {
+    // Create function to access the number training batches hits
     module_manager_.MakeFunction("training_batches_hits", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_hits_->Begin())));
+    });
+  }
+
+  if(options_.log_training_accuracy) {
+    // Create function to access the number training batches hits
+    module_manager_.MakeFunction("training_batches_error", {{},{Type::F32}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF32Load(MakeI32Const(training_error_->Begin())));
     });
   }
 
