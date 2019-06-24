@@ -424,9 +424,8 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_s
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const std::vector<std::vector<float>> &input,
+void Model::CompileTrainingFunctions(float learning_rate, const std::vector<std::vector<float>> &input,
                             const std::vector<std::vector<float>> &labels) {
-  ERROR_UNLESS(epochs >= 1, "epoch must be at least 1");
   ERROR_UNLESS(!input.empty(), "training input cannot be empty");
   ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
   ERROR_UNLESS(input.size() % training_batch_size_ == 0, "Input must be a multiple of the training batch size");
@@ -435,22 +434,21 @@ void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const
   training_labels_vals_ = labels;
   AllocateTraining();
 
-  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     // Set learning rate
     f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
 
-    assert(locals.size() == 9);
+    assert(locals.size() == 8);
     auto time_total = locals[0];
     auto time_epoch = locals[1];
     auto cost_mean = locals[2];
     auto hits = locals[3]; // TODO Change to Type::I32
-    auto epoch = locals[4];
-    auto train_addr = locals[5];
-    auto label_addr = locals[6];
-    auto vi32_1 = locals[7];
-    auto vi32_2 = locals[8];
+    auto train_addr = locals[4];
+    auto label_addr = locals[5];
+    auto vi32_1 = locals[6];
+    auto vi32_2 = locals[7];
 
     auto train_begin = training_batch_.front()->Memory()->Begin();
     auto train_end = training_batch_.back()->Memory()->End();
@@ -458,59 +456,57 @@ void Model::CompileTrainingFunctions(uint32_t epochs, float learning_rate, const
     auto label_begin = training_labels_batch_.front()->Memory()->Begin();
     auto label_size = training_labels_batch_.front()->Memory()->Bytes();
 
-    f.Insert(GenerateRangeLoop(f.Label(), epoch, 0, epochs, 1, {}, [&](BlockBody* b1) {
-      b1->Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
-      b1->Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
-      b1->Insert(MakeLocalSet(hits, MakeF32Const(0)));
-      b1->Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b2){
-        // Forward algorithm
-        b2->Insert(MakeCall(forward_training_func_, {
-          MakeLocalGet(train_addr)
-        }));
-
-        // Backward algorithm
-        b2->Insert(MakeCall(backward_func_, {
-          MakeLocalGet(train_addr),
-          MakeLocalGet(label_addr)
-        }));
-
-        if(options_.log_training_accuracy) {
-          // Count number of correct results
-          b2->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
-              MakeLocalGet(label_addr)
-          })));
-        }
-
-        if(options_.log_training_error) {
-          // Compute training error
-          assert(layers_.back()->Position() == Output);
-          if(layers_.back()->Type() == FullyConnected) {
-            auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
-            b2->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
-          } else {
-            assert(!"Compute cost not implemented");
-          }
-        }
-
-        if(options_.log_training_confusion_matrix) {
-          // Update confusion matrix
-          b2->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
-        }
-
-        // Move to the next label batch in memory
-        b2->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
+    f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
+    f.Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
+    f.Insert(MakeLocalSet(hits, MakeF32Const(0)));
+    f.Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b1){
+      // Forward algorithm
+      b1->Insert(MakeCall(forward_training_func_, {
+        MakeLocalGet(train_addr)
       }));
 
-      if(options_.log_training_error) {
-        // Store total cost error in memory
-        b1->Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost_mean)));
-      }
+      // Backward algorithm
+      b1->Insert(MakeCall(backward_func_, {
+        MakeLocalGet(train_addr),
+        MakeLocalGet(label_addr)
+      }));
 
       if(options_.log_training_accuracy) {
-        // Store accuracy in memory
-        b1->Insert(MakeF32Store(MakeI32Const(training_hits_->Begin()), MakeLocalGet(hits)));
+        // Count number of correct results
+        b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
+            MakeLocalGet(label_addr)
+        })));
       }
+
+      if(options_.log_training_error) {
+        // Compute training error
+        assert(layers_.back()->Position() == Output);
+        if(layers_.back()->Type() == FullyConnected) {
+          auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
+          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
+        } else {
+          assert(!"Compute cost not implemented");
+        }
+      }
+
+      if(options_.log_training_confusion_matrix) {
+        // Update confusion matrix
+        b1->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
+      }
+
+      // Move to the next label batch in memory
+      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
     }));
+
+    if(options_.log_training_error) {
+      // Store total cost error in memory
+      f.Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost_mean)));
+    }
+
+    if(options_.log_training_accuracy) {
+      // Store accuracy in memory
+      f.Insert(MakeF32Store(MakeI32Const(training_hits_->Begin()), MakeLocalGet(hits)));
+    }
   });
 
   if(options_.log_training_accuracy) {
