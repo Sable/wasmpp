@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Load csv file
-  uint32_t training_limit = 1000;
+  uint32_t training_limit = 2240;
   uint32_t testing_limit = 100;
   std::vector<std::vector<float>> train_data;
   std::vector<std::vector<float>> train_labels;
@@ -140,12 +140,14 @@ int main(int argc, char *argv[]) {
   });
 
   uint32_t training_batch_size = 1;
+  uint32_t training_batches_in_memory = 1;
   uint32_t testing_batch_size = 1;
   uint32_t prediction_batch_size = 1;
   float learning_rate = 0.02;
   auto loss = model.Builtins().loss.CrossEntropy();
-  model.CompileLayers(training_batch_size, testing_batch_size, prediction_batch_size, loss);
-  model.CompileTrainingFunctions(learning_rate, train_data, train_labels);
+  model.CompileLayers(training_batch_size, training_batches_in_memory,
+                      testing_batch_size, prediction_batch_size, loss);
+  model.CompileTrainingFunctions(learning_rate);
   model.CompileTestingFunction(test_data, test_labels);
   model.CompilePredictionFunctions();
   model.CompileInitialization();

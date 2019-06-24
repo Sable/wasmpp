@@ -109,6 +109,7 @@ private:
   uint32_t training_batch_size_;
   uint32_t testing_batch_size_;
   uint32_t prediction_batch_size_;
+  uint32_t training_batches_in_memory_;
 
   // Limits
   // MAX_FLOAT_PER_DATA value is arbitrary, but large
@@ -143,10 +144,8 @@ private:
   wabt::Var count_correct_predictions_testing_func_;
 
   // Training data
-  std::vector<ds::NDArray*> training_batch_;
-  std::vector<ds::NDArray*> training_labels_batch_;
-  std::vector<std::vector<float>> training_vals_;
-  std::vector<std::vector<float>> training_labels_vals_;
+  wasmpp::Memory* training_data_batches_;
+  wasmpp::Memory* training_labels_batches_;
 
   // Test data
   std::vector<ds::NDArray*> testing_batch_;
@@ -185,7 +184,6 @@ private:
   void MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals,
                 std::vector<std::vector<float>> labels_vals, std::vector<ds::NDArray*> data_batch,
                 std::vector<ds::NDArray*> labels_batch, uint32_t batch_size);
-  void MakeTrainingData(wabt::Var memory);
   void MakeTestingData(wabt::Var memory);
   void MakeLayersData(wabt::Var memory);
 
@@ -201,10 +199,10 @@ public:
   void SetLayers(std::vector<layer::Layer*> layers);
 
   // Compile functions
-  void CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_size, uint32_t prediction_batch_size,
+  void CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+                     uint32_t testing_batch_size, uint32_t prediction_batch_size,
                      builtins::LossFunction loss);
-  void CompileTrainingFunctions(float learning_rate, const std::vector<std::vector<float>> &input,
-                       const std::vector<std::vector<float>> &labels);
+  void CompileTrainingFunctions(float learning_rate);
   void CompileTestingFunction(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompilePredictionFunctions();
   void CompileInitialization();
@@ -222,6 +220,7 @@ public:
   const NativeFunctions& Natives() const { return natives_; }
 #endif
   uint32_t TrainingBatchSize() const { return training_batch_size_; }
+  uint32_t TrainingBatchesInMemory() const { return training_batches_in_memory_; }
   uint32_t TestingBatchSize() const { return testing_batch_size_; }
   uint32_t PredictionBatchSize() const { return prediction_batch_size_; }
   const ModelOptions& Options() const { return options_; }

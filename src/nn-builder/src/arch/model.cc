@@ -168,22 +168,7 @@ void Model::AllocateLayers() {
 }
 
 void Model::AllocateTraining() {
-  // Do not merge loops so that all
-  // training data are consecutive in memory
 
-  for(uint32_t b=0; b < training_vals_.size(); b += TrainingBatchSize()) {
-    // Training data
-    ds::NDArray* training_array = nullptr;
-    ALLOCATE_MATRIX(training_array, (uint32_t) training_vals_[0].size(), TrainingBatchSize());
-    training_batch_.push_back(training_array);
-  }
-
-  for(uint32_t b=0; b < training_labels_vals_.size(); b += TrainingBatchSize()) {
-    // Training labels
-    ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MATRIX(labels_array, (uint32_t) training_labels_vals_[0].size(), TrainingBatchSize());
-    training_labels_batch_.push_back(labels_array);
-  }
 }
 
 void Model::AllocateTest() {
@@ -259,10 +244,6 @@ void Model::MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals
     auto memory_begin = labels_batch.front()->Memory()->Begin() + (i * MAX_FLOAT_PER_DATA * TypeSize(Type::F32));
     module_manager_.MakeData(memory, memory_begin, sub_labels);
   }
-}
-
-void Model::MakeTrainingData(wabt::Var memory) {
-  MakeData(memory, training_vals_, training_labels_vals_, training_batch_, training_labels_batch_, TrainingBatchSize());
 }
 
 void Model::MakeTestingData(wabt::Var memory) {
@@ -389,17 +370,19 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 void Model::CompileInitialization() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
-  MakeTrainingData(memory);
   MakeTestingData(memory);
   MakeLayersData(memory);
 }
 
-void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_size, uint32_t prediction_batch_size,
+void Model::CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+                          uint32_t testing_batch_size, uint32_t prediction_batch_size,
                           nn::builtins::LossFunction loss) {
   ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
   ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
   ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
+  ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
   training_batch_size_ = training_batch_size;
+  training_batches_in_memory_ = training_batches_in_memory;
   testing_batch_size_ = testing_batch_size;
   prediction_batch_size_ = prediction_batch_size;
   loss_ = loss;
@@ -424,42 +407,73 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t testing_batch_s
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTrainingFunctions(float learning_rate, const std::vector<std::vector<float>> &input,
-                            const std::vector<std::vector<float>> &labels) {
-  ERROR_UNLESS(!input.empty(), "training input cannot be empty");
-  ERROR_UNLESS(input.size() == labels.size(), "training and labels size should match");
-  ERROR_UNLESS(input.size() % training_batch_size_ == 0, "Input must be a multiple of the training batch size");
+void Model::CompileTrainingFunctions(float learning_rate) {
 
-  training_vals_ = input;
-  training_labels_vals_ = labels;
-  AllocateTraining();
+  // Get the number of input and output
+  uint32_t input_size = 0;
+  uint32_t output_size = 0;
+  if(layers_.front()->Type() == FullyConnected)  {
+    input_size = static_cast<DenseInputLayer*>(layers_.front())->Nodes();
+  } else {
+    assert(!"Not implemented");
+  }
+  if(layers_.back()->Type() == FullyConnected)  {
+    output_size = static_cast<DenseOutputLayer*>(layers_.back())->Nodes();
+  } else {
+    assert(!"Not implemented");
+  }
 
-  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
-  module_manager_.MakeFunction("train", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
+  // Allocate memory for data
+  uint32_t data_entry_bytes             = input_size * TypeSize(Type::F32);
+  uint32_t data_batch_bytes             = data_entry_bytes * TrainingBatchSize();
+  uint32_t data_batches_in_memory_bytes = data_batch_bytes * TrainingBatchesInMemory();
+  training_data_batches_ = module_manager_.Memory().Allocate(data_batches_in_memory_bytes);
+
+  // Allocate memory for labels
+  uint32_t labels_entry_bytes             = output_size * TypeSize(Type::F32);
+  uint32_t labels_batch_bytes             = labels_entry_bytes * TrainingBatchSize();
+  uint32_t labels_batches_in_memory_bytes = labels_batch_bytes * TrainingBatchesInMemory();
+  training_labels_batches_ = module_manager_.Memory().Allocate(labels_batches_in_memory_bytes);
+
+  // Create function to get the offset for training data in memory
+  module_manager_.MakeFunction("training_data_offset", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(training_data_batches_->Begin()));
+  });
+
+  // Create function to get the offset for training labels in memory
+  module_manager_.MakeFunction("training_labels_offset", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(training_labels_batches_->Begin()));
+  });
+
+  // Create training function
+  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  module_manager_.MakeFunction("train", {{Type::I32},{}}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     // Set learning rate
+    // TODO Move to JavaScript
     f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
 
-    assert(locals.size() == 8);
-    auto time_total = locals[0];
-    auto time_epoch = locals[1];
-    auto cost_mean = locals[2];
-    auto hits = locals[3]; // TODO Change to Type::I32
-    auto train_addr = locals[4];
-    auto label_addr = locals[5];
-    auto vi32_1 = locals[6];
-    auto vi32_2 = locals[7];
+    assert(params.size() == 1);
+    auto batches_to_train_on = params[0];
 
-    auto train_begin = training_batch_.front()->Memory()->Begin();
-    auto train_end = training_batch_.back()->Memory()->End();
-    auto train_size = training_batch_.front()->Memory()->Bytes();
-    auto label_begin = training_labels_batch_.front()->Memory()->Begin();
-    auto label_size = training_labels_batch_.front()->Memory()->Bytes();
+    assert(locals.size() == 7);
+    auto cost = locals[0];
+    auto hits = locals[1];        // TODO Change to Type::I32
+    auto counter = locals[2];
+    auto train_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
-    f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
-    f.Insert(MakeLocalSet(cost_mean, MakeF32Const(0)));
-    f.Insert(MakeLocalSet(hits, MakeF32Const(0)));
-    f.Insert(GenerateRangeLoop(f.Label(), train_addr, train_begin, train_end, train_size, {}, [&](BlockBody* b1){
+    // Set the training pointer to the address of the first training batch
+    f.Insert(MakeLocalSet(train_addr, MakeI32Const(training_data_batches_->Begin())));
+    // Set the labels pointer to the address of the first labels batch
+    f.Insert(MakeLocalSet(label_addr, MakeI32Const(training_labels_batches_->Begin())));
+
+    // Loop on batches in memory
+    f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_train_on, 1, {}, [&](BlockBody* b1){
       // Forward algorithm
       b1->Insert(MakeCall(forward_training_func_, {
         MakeLocalGet(train_addr)
@@ -471,59 +485,73 @@ void Model::CompileTrainingFunctions(float learning_rate, const std::vector<std:
         MakeLocalGet(label_addr)
       }));
 
+      // Count number of correct results
       if(options_.log_training_accuracy) {
-        // Count number of correct results
         b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
             MakeLocalGet(label_addr)
         })));
       }
 
+      // Compute training error
       if(options_.log_training_error) {
-        // Compute training error
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
-          auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
+          auto compute_cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
+          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, compute_cost));
         } else {
           assert(!"Compute cost not implemented");
         }
       }
 
+      // Update confusion matrix
       if(options_.log_training_confusion_matrix) {
-        // Update confusion matrix
         b1->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
       }
 
+      // Move to the next data batch in memory
+      b1->Insert(GenerateCompoundAssignment(train_addr, Opcode::I32Add, MakeI32Const(data_batch_bytes)));
       // Move to the next label batch in memory
-      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
+      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
 
+    // Store total cost error in memory
     if(options_.log_training_error) {
-      // Store total cost error in memory
-      f.Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost_mean)));
+      f.Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost)));
     }
 
+    // Store accuracy in memory
     if(options_.log_training_accuracy) {
-      // Store accuracy in memory
       f.Insert(MakeF32Store(MakeI32Const(training_hits_->Begin()), MakeLocalGet(hits)));
     }
   });
 
+  // Create function to access training batches hits
   if(options_.log_training_accuracy) {
-    // Create function to access the number training batches hits
     module_manager_.MakeFunction("training_batches_hits", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_hits_->Begin())));
     });
   }
 
+  // Create function to access training batches error
   if(options_.log_training_accuracy) {
-    // Create function to access the number training batches hits
     module_manager_.MakeFunction("training_batches_error", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_error_->Begin())));
     });
   }
+
+  // Create function to access training batch size
+  module_manager_.MakeFunction("training_batch_size", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(TrainingBatchSize()));
+  });
+
+  // Create function tot access training batches in memory
+  module_manager_.MakeFunction("training_batches_in_memory", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(TrainingBatchesInMemory()));
+  });
 
   // Create forward log functions
   if(options_.log_forward) {

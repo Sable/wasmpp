@@ -153,13 +153,21 @@ class CompiledModel {
   }
 
   // Run train Wasm function
-  Train(config) {
+  Train(data, labels, config) {
     // Register the total training time
     let total_time = 0.0;
     // Model details
-    let batch_size = 0;
-    let batches_in_memory = 0;
-    let batches_in_memory_count = 1;
+    let batch_size = this._TrainingBatchSize();
+    let batches_in_memory = this._TrainingBatchesInMemory();
+    let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
+    if(data.length != labels.length) {
+      console.error("Data size should be equal to the labels size");
+      return false;
+    }
+    if(data.length % batch_size != 0) {
+      console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
+      return false;
+    }
     // Set configuration
     config = config || {};
     config.log_accuracy = config.log_accuracy || false;
@@ -171,12 +179,17 @@ class CompiledModel {
       let total_hits = 0;
       let average_cost = 0.0;
       let subtotal_time = 0.0;
-      // Load new batches in memory and train
       for(let i=0; i < batches_in_memory_count; i++) {
+        // Load new batches in memory and train
+        let batches_inserted = this._InsertBatchesInMemory(this._TrainingDataOffset(), 
+          data, this._TrainingLabelsOffset(), labels, i * batches_in_memory * batch_size, 
+          batch_size, batches_in_memory);
+        
         // Start training
         let time = new Date().getTime();
-        this.Exports().train();
+        this.Exports().train(batches_inserted);
         subtotal_time += new Date().getTime() - time;
+        
         // Update training details
         if(config.log_accuracy) total_hits    += this._TrainingBatchesAccuracy();
         if(config.log_error)    average_cost  += this._TrainingBatchesError();
@@ -184,11 +197,44 @@ class CompiledModel {
       // Update total time
       total_time += subtotal_time;
       // Log after end of epoch
-      if(config.log_accuracy) console.log("Training Accuracy in epoch", e,":", total_hits);
-      if(config.log_error)    console.log("Training Error in epoch", e,":", average_cost);
+      if(config.log_accuracy) console.log("Training Accuracy in epoch", e,":", total_hits / data.length);
+      if(config.log_error)    console.log("Training Error in epoch", e,":", average_cost / (data.length / batch_size));
       if(config.log_time)     console.log("Training Time in epoch", e,":", subtotal_time,
                                       "ms. Total time:",total_time,"ms");
     }
+  }
+
+  _InsertBatchesInMemory(data_offset, data, labels_offset, labels, from, batch_size, num_batches) {
+    let count = 0;
+    let to = from + batch_size * num_batches;
+    for(let i=from; i < to && i < data.length; i+=batch_size) {
+      this._InsertBatchInMemory(data_offset, data, i, batch_size);
+      this._InsertBatchInMemory(labels_offset, labels, i, batch_size);
+      // Update offsets
+      data_offset += data[i].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+      labels_offset += labels[i].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+      count++;
+    }
+    return count;
+  }
+
+  _InsertBatchInMemory(memory_offset, data, from, batch_size) {
+    let index = 0;
+    let entry_size = data[from].length;
+    let memory = new Float32Array(this.Memory().buffer, memory_offset, entry_size * batch_size);
+    for (let c = 0; c < entry_size; c++) {
+      for (let r = 0; r < batch_size; r++) {
+        memory[index++] = data[from + r][c];
+      }
+    }
+  }
+
+  _TrainingDataOffset() {
+    return this.Exports().training_data_offset();
+  }
+
+  _TrainingLabelsOffset() {
+    return this.Exports().training_labels_offset();
   }
 
   _TrainingBatchesAccuracy() {
@@ -209,6 +255,14 @@ class CompiledModel {
       this._WarnNotFound("Training batches error function not found");
     }
     return 0;
+  }
+
+  _TrainingBatchSize() {
+    return this.Exports().training_batch_size();
+  }
+
+  _TrainingBatchesInMemory() {
+    return this.Exports().training_batches_in_memory();
   }
 
   // Run test Wasm function
