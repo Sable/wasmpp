@@ -125,6 +125,7 @@ class EncodedData {
   Y;
   y_size;
   y_count;
+  good = false;
 }
 
 // This class is a wrapper for the generated Wasm model
@@ -185,6 +186,13 @@ class CompiledModel {
     for(let batch=0; batch < total_batches; batch++) {
       let data_begin = batch * batch_size;
       let data_end = data_begin + batch_size;
+      // Check if the input provided is correct
+      for(let r = data_begin; r < data_end; r++) {
+        if(data[r].length != entry_size) {
+          console.log("Input shape is incorrect. Expecting", entry_size, "but received", data[r].length);
+          return false;
+        }
+      }
       for (let c = 0; c < entry_size; c++) {
         for (let r = data_begin; r < data_end; r++) {
           encoded[index++] = data[r][c];
@@ -220,6 +228,10 @@ class CompiledModel {
     result.Y = this._EncodeArray(labels, output_size, batch_size);
     result.y_size = output_size;
     result.y_count = labels.length;
+    // Check if encoding was successful
+    if(result.X !== false && result.Y !== false) {
+      result.good = true;
+    }
     return result;
   }
 
@@ -237,6 +249,10 @@ class CompiledModel {
 
   // Run train Wasm function
   Train(input, config) {
+    if(!input.good) {
+      console.log("Trainting input seems bad, skipping ...");
+      return false;
+    }
     // Load model batch information
     let batch_size = this._TrainingBatchSize();
     let batches_in_memory = this._TrainingBatchesInMemory();
@@ -266,18 +282,15 @@ class CompiledModel {
       let total_hits = 0;
       let average_cost = 0.0;
       let train_time = 0.0;
-      let copy_time = 0.0;
       let data_offset = this._TrainingDataOffset();
       let labels_offset = this._TrainingLabelsOffset();
       for(let i=0; i < number_of_batches; i += batches_in_memory) {
         // Load new batches in memory and train
-        let time = new Date().getTime();
         let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
                                                          batch_size, batches_in_memory);
-        copy_time += new Date().getTime() - time;
 
         // Start training
-        time = new Date().getTime();
+        let time = new Date().getTime();
         this.Exports().train_batches_in_memory(batches_inserted);
         train_time += new Date().getTime() - time;
         
@@ -290,7 +303,7 @@ class CompiledModel {
         }
       }
       // Update total time
-      total_time += train_time + copy_time;
+      total_time += train_time;
       // Log after end of epoch
       if(config.log_epoch_num) {
         console.log("Epoch",e+1);
@@ -302,9 +315,7 @@ class CompiledModel {
         console.log(">> Error:     ", average_cost / number_of_batches);
       }
       if(config.log_time) {
-        console.log(">> Copy time: ", copy_time, "ms");
-        console.log(">> Train time:", train_time, "ms");
-        console.log(">> Epoch time:", train_time + copy_time, "ms")
+        console.log(">> Epoch time:", train_time, "ms");
         console.log(">> Total time:", total_time, "ms");
       }
     }
@@ -321,6 +332,10 @@ class CompiledModel {
   
   // Run test Wasm function
   Test(input, config) {
+    if(!input.good) {
+      console.log("Testing input seems bad, skipping ...");
+      return false;
+    }
     // Load model batch information
     let batch_size = this._TestingBatchSize();
     let batches_in_memory = this._TestingBatchesInMemory();
@@ -338,18 +353,15 @@ class CompiledModel {
     let total_hits = 0;
     let average_cost = 0.0;
     let test_time = 0.0;
-    let copy_time = 0.0;
     let data_offset = this._TestingDataOffset();
     let labels_offset = this._TestingLabelsOffset();
     for(let i=0; i < number_of_batches; i += batches_in_memory) {
       // Load new batches in memory and test
-      let time = new Date().getTime();
       let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
                                                        batch_size, batches_in_memory);
-      copy_time += new Date().getTime() - time;
 
       // Start testing
-      time = new Date().getTime();
+      let time = new Date().getTime();
       this.Exports().test_batches_in_memory(batches_inserted);
       test_time += new Date().getTime() - time;
       
@@ -362,19 +374,16 @@ class CompiledModel {
       }
     }
     // Update total time
-    total_time += test_time + copy_time;
+    total_time += test_time;
     // Log testing results
-    console.log("Testing complete!");
     if(config.log_accuracy) {
-      console.log(">> Accuracy:  ", total_hits / input.x_count);
+      console.log(">> Test Accuracy:  ", total_hits / input.x_count);
     }
     if(config.log_error) {
-      console.log(">> Error:     ", average_cost / number_of_batches);
+      console.log(">> Test Error:     ", average_cost / number_of_batches);
     }
     if(config.log_time) {
-      console.log(">> Copy time: ", copy_time, "ms");
-      console.log(">> Test time: ", test_time, "ms");
-      console.log(">> Total time:", total_time, "ms");
+      console.log(">> Test Time: ", test_time, "ms");
     }
     if(config.log_conf_mat) {
       this._LogTestingConfusionMatrix();
