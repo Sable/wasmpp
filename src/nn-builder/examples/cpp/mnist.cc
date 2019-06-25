@@ -143,11 +143,10 @@ int main(int argc, char *argv[]) {
   uint32_t training_batches_in_memory = 1;
   uint32_t testing_batch_size = 1;
   uint32_t prediction_batch_size = 1;
-  float learning_rate = 0.02;
   auto loss = model.Builtins().loss.CrossEntropy();
   model.CompileLayers(training_batch_size, training_batches_in_memory,
                       testing_batch_size, prediction_batch_size, loss);
-  model.CompileTrainingFunctions(learning_rate);
+  model.CompileTrainingFunctions();
   model.CompileTestingFunction(test_data, test_labels);
   model.CompilePredictionFunctions();
   model.CompileInitialization();

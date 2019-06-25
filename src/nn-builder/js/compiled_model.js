@@ -156,11 +156,14 @@ class CompiledModel {
   Train(data, labels, config) {
     // Register the total training time
     let total_time = 0.0;
-    // Model details
+    
+    // Load model batch information
     let batch_size = this._TrainingBatchSize();
     let batches_in_memory = this._TrainingBatchesInMemory();
     let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
     let number_of_batches = data.length / batch_size;
+    
+    // Check if input is valid
     if(data.length != labels.length) {
       console.error("Data size should be equal to the labels size");
       return false;
@@ -169,12 +172,19 @@ class CompiledModel {
       console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
       return false;
     }
-    // Set configuration
-    config = config || {};
-    config.log_accuracy = config.log_accuracy || false;
-    config.log_error = config.log_error || false;
-    config.log_time = config.log_time || false;
-    config.epochs = config.epochs || 0;
+    
+    // Configuration        Value                     Default
+    config                  = config                  || {};
+    config.log_accuracy     = config.log_accuracy     || false;
+    config.log_error        = config.log_error        || false;
+    config.log_time         = config.log_time         || false;
+    config.epochs           = config.epochs           || 0;
+    config.learning_rate    = config.learning_rate    || 0.01;
+
+    // Update learning rate
+    this._SetLearningRate(config.learning_rate);
+
+    // Train for each epoch
     for(let e=0; e < config.epochs; e++) {
       // Epoch results
       let total_hits = 0;
@@ -185,8 +195,9 @@ class CompiledModel {
         // Load new batches in memory and train
         let time = new Date().getTime();
         let batches_inserted = this._InsertBatchesInMemory(this._TrainingDataOffset(), 
-          data, this._TrainingLabelsOffset(), labels, i * batches_in_memory * batch_size, 
-          batch_size, batches_in_memory);
+                                data, this._TrainingLabelsOffset(), labels, 
+                                i * batches_in_memory * batch_size, 
+                                batch_size, batches_in_memory);
         copy_time += new Date().getTime() - time;
 
         // Start training
@@ -217,11 +228,18 @@ class CompiledModel {
         console.log(">> Train time:", train_time, "ms");
         console.log(">> Epoch time:", train_time + copy_time, "ms")
         console.log(">> Total time:", total_time, "ms");
+        if(e === config.epochs - 1)
+          console.log(">> Time/Batch:", total_time / number_of_batches);
       }
     }
-    if(config.log_time) {
-      console.log(">> Time/Batch:", total_time / number_of_batches);
-    }
+  }
+
+  _GetLearningRate() {
+    return this.Exports().get_learning_rate();
+  }
+
+  _SetLearningRate(val) {
+    this.Exports().set_learning_rate(val);
   }
 
   _InsertBatchesInMemory(data_offset, data, labels_offset, labels, from, batch_size, num_batches) {

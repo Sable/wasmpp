@@ -44,7 +44,8 @@ if(process.argv.length > 2) {
       log_accuracy: true,
       log_error: true,
       log_time: true,
-      epochs: 10
+      epochs: 10,
+      learning_rate: 0.02
     });
     //compiled_model.LogTrainForward();
     //compiled_model.LogTrainBackward();

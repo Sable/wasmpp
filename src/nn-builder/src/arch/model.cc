@@ -407,7 +407,7 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t training_batche
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTrainingFunctions(float learning_rate) {
+void Model::CompileTrainingFunctions() {
 
   // Get the number of input and output
   uint32_t input_size = 0;
@@ -447,14 +447,22 @@ void Model::CompileTrainingFunctions(float learning_rate) {
     f.Insert(MakeI32Const(training_labels_batches_->Begin()));
   });
 
+  // Create function to get the learning rate
+  module_manager_.MakeFunction("get_learning_rate", {{},{Type::F32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(GetLearningRate());
+  });
+
+  // Create function to get the learning rate
+  module_manager_.MakeFunction("set_learning_rate", {{Type::F32},{}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(SetLearningRate(MakeLocalGet(params[0])));
+  });
+
   // Create training function
   std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
-    // Set learning rate
-    // TODO Move to JavaScript
-    f.Insert(SetLearningRate(MakeF32Const(learning_rate)));
-
     assert(params.size() == 1);
     auto batches_to_train_on = params[0];
 

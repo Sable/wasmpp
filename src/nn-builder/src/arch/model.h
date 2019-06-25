@@ -202,7 +202,7 @@ public:
   void CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
                      uint32_t testing_batch_size, uint32_t prediction_batch_size,
                      builtins::LossFunction loss);
-  void CompileTrainingFunctions(float learning_rate);
+  void CompileTrainingFunctions();
   void CompileTestingFunction(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
   void CompilePredictionFunctions();
   void CompileInitialization();
