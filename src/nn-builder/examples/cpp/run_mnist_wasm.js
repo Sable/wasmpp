@@ -1,11 +1,11 @@
 const fs = require('fs');
-const {CompiledModel} = require('./compiled_model');
+const {CompiledModel} = require('../../js/compiled_model');
 const mnist = require('mnist');
 
 // This is a workaround to omit trap-handlers
 // in the generated machine code
 // Comment: https://github.com/nodejs/node/issues/14927#issuecomment-482919665
-require("../../../third_party/gyp/trap-handler/build/Release/th");
+require("../../../../third_party/gyp/trap-handler/build/Release/th");
 
 // Warning to enable SIMD in Node
 process.on('unhandledRejection', error => {
@@ -22,7 +22,7 @@ if(process.argv.length > 2) {
 
     // Load mnist data
     let mnist_data = {training:[]};
-    for(let i=0; i < 224; i++) {
+    for(let i=0; i < 224*3; i++) {
       for(let j=0; j < 10; j++) {
         let l = [0,0,0,0,0,0,0,0,0,0];
         l[j] = 1;
