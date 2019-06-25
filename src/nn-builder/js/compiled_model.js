@@ -164,7 +164,7 @@ class CompiledModel {
     return this.Exports().memory;
   }
 
-  _EncodeInput(data, entry_size, batch_size) {
+  _EncodeArray(data, entry_size, batch_size) {
     // We assume that data and batch size
     // have already been checked
     //
@@ -194,34 +194,41 @@ class CompiledModel {
     return encoded;
   }
 
-  EncodeTraining(data, labels) {
+  _EncodeInput(data, labels, batch_size) {
     // Load model info
-    let batch_size = this._TrainingBatchSize();
     let input_size = this._LayerSize(0);
     let output_size = this._LayerSize(this._TotalLayers() - 1);
     // Check if input is valid
     if(data.length === 0) {
-      console.log("Training data cannot be empty");
+      console.log("Data cannot be empty");
       return false;
     }
     if(data.length !== labels.length) {
-      console.log("Training data and labels should be equal");
+      console.log("Data and labels should be equal");
       return false;
     }
     if(data.length % batch_size != 0) {
-      console.error("Training data size",data.length,"should be divisible by the number of batch",batch_size);
+      console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
       return false;
     }
     // Encode data
     let result = new EncodedData();
-    result.X = this._EncodeInput(data, input_size, batch_size);
+    result.X = this._EncodeArray(data, input_size, batch_size);
     result.x_size = input_size;
     result.x_count = data.length;
     // Encode labels
-    result.Y = this._EncodeInput(labels, output_size, batch_size);
+    result.Y = this._EncodeArray(labels, output_size, batch_size);
     result.y_size = output_size;
     result.y_count = labels.length;
     return result;
+  }
+
+  EncodeTraining(data, labels) {
+    return this._EncodeInput(data, labels, this._TrainingBatchSize());
+  }
+
+  EncodeTesting(data, labels) {
+    return this._EncodeInput(data, labels, this._TestingBatchSize());
   }
 
   _LayerSize(id) {
@@ -313,22 +320,11 @@ class CompiledModel {
   }
   
   // Run test Wasm function
-  Test(data, labels, config) {
+  Test(input, config) {
     // Load model batch information
     let batch_size = this._TestingBatchSize();
     let batches_in_memory = this._TestingBatchesInMemory();
-    let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
-    let number_of_batches = data.length / batch_size;
-    
-    // Check if input is valid
-    if(data.length != labels.length) {
-      console.error("Data size should be equal to the labels size");
-      return false;
-    }
-    if(data.length % batch_size != 0) {
-      console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
-      return false;
-    }
+    let number_of_batches = input.x_count / batch_size;
     
     // Configuration        Value                     Default
     config                  = config                  || {};
@@ -343,14 +339,13 @@ class CompiledModel {
     let average_cost = 0.0;
     let test_time = 0.0;
     let copy_time = 0.0;
-
-    for(let i=0; i < batches_in_memory_count; i++) {
+    let data_offset = this._TestingDataOffset();
+    let labels_offset = this._TestingLabelsOffset();
+    for(let i=0; i < number_of_batches; i += batches_in_memory) {
       // Load new batches in memory and test
       let time = new Date().getTime();
-      let batches_inserted = this._InsertBatchesInMemory(this._TestingDataOffset(), 
-                              data, this._TestingLabelsOffset(), labels, 
-                              i * batches_in_memory * batch_size, 
-                              batch_size, batches_in_memory);
+      let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
+                                                       batch_size, batches_in_memory);
       copy_time += new Date().getTime() - time;
 
       // Start testing
@@ -371,7 +366,7 @@ class CompiledModel {
     // Log testing results
     console.log("Testing complete!");
     if(config.log_accuracy) {
-      console.log(">> Accuracy:  ", total_hits / data.length);
+      console.log(">> Accuracy:  ", total_hits / input.x_count);
     }
     if(config.log_error) {
       console.log(">> Error:     ", average_cost / number_of_batches);
@@ -424,26 +419,6 @@ class CompiledModel {
 
     // Return number of batches inserted in the memory
     return batch_in_memory;
-  }
-
-  _InsertBatchesInMemory(data_offset, data, labels_offset, labels, from, batch_size, num_batches) {
-    let count = 0;
-    let to = from + batch_size * num_batches;
-    // Compute batch sizes
-    let data_batch_bytes = data[from].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
-    let labels_batch_bytes = labels[from].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
-    // Copy batches into linear memory
-    for(let i=from; i < to && i < data.length; i+=batch_size) {
-      // Copy data and labels
-      this._InsertBatchInMemory(data_offset, data, i, batch_size);
-      this._InsertBatchInMemory(labels_offset, labels, i, batch_size);
-      // Move to the next batch
-      data_offset += data_batch_bytes;
-      labels_offset += labels[i].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
-      // Count how many batches were copied
-      count++;
-    }
-    return count;
   }
 
   _InsertBatchInMemory(memory_offset, data, from, batch_size) {

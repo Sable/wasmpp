@@ -30,39 +30,32 @@ if(process.argv.length > 2) {
     mnist_data.test.forEach((x) => {test_data.push(x.input); test_labels.push(x.output)});
     
     let training = compiled_model.EncodeTraining(train_data, train_labels);
+    let testing = compiled_model.EncodeTesting(test_data, test_labels);
 
     console.log("Training ...");
     compiled_model.Train(training, {
-      log_accuracy: true,
+      // log_accuracy: true,
       // log_error: true,
-      log_time: true,
+      // log_time: true,
       // log_forward: true,
       // log_backward: true,
       // log_conf_mat: true,
-      epochs: 100,
+      epochs: 10,
       learning_rate: 0.02
     });
 
-    // console.log("Testing ...");
-    // compiled_model.Test(test_data, test_labels, {
-    //   log_time: true,
-    //   log_accuracy: true,
-    //   log_error: true
-    // });
+    console.log("Testing ...");
+    compiled_model.Test(testing, {
+      log_time: true,
+      log_accuracy: true,
+      log_error: true
+    });
 
     // console.log("Predicting ...");
     // compiled_model.Predict([train_data[0],train_data[1]], {
     //   log_time: true,
     //   log_result: true,
     // });
-    //
-    // For example, in the logic example
-    // if the prediction batch size is 2
-    // then the function call will be:
-    // compiled_model.Predict([[0,1],[1,0]]);
-    // compiled_model.Predict([[1,1],[0,0]]);
-    // compiled_model.Predict([[0,1],[1,1]]);
-    // ...
   })
 } else {
     console.log("Missing argument: mnist.wasm");
