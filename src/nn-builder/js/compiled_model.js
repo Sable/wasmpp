@@ -205,7 +205,7 @@ class CompiledModel {
       // Update total time
       total_time += train_time + copy_time;
       // Log after end of epoch
-      console.log("Epoch",e);
+      console.log("Epoch",e+1);
       if(config.log_accuracy) {
         console.log(">> Accuracy:  ", total_hits / data.length);
       }
@@ -213,7 +213,7 @@ class CompiledModel {
         console.log(">> Error:     ", average_cost / number_of_batches);
       }
       if(config.log_time) {
-        console.log(">> Copy time:", copy_time, "ms");
+        console.log(">> Copy time: ", copy_time, "ms");
         console.log(">> Train time:", train_time, "ms");
         console.log(">> Epoch time:", train_time + copy_time, "ms")
         console.log(">> Total time:", total_time, "ms");
