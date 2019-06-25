@@ -29,15 +29,17 @@ if(process.argv.length > 2) {
     let test_labels  = [];
     mnist_data.test.forEach((x) => {test_data.push(x.input); test_labels.push(x.output)});
     
+    let training = compiled_model.EncodeTraining(train_data, train_labels);
+
     console.log("Training ...");
-    compiled_model.Train(train_data, train_labels, {
-      // log_accuracy: true,
+    compiled_model.Train(training, {
+      log_accuracy: true,
       // log_error: true,
-      // log_time: true,
+      log_time: true,
       // log_forward: true,
       // log_backward: true,
       // log_conf_mat: true,
-      epochs: 10,
+      epochs: 100,
       learning_rate: 0.02
     });
 
@@ -48,12 +50,11 @@ if(process.argv.length > 2) {
     //   log_error: true
     // });
 
-    console.log("Predicting ...");
-    compiled_model.Predict([train_data[0],train_data[1]], {
-      log_time: true,
-      log_result: true,
-      result_mode: "softmax"
-    });
+    // console.log("Predicting ...");
+    // compiled_model.Predict([train_data[0],train_data[1]], {
+    //   log_time: true,
+    //   log_result: true,
+    // });
     //
     // For example, in the logic example
     // if the prediction batch size is 2

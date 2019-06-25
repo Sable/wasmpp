@@ -51,6 +51,7 @@ class LayerWeights {
   }
 }
 
+// Class for logging model details
 class ModelLogger {
   constructor(){}
   // Forward timing
@@ -115,6 +116,17 @@ class ModelLogger {
   }
 }
 
+// This class is the type of the training, 
+// testing and predicting parameter
+class EncodedData { 
+  X; 
+  x_size;
+  x_count;
+  Y;
+  y_size;
+  y_count;
+}
+
 // This class is a wrapper for the generated Wasm model
 // It also contains the import functions from JS to Wasm
 // Most functions simply calls the Wasm exported functions
@@ -152,23 +164,76 @@ class CompiledModel {
     return this.Exports().memory;
   }
 
-  // Run train Wasm function
-  Train(data, labels, config) {
-    // Load model batch information
+  _EncodeInput(data, entry_size, batch_size) {
+    // We assume that data and batch size
+    // have already been checked
+    //
+    // This encoder partially trainsposes, flatten 
+    // and stores the data in a Float32Array
+    //  Batch = 2
+    //  [
+    //    [0,  1, 2],
+    //    [3,  4, 5],
+    //    [6,  7, 8],
+    //    [9, 10, 11]
+    //  ];
+    // Becomes:
+    // Float32Array [0, 3, 1, 4, 2, 5, 6, 9, 7, 10, 8, 11]
+    let index = 0;
+    let encoded = new Float32Array(data.length * entry_size);
+    let total_batches = data.length / batch_size;
+    for(let batch=0; batch < total_batches; batch++) {
+      let data_begin = batch * batch_size;
+      let data_end = data_begin + batch_size;
+      for (let c = 0; c < entry_size; c++) {
+        for (let r = data_begin; r < data_end; r++) {
+          encoded[index++] = data[r][c];
+        }
+      }
+    }
+    return encoded;
+  }
+
+  EncodeTraining(data, labels) {
+    // Load model info
     let batch_size = this._TrainingBatchSize();
-    let batches_in_memory = this._TrainingBatchesInMemory();
-    let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
-    let number_of_batches = data.length / batch_size;
-    
+    let input_size = this._LayerSize(0);
+    let output_size = this._LayerSize(this._TotalLayers() - 1);
     // Check if input is valid
-    if(data.length != labels.length) {
-      console.error("Training data size should be equal to the labels size");
+    if(data.length === 0) {
+      console.log("Training data cannot be empty");
+      return false;
+    }
+    if(data.length !== labels.length) {
+      console.log("Training data and labels should be equal");
       return false;
     }
     if(data.length % batch_size != 0) {
       console.error("Training data size",data.length,"should be divisible by the number of batch",batch_size);
       return false;
     }
+    // Encode data
+    let result = new EncodedData();
+    result.X = this._EncodeInput(data, input_size, batch_size);
+    result.x_size = input_size;
+    result.x_count = data.length;
+    // Encode labels
+    result.Y = this._EncodeInput(labels, output_size, batch_size);
+    result.y_size = output_size;
+    result.y_count = labels.length;
+    return result;
+  }
+
+  _LayerSize(id) {
+    return this.Exports()["layer_" + id + "_size"]();
+  }
+
+  // Run train Wasm function
+  Train(input, config) {
+    // Load model batch information
+    let batch_size = this._TrainingBatchSize();
+    let batches_in_memory = this._TrainingBatchesInMemory();
+    let number_of_batches = input.x_count / batch_size;
     
     // Configuration        Value                     Default
     config                  = config                  || {};
@@ -195,13 +260,13 @@ class CompiledModel {
       let average_cost = 0.0;
       let train_time = 0.0;
       let copy_time = 0.0;
-      for(let i=0; i < batches_in_memory_count; i++) {
+      let data_offset = this._TrainingDataOffset();
+      let labels_offset = this._TrainingLabelsOffset();
+      for(let i=0; i < number_of_batches; i += batches_in_memory) {
         // Load new batches in memory and train
         let time = new Date().getTime();
-        let batches_inserted = this._InsertBatchesInMemory(this._TrainingDataOffset(), 
-                                data, this._TrainingLabelsOffset(), labels, 
-                                i * batches_in_memory * batch_size, 
-                                batch_size, batches_in_memory);
+        let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
+                                                         batch_size, batches_in_memory);
         copy_time += new Date().getTime() - time;
 
         // Start training
@@ -224,7 +289,7 @@ class CompiledModel {
         console.log("Epoch",e+1);
       }
       if(config.log_accuracy) {
-        console.log(">> Accuracy:  ", total_hits / data.length);
+        console.log(">> Accuracy:  ", total_hits / input.x_count);
       }
       if(config.log_error) {
         console.log(">> Error:     ", average_cost / number_of_batches);
@@ -327,6 +392,38 @@ class CompiledModel {
 
   _SetLearningRate(val) {
     this.Exports().set_learning_rate(val);
+  }
+
+  _CopyBatchesToMemory(input, x_offset, y_offset, batch_index, batch_size, batch_in_memory) {
+    // Compute data indicies
+    let x_batch_float_size  = batch_size * input.x_size;
+    let x_begin             = batch_index * x_batch_float_size;
+    let x_length            = batch_in_memory * x_batch_float_size;
+    // Detech if batch in memory value is more than there is actually
+    if(x_begin + x_length > input.X.length) {
+      let remaining_entries = (input.X.length - x_begin) / input.x_size;
+      // Update number of batch in memory
+      batch_in_memory = remaining_entries / batch_size;
+      // Recompute length
+      x_length = batch_in_memory * x_batch_float_size;
+    }
+    // Compute labels indices
+    let y_batch_float_size  = batch_size * input.y_size;
+    let y_begin             = batch_index * y_batch_float_size;
+    let y_length            = batch_in_memory * y_batch_float_size;
+
+    // Create a float array view
+    let data_array = new Float32Array(input.X.buffer, x_begin* Float32Array.BYTES_PER_ELEMENT, x_length);
+    let labels_array = new Float32Array(input.Y.buffer, y_begin* Float32Array.BYTES_PER_ELEMENT, y_length);
+    let data_memory = new Float32Array(this.Memory().buffer, x_offset, x_length);
+    let labels_memory = new Float32Array(this.Memory().buffer, y_offset, y_length);
+    
+    // Copy data
+    data_memory.set(data_array);
+    labels_memory.set(labels_array);
+
+    // Return number of batches inserted in the memory
+    return batch_in_memory;
   }
 
   _InsertBatchesInMemory(data_offset, data, labels_offset, labels, from, batch_size, num_batches) {
