@@ -34,7 +34,7 @@ if(process.argv.length > 2) {
       // log_accuracy: true,
       // log_error: true,
       // log_time: true,
-      epochs: 1,
+      epochs: 1000,
       learning_rate: 0.02
     });
     //compiled_model.LogTrainForward();
@@ -47,6 +47,7 @@ if(process.argv.length > 2) {
       log_accuracy: true,
       log_error: true
     });
+    compiled_model.PrintTestingConfusionMatrix();
 
     // console.log("Predicting ...");
     // compiled_model.Predict(...);

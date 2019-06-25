@@ -20,6 +20,7 @@ namespace nn {
 namespace arch {
 
 struct ModelOptions {
+  // TODO Change names to gen_.._bytecode
   bool log_training_accuracy = false;
   bool log_training_error = false;
   bool log_training_confusion_matrix = false;
@@ -109,6 +110,7 @@ private:
   uint32_t testing_batch_size_;
   uint32_t prediction_batch_size_;
   uint32_t training_batches_in_memory_;
+  uint32_t testing_batches_in_memory_;
 
   // Limits
   // MAX_FLOAT_PER_DATA value is arbitrary, but large
@@ -149,10 +151,8 @@ private:
   wasmpp::Memory* training_labels_batches_;
 
   // Test data
-  std::vector<ds::NDArray*> testing_batch_;
-  std::vector<ds::NDArray*> testing_labels_batch_;
-  std::vector<std::vector<float>> testing_vals_;
-  std::vector<std::vector<float>> testing_labels_vals_;
+  wasmpp::Memory* testing_data_batches_;
+  wasmpp::Memory* testing_labels_batches_;
 
   // Builtin functions
   BuiltinFunctions builtins_;
@@ -178,20 +178,15 @@ private:
   // Memory allocation
   void AllocateMembers();
   void AllocateLayers();
-  void AllocateTest();
-
-  // Date generation
-  void MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals,
-                std::vector<std::vector<float>> labels_vals, std::vector<ds::NDArray*> data_batch,
-                std::vector<ds::NDArray*> labels_batch, uint32_t batch_size);
-  void MakeTestingData(wabt::Var memory);
-  void MakeLayersData(wabt::Var memory);
 
   // Generate neural network algorithms
   wabt::Var ForwardAlgorithmFunction(uint8_t mode_index);
   wabt::Var BackwardAlgorithmFunction();
   wabt::Var ConfusionMatrixFunction(uint8_t mode_index);
   wabt::Var CountCorrectPredictionsFunction(uint8_t mode_index);
+
+  // Helper
+  void GetInputOutputSize(uint32_t *input_size, uint32_t *output_size);
 public:
   Model(ModelOptions options);
   wasmpp::ModuleManager& ModuleManager() { return module_manager_; }
@@ -200,10 +195,11 @@ public:
 
   // Compile functions
   void CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                     uint32_t testing_batch_size, uint32_t prediction_batch_size,
-                     builtins::LossFunction loss);
+                     uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+                     uint32_t prediction_batch_size, builtins::LossFunction loss);
+  // TODO Rename to Make*
   void CompileTrainingFunctions();
-  void CompileTestingFunction(const std::vector<std::vector<float>> &input, const std::vector<std::vector<float>> &labels);
+  void CompileTestingFunctions();
   void CompilePredictionFunctions();
   void CompileInitialization();
 
@@ -222,6 +218,7 @@ public:
   uint32_t TrainingBatchSize() const { return training_batch_size_; }
   uint32_t TrainingBatchesInMemory() const { return training_batches_in_memory_; }
   uint32_t TestingBatchSize() const { return testing_batch_size_; }
+  uint32_t TestingBatchesInMemory() const { return testing_batches_in_memory_; }
   uint32_t PredictionBatchSize() const { return prediction_batch_size_; }
   const ModelOptions& Options() const { return options_; }
   const builtins::LossFunction& Loss() const { return loss_; }

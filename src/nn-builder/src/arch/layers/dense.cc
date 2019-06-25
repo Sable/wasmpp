@@ -493,11 +493,19 @@ void DenseOutputLayer::MakeFunctions() {
   // Create functions defined in parent
   FullyConnectedLayer::MakeFunctions();
 
-  // Create confusion matrix functions
+  // Create training confusion matrix functions
   if(NetworkModel()->Options().log_training_confusion_matrix) {
     NetworkModel()->ModuleManager().MakeFunction("training_confusion_matrix_offset", {{},{Type::I32}},{},
                                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
       f.Insert(MakeI32Const(confusion_matrix_[Model::Mode::Training]->Begin()));
+    });
+  }
+
+  // Create testing confusion matrix functions
+  if(NetworkModel()->Options().log_testing_confusion_matrix) {
+    NetworkModel()->ModuleManager().MakeFunction("testing_confusion_matrix_offset", {{},{Type::I32}},{},
+                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+      f.Insert(MakeI32Const(confusion_matrix_[Model::Mode::Testing]->Begin()));
     });
   }
 }

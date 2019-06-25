@@ -238,9 +238,9 @@ class CompiledModel {
   Test(data, labels, config) {
     // Load model batch information
     let batch_size = this._TestingBatchSize();
-    // let batches_in_memory = this._TrainingBatchesInMemory();
-    // let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
-    // let number_of_batches = data.length / batch_size;
+    let batches_in_memory = this._TestingBatchesInMemory();
+    let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
+    let number_of_batches = data.length / batch_size;
     
     // Check if input is valid
     if(data.length != labels.length) {
@@ -262,25 +262,46 @@ class CompiledModel {
     let total_time = 0.0;
     let total_hits = 0;
     let average_cost = 0.0;
+    let test_time = 0.0;
+    let copy_time = 0.0;
 
-    // Test data
-    this.Exports().test();
-    
-    // Update testing details
-    if(config.log_accuracy) {
-      total_hits += this._TestingBatchesAccuracy();
-    }
-    if(config.log_error) {
-      average_cost += this._TestingBatchesError();
-    }
+    for(let i=0; i < batches_in_memory_count; i++) {
+      // Load new batches in memory and test
+      let time = new Date().getTime();
+      let batches_inserted = this._InsertBatchesInMemory(this._TestingDataOffset(), 
+                              data, this._TestingLabelsOffset(), labels, 
+                              i * batches_in_memory * batch_size, 
+                              batch_size, batches_in_memory);
+      copy_time += new Date().getTime() - time;
 
+      // Start testing
+      time = new Date().getTime();
+      this.Exports().test_batches_in_memory(batches_inserted);
+      test_time += new Date().getTime() - time;
+      
+      // Update testing details
+      if(config.log_accuracy) {
+        total_hits += this._TestingBatchesAccuracy();
+      }
+      if(config.log_error) {
+        average_cost += this._TestingBatchesError();
+      }
+    }
+    // Update total time
+    total_time += test_time + copy_time;
     // Log testing results
     console.log("Testing complete!");
     if(config.log_accuracy) {
       console.log(">> Accuracy:  ", total_hits / data.length);
     }
     if(config.log_error) {
-      console.log(">> Error:     ", average_cost /*FIXME / number_of_batches*/);
+      console.log(">> Error:     ", average_cost / number_of_batches);
+    }
+    if(config.log_time) {
+      console.log(">> Copy time: ", copy_time, "ms");
+      console.log(">> Test time: ", test_time, "ms");
+      console.log(">> Total time:", total_time, "ms");
+      console.log(">> Time/Batch:", total_time / number_of_batches);
     }
   }
 
@@ -327,8 +348,16 @@ class CompiledModel {
     return this.Exports().training_data_offset();
   }
 
+  _TestingDataOffset() {
+    return this.Exports().testing_data_offset();
+  }
+
   _TrainingLabelsOffset() {
     return this.Exports().training_labels_offset();
+  }
+
+  _TestingLabelsOffset() {
+    return this.Exports().testing_labels_offset();
   }
 
   _TrainingBatchesAccuracy() {
@@ -383,6 +412,10 @@ class CompiledModel {
     return this.Exports().training_batches_in_memory();
   }
 
+  _TestingBatchesInMemory() {
+    return this.Exports().testing_batches_in_memory();
+  }
+
   // Log training forward details
   LogTrainForward() {
     let found = false;
@@ -419,6 +452,17 @@ class CompiledModel {
       console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Training confusion matrix function not found");
+    }
+  }
+
+  PrintTestingConfusionMatrix() {
+    let matrix_offset_key = "testing_confusion_matrix_offset";
+    let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
+    let matrix_side = this.Exports()[output_size_key]();
+    if(!(matrix_offset_key in Object.keys(this.Exports()))) {
+      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+    } else {
+      this._WarnNotFound("Testing confusion matrix function not found");
     }
   }
 

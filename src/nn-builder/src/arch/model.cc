@@ -164,27 +164,8 @@ void Model::AllocateMembers() {
   }
 
 void Model::AllocateLayers() {
-  for(auto l = 0; l < layers_.size(); ++l) {
-    layers_[l]->AllocateMemory();
-  }
-}
-
-void Model::AllocateTest() {
-  // Do not merge loops so that all
-  // test data are consecutive in memory
-
-  for(uint32_t b=0; b < testing_vals_.size(); b += TestingBatchSize()) {
-    // Testing data
-    ds::NDArray* testing_array = nullptr;
-    ALLOCATE_MATRIX(testing_array, (uint32_t) testing_vals_[0].size(), TestingBatchSize());
-    testing_batch_.push_back(testing_array);
-  }
-
-  for(uint32_t b=0; b < testing_labels_vals_.size(); b += TestingBatchSize()) {
-    // Testing labels
-    ds::NDArray* labels_array = nullptr;
-    ALLOCATE_MATRIX(labels_array, (uint32_t) testing_labels_vals_[0].size(), TestingBatchSize());
-    testing_labels_batch_.push_back(labels_array);
+  for (auto &layer : layers_) {
+    layer->AllocateMemory();
   }
 }
 
@@ -196,62 +177,6 @@ std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector
     }
   }
   return entries;
-}
-
-void Model::MakeData(wabt::Var memory, std::vector<std::vector<float>> data_vals,
-                     std::vector<std::vector<float>> labels_vals, std::vector<ds::NDArray*> data_batch,
-                     std::vector<ds::NDArray*> labels_batch, uint32_t batch_size) {
-  // Store all data in one vector
-  std::vector<DataEntry> data_entries;
-  for(uint32_t i=0; i < data_batch.size(); ++i) {
-    auto training_begin = data_vals.begin() + (i * batch_size);
-    std::vector<std::vector<float>> sub_input(training_begin, training_begin + batch_size);
-    auto entry = MakeTransposeData(data_batch[i], sub_input);
-    data_entries.insert(data_entries.end(), entry.begin(), entry.end());
-  }
-  // Split data into chunks
-  auto total_data_chunks = 1 + ((data_entries.size() - 1) / MAX_FLOAT_PER_DATA);
-  for(uint32_t i=0; i < total_data_chunks; i++) {
-    auto begin = data_entries.begin() + (i * MAX_FLOAT_PER_DATA);
-    auto end = begin + MAX_FLOAT_PER_DATA;
-    if(end > data_entries.end()) {
-      end = data_entries.end();
-    }
-    auto sub_data = std::vector<DataEntry>(begin, end);
-    auto memory_begin = data_batch.front()->Memory()->Begin() + (i * MAX_FLOAT_PER_DATA * TypeSize(Type::F32));
-    module_manager_.MakeData(memory, memory_begin, sub_data);
-  }
-
-  // Store all labels in one vector
-  std::vector<DataEntry> labels_entries;
-  for(uint32_t i=0; i < labels_batch.size(); ++i) {
-    auto labels_begin = labels_vals.begin() + (i * batch_size);
-    std::vector<std::vector<float>> sub_labels(labels_begin, labels_begin + batch_size);
-    auto entry = MakeTransposeData(labels_batch[i], sub_labels);
-    labels_entries.insert(labels_entries.end(), entry.begin(), entry.end());
-  }
-  // Split labels into chunks
-  auto total_labels_chunks = 1 + ((labels_entries.size() - 1) / MAX_FLOAT_PER_DATA);
-  for(uint32_t i=0; i < total_labels_chunks; i++) {
-    auto begin = labels_entries.begin() + (i * MAX_FLOAT_PER_DATA);
-    auto end = begin + MAX_FLOAT_PER_DATA;
-    if(end > labels_entries.end()) {
-      end = labels_entries.end();
-    }
-    auto sub_labels = std::vector<DataEntry>(begin, end);
-    auto memory_begin = labels_batch.front()->Memory()->Begin() + (i * MAX_FLOAT_PER_DATA * TypeSize(Type::F32));
-    module_manager_.MakeData(memory, memory_begin, sub_labels);
-  }
-}
-
-void Model::MakeTestingData(wabt::Var memory) {
-  MakeData(memory, testing_vals_, testing_labels_vals_, testing_batch_, testing_labels_batch_, TestingBatchSize());
-}
-
-void Model::MakeLayersData(wabt::Var memory) {
-  for(int l=1; l < layers_.size(); ++l) {
-    layers_[l]->MakeData(memory);
-  }
 }
 
 Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
@@ -368,20 +293,23 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 void Model::CompileInitialization() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
-  MakeTestingData(memory);
-  MakeLayersData(memory);
+  for(int l=1; l < layers_.size(); ++l) {
+    layers_[l]->MakeData(memory);
+  }
 }
 
 void Model::CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                          uint32_t testing_batch_size, uint32_t prediction_batch_size,
-                          nn::builtins::LossFunction loss) {
+                          uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+                          uint32_t prediction_batch_size, nn::builtins::LossFunction loss) {
   ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
   ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
   ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
   ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
+  ERROR_UNLESS(testing_batches_in_memory >= 1, "testing batches in memory must be at least 1");
   training_batch_size_ = training_batch_size;
   training_batches_in_memory_ = training_batches_in_memory;
   testing_batch_size_ = testing_batch_size;
+  testing_batches_in_memory_ = testing_batches_in_memory;
   prediction_batch_size_ = prediction_batch_size;
   loss_ = loss;
 
@@ -405,21 +333,25 @@ void Model::CompileLayers(uint32_t training_batch_size, uint32_t training_batche
   count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
 }
 
-void Model::CompileTrainingFunctions() {
-
-  // Get the number of input and output
-  uint32_t input_size = 0;
-  uint32_t output_size = 0;
+void Model::GetInputOutputSize(uint32_t *input_size, uint32_t *output_size) {
   if(layers_.front()->Type() == FullyConnected)  {
-    input_size = static_cast<DenseInputLayer*>(layers_.front())->Nodes();
+    *input_size = static_cast<DenseInputLayer*>(layers_.front())->Nodes();
   } else {
     assert(!"Not implemented");
   }
   if(layers_.back()->Type() == FullyConnected)  {
-    output_size = static_cast<DenseOutputLayer*>(layers_.back())->Nodes();
+    *output_size = static_cast<DenseOutputLayer*>(layers_.back())->Nodes();
   } else {
     assert(!"Not implemented");
   }
+}
+
+void Model::CompileTrainingFunctions() {
+
+  // Get the number of input and output
+  uint32_t input_size;
+  uint32_t output_size;
+  GetInputOutputSize(&input_size, &output_size);
 
   // Allocate memory for data
   uint32_t data_entry_bytes             = input_size * TypeSize(Type::F32);
@@ -459,8 +391,8 @@ void Model::CompileTrainingFunctions() {
 
   // Create training function
   std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
-  module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type, [&](FuncBody f, std::vector<Var> params,
-                                                             std::vector<Var> locals) {
+  module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type,
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(params.size() == 1);
     auto batches_to_train_on = params[0];
 
@@ -582,36 +514,59 @@ void Model::CompileTrainingFunctions() {
   }
 }
 
-void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
-                           const std::vector<std::vector<float>> &labels) {
-  ERROR_UNLESS(!input.empty(), "test input cannot be empty");
-  ERROR_UNLESS(input.size() == labels.size(), "testing and labels size should match");
-  ERROR_UNLESS(input.size() % testing_batch_size_ == 0, "Input must be a multiple of the testing batch size");
+void Model::CompileTestingFunctions() {
 
-  testing_vals_ = input;
-  testing_labels_vals_ = labels;
-  AllocateTest();
+  // Get the number of input and output
+  uint32_t input_size;
+  uint32_t output_size;
+  GetInputOutputSize(&input_size, &output_size);
 
-  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
-  module_manager_.MakeFunction("test", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
-                                                             std::vector<Var> locals) {
-    assert(locals.size() == 6);
+  // Allocate memory for data
+  uint32_t data_entry_bytes             = input_size * TypeSize(Type::F32);
+  uint32_t data_batch_bytes             = data_entry_bytes * TestingBatchSize();
+  uint32_t data_batches_in_memory_bytes = data_batch_bytes * TestingBatchesInMemory();
+  testing_data_batches_ = module_manager_.Memory().Allocate(data_batches_in_memory_bytes);
+
+  // Allocate memory for labels
+  uint32_t labels_entry_bytes             = output_size * TypeSize(Type::F32);
+  uint32_t labels_batch_bytes             = labels_entry_bytes * TestingBatchSize();
+  uint32_t labels_batches_in_memory_bytes = labels_batch_bytes * TestingBatchesInMemory();
+  testing_labels_batches_ = module_manager_.Memory().Allocate(labels_batches_in_memory_bytes);
+
+  // Create function to get the offset for testing data in memory
+  module_manager_.MakeFunction("testing_data_offset", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(testing_data_batches_->Begin()));
+  });
+
+  // Create function to get the offset for testing labels in memory
+  module_manager_.MakeFunction("testing_labels_offset", {{},{Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(testing_labels_batches_->Begin()));
+  });
+
+  // Create testing function
+  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  module_manager_.MakeFunction("test_batches_in_memory", {{Type::I32},{}}, locals_type,
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    assert(params.size() == 1);
+    auto batches_to_test_on = params[0];
+
+    assert(locals.size() == 7);
     auto cost = locals[0];
     auto hits = locals[1];
-    auto test_addr = locals[2];
-    auto label_addr = locals[3];
-    auto vi32_1 = locals[4];
-    auto vi32_2 = locals[5];
+    auto counter = locals[2];
+    auto test_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
-    auto test_begin = testing_batch_.front()->Memory()->Begin();
-    auto test_end = testing_batch_.back()->Memory()->End();
-    auto test_size = testing_batch_.front()->Memory()->Bytes();
-    auto label_begin = testing_labels_batch_.front()->Memory()->Begin();
-    auto label_size = testing_labels_batch_.front()->Memory()->Bytes();
-
-    f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
-    f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
-
+    // Set the testing pointer to the address of the first testing batch
+    f.Insert(MakeLocalSet(test_addr, MakeI32Const(testing_data_batches_->Begin())));
+    // Set the labels pointer to the address of the first labels batch
+    f.Insert(MakeLocalSet(label_addr, MakeI32Const(testing_labels_batches_->Begin())));
+    // Loop on batches in memory
+    f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_test_on, 1, {}, [&](BlockBody* b1){
       // Forward algorithm
       b1->Insert(MakeCall(forward_testing_func_, {
         MakeLocalGet(test_addr)
@@ -624,8 +579,8 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
         })));
       }
 
+      // Compute testing error
       if(options_.log_testing_error) {
-        // Compute testing error
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
           auto cost_call = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
@@ -635,12 +590,15 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
         }
       }
 
+      // Update confusion matrix
       if(options_.log_testing_confusion_matrix) {
-        // Update confusion matrix
         b1->Insert(MakeCall(confusion_matrix_testing_func_, {MakeLocalGet(label_addr)}));
       }
 
-      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
+      // Move to the next data batch in memory
+      b1->Insert(GenerateCompoundAssignment(test_addr, Opcode::I32Add, MakeI32Const(data_batch_bytes)));
+      // Move to the next label batch in memory
+      b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
 
     // Store total cost error in memory
@@ -651,21 +609,6 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
     // Store number of hits in memory
     if(options_.log_testing_accuracy) {
       f.Insert(MakeF32Store(MakeI32Const(testing_hits_->Begin()), MakeLocalGet(hits)));
-    }
-
-    if(options_.log_testing_confusion_matrix) {
-      assert(layers_.back()->Position() == Output);
-      if(layers_.back()->Type() == FullyConnected) {
-        auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-        // Log confusion matrix
-        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Begin()),
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Shape()[0]),
-            MakeI32Const(out_layer->ConfusionMatrix(Mode::Testing)->Shape()[1])
-        }));
-      } else {
-        assert(!"Not implemented");
-      }
     }
   });
 
@@ -689,6 +632,12 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
   module_manager_.MakeFunction("testing_batch_size", {{}, {Type::I32}}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     f.Insert(MakeI32Const(TestingBatchSize()));
+  });
+
+  // Create function to access testing batches in memory
+  module_manager_.MakeFunction("testing_batches_in_memory", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(TestingBatchesInMemory()));
   });
 }
 
