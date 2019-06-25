@@ -44,7 +44,8 @@ if(process.argv.length > 2) {
     console.log("Testing ...");
     compiled_model.Test(test_data, test_labels, {
       log_time: true,
-      log_accuracy: true
+      log_accuracy: true,
+      log_error: true
     });
 
     // console.log("Predicting ...");

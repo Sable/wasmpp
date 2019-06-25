@@ -261,6 +261,7 @@ class CompiledModel {
     // Testing results
     let total_time = 0.0;
     let total_hits = 0;
+    let average_cost = 0.0;
 
     // Test data
     this.Exports().test();
@@ -269,10 +270,17 @@ class CompiledModel {
     if(config.log_accuracy) {
       total_hits += this._TestingBatchesAccuracy();
     }
+    if(config.log_error) {
+      average_cost += this._TestingBatchesError();
+    }
 
+    // Log testing results
     console.log("Testing complete!");
     if(config.log_accuracy) {
       console.log(">> Accuracy:  ", total_hits / data.length);
+    }
+    if(config.log_error) {
+      console.log(">> Error:     ", average_cost /*FIXME / number_of_batches*/);
     }
   }
 
@@ -349,6 +357,16 @@ class CompiledModel {
       return this.Exports()[key]();
     } else {
       this._WarnNotFound("Training batches error function not found");
+    }
+    return 0;
+  }
+
+  _TestingBatchesError() {
+    let key = "testing_batches_error";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Testing batches error function not found");
     }
     return 0;
   }

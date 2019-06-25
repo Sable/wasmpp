@@ -130,6 +130,7 @@ private:
   wasmpp::Memory* training_error_ = nullptr;
   wasmpp::Memory* training_hits_ = nullptr;
   wasmpp::Memory* testing_hits_ = nullptr;
+  wasmpp::Memory* testing_error_ = nullptr;
   DenseForwardTimeMembers dense_forward_logging_members_;
   DenseBackwardTimeMembers dense_backward_logging_members_;
 
@@ -177,7 +178,6 @@ private:
   // Memory allocation
   void AllocateMembers();
   void AllocateLayers();
-  void AllocateTraining();
   void AllocateTest();
 
   // Date generation

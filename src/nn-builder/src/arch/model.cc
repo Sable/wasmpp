@@ -151,6 +151,7 @@ void Model::AllocateMembers() {
   training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   testing_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  testing_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
 #define ALLOCATE_TIME_MEMBERS(name) \
   dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
@@ -166,10 +167,6 @@ void Model::AllocateLayers() {
   for(auto l = 0; l < layers_.size(); ++l) {
     layers_[l]->AllocateMemory();
   }
-}
-
-void Model::AllocateTraining() {
-
 }
 
 void Model::AllocateTest() {
@@ -599,7 +596,7 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
   module_manager_.MakeFunction("test", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     assert(locals.size() == 6);
-    auto cost_mean = locals[0];
+    auto cost = locals[0];
     auto hits = locals[1];
     auto test_addr = locals[2];
     auto label_addr = locals[3];
@@ -631,8 +628,8 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
         // Compute testing error
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
-          auto cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost_mean, Opcode::F32Add, cost));
+          auto cost_call = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
+          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, cost_call));
         } else {
           assert(!"Compute cost not implemented");
         }
@@ -646,11 +643,9 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
     }));
 
-    // Log testing error
+    // Store total cost error in memory
     if(options_.log_testing_error) {
-      f.Insert(MakeCall(builtins_.message.LogTestingError(), {
-        MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(testing_batch_.size()))
-      }));
+      f.Insert(MakeF32Store(MakeI32Const(testing_error_->Begin()), MakeLocalGet(cost)));
     }
 
     // Store number of hits in memory
@@ -680,6 +675,14 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(testing_hits_->Begin())));
     });
+  }
+
+  // Create function to access testing batches error
+  if(options_.log_testing_error) {
+    module_manager_.MakeFunction("testing_batches_error", {{},{Type::F32}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeF32Load(MakeI32Const(testing_error_->Begin())));
+   });
   }
 
   // Create function to access testing batch size
