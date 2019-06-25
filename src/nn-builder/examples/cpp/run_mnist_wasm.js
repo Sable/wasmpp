@@ -31,25 +31,29 @@ if(process.argv.length > 2) {
     
     console.log("Training ...");
     compiled_model.Train(train_data, train_labels, {
-      log_accuracy: true,
-      log_error: true,
-      log_time: true,
-      log_forward: true,
-      log_backward: true,
-      log_conf_mat: true,
+      // log_accuracy: true,
+      // log_error: true,
+      // log_time: true,
+      // log_forward: true,
+      // log_backward: true,
+      // log_conf_mat: true,
       epochs: 10,
       learning_rate: 0.02
     });
 
-    console.log("Testing ...");
-    compiled_model.Test(test_data, test_labels, {
-      log_time: true,
-      log_accuracy: true,
-      log_error: true
-    });
+    // console.log("Testing ...");
+    // compiled_model.Test(test_data, test_labels, {
+    //   log_time: true,
+    //   log_accuracy: true,
+    //   log_error: true
+    // });
 
-    // console.log("Predicting ...");
-    // compiled_model.Predict(...);
+    console.log("Predicting ...");
+    compiled_model.Predict([train_data[0],train_data[1]], {
+      log_time: true,
+      log_result: true,
+      result_mode: "softmax"
+    });
     //
     // For example, in the logic example
     // if the prediction batch size is 2

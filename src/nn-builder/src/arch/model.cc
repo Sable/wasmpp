@@ -116,7 +116,6 @@ void Model::InitBuiltinImports() {
   builtins_.math.InitImports(this, &module_manager_, "Math");
   builtins_.activation.InitImports(this, &module_manager_, "Activation");
   builtins_.loss.InitImports(this, &module_manager_, "Loss");
-  builtins_.message.InitImports(this, &module_manager_, "Message");
 }
 
 void Model::InitBuiltinDefinitions() {
@@ -125,7 +124,6 @@ void Model::InitBuiltinDefinitions() {
   builtins_.math.InitDefinitions(this, &module_manager_);
   builtins_.activation.InitDefinitions(this, &module_manager_);
   builtins_.loss.InitDefinitions(this, &module_manager_);
-  builtins_.message.InitDefinitions(this, &module_manager_);
 }
 
 void Model::InitSnippets() {
@@ -654,81 +652,29 @@ void Model::MakeTestingFunctions() {
 }
 
 void Model::MakePredictionFunctions() {
-  // Create a function to export the prediction input offset
-  auto prediction_input_offset = module_manager_.MakeFunction("prediction_input_offset", {{}, {Type::I32}}, {},
-                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    assert(layers_.front()->Position() == Input);
-    if(layers_.front()->Type() == FullyConnected) {
-      f.Insert(MakeI32Const(static_cast<DenseInputLayer*>(layers_.front())->InputData(Mode::Prediction)->Begin()));
-    } else {
-      assert(!"No implemented!");
-    }
-  });
 
-  // Create a function to export the prediction batch size
-  module_manager_.MakeFunction("prediction_batch_size", {{}, {Type::I32}}, {},
-                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    f.Insert(MakeI32Const(PredictionBatchSize()));
-  });
+  uint32_t input_addr;
+  assert(layers_.front()->Position() == Input);
+  if(layers_.front()->Type() == FullyConnected) {
+    input_addr = static_cast<DenseInputLayer*>(layers_.front())->InputArray(Model::Mode::Prediction)->Begin();
+  } else {
+    assert(!"Not implemented");
+  }
 
   // Create prediction function
-  auto local_types = {Type::F64, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32};
-  module_manager_.MakeFunction("predict", {}, local_types,
+  module_manager_.MakeFunction("predict_batch", {}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    assert(locals.size() == 8);
-    auto time = locals[0];
-    auto vi32_1 = locals[1];
-    auto vi32_2 = locals[2];
-    auto vi32_3 = locals[3];
-    auto vi32_4 = locals[4];
-    auto vi32_5 = locals[5];
-    auto vf32_1 = locals[6];
-    auto vf32_2 = locals[7];
-
-    if(options_.bytecode_options.gen_prediction_time) {
-      // Start prediction timer
-      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
-    }
 
     // Apply forward algorithm
     f.Insert(MakeCall(forward_prediction_func_, {
-      MakeCall(prediction_input_offset, {})
+      MakeI32Const(input_addr)
     }));
+  });
 
-    if(options_.bytecode_options.gen_prediction_time) {
-      // Log prediction time
-      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
-      f.Insert(MakeCall(builtins_.message.LogPredictionTime(), {MakeLocalGet(time)}));
-    }
-
-    // Print predictions
-    assert(layers_.back()->Position() == Output);
-    if(layers_.back()->Type() == FullyConnected) {
-      auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-      if(options_.bytecode_options.gen_prediction_results) {
-        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
-            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
-            MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
-        }));
-      }
-      if(options_.bytecode_options.gen_prediction_results_softmax) {
-        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Begin()),
-            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[0]),
-            MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[1])
-        }));
-      }
-      if(options_.bytecode_options.gen_prediction_results_hardmax) {
-        f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
-            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Begin()),
-            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Shape()[0]),
-            MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Shape()[1])
-        }));
-      }
-    } else {
-      assert(!"Not implemented!");
-    }
+  // Create a function to get prediction batch size
+  module_manager_.MakeFunction("prediction_batch_size", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(PredictionBatchSize()));
   });
 }
 

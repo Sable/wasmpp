@@ -97,7 +97,8 @@ public:
   // and it will not be used in the forward or
   // the backward algorithms
   DenseInputLayer(uint32_t nodes) : FullyConnectedLayer(Input, nodes, builtins::ActivationFunction()) {}
-  ds::NDArray* InputData(uint8_t mode_index) const;
+  ds::NDArray* InputArray(uint8_t mode_index) const;
+  void MakeFunctions() override ;
 };
 
 } // namespace layer

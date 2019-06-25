@@ -8,7 +8,6 @@
 #include <src/nn-builder/src/builtins/loss.h>
 #include <src/nn-builder/src/builtins/math.h>
 #include <src/nn-builder/src/builtins/system.h>
-#include <src/nn-builder/src/builtins/message.h>
 #include <src/nn-builder/src/data_structure/ndarray.h>
 #include <src/nn-builder/src/snippet/matrix.h>
 #include <src/nn-builder/src/snippet/analysis.h>
@@ -33,7 +32,6 @@ struct ModelBytecodeOptions {
   bool gen_prediction_results = false;
   bool gen_prediction_results_softmax = false;
   bool gen_prediction_results_hardmax = false;
-  bool gen_prediction_time = false;
   bool gen_forward = false;
   bool gen_backward = false;
   bool use_simd = false;
@@ -51,7 +49,6 @@ struct BuiltinFunctions {
   builtins::Loss loss;
   builtins::Math math;
   builtins::System system;
-  builtins::Message message;
 };
 
 struct SnippetCode {

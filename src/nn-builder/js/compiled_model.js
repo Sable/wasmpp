@@ -162,16 +162,17 @@ class CompiledModel {
     
     // Check if input is valid
     if(data.length != labels.length) {
-      console.error("Data size should be equal to the labels size");
+      console.error("Training data size should be equal to the labels size");
       return false;
     }
     if(data.length % batch_size != 0) {
-      console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
+      console.error("Training data size",data.length,"should be divisible by the number of batch",batch_size);
       return false;
     }
     
     // Configuration        Value                     Default
     config                  = config                  || {};
+    config.log_epoch_num    = config.log_epoch_num    || true;
     config.log_accuracy     = config.log_accuracy     || false;
     config.log_error        = config.log_error        || false;
     config.log_time         = config.log_time         || false;
@@ -219,7 +220,9 @@ class CompiledModel {
       // Update total time
       total_time += train_time + copy_time;
       // Log after end of epoch
-      console.log("Epoch",e+1);
+      if(config.log_epoch_num) {
+        console.log("Epoch",e+1);
+      }
       if(config.log_accuracy) {
         console.log(">> Accuracy:  ", total_hits / data.length);
       }
@@ -231,8 +234,6 @@ class CompiledModel {
         console.log(">> Train time:", train_time, "ms");
         console.log(">> Epoch time:", train_time + copy_time, "ms")
         console.log(">> Total time:", total_time, "ms");
-        if(e === config.epochs - 1)
-          console.log(">> Time/Batch:", total_time / number_of_batches);
       }
     }
     if(config.log_forward) {
@@ -314,7 +315,6 @@ class CompiledModel {
       console.log(">> Copy time: ", copy_time, "ms");
       console.log(">> Test time: ", test_time, "ms");
       console.log(">> Total time:", total_time, "ms");
-      console.log(">> Time/Batch:", total_time / number_of_batches);
     }
     if(config.log_conf_mat) {
       this._LogTestingConfusionMatrix();
@@ -482,6 +482,31 @@ class CompiledModel {
     }
   }
 
+  _LogPredictionResultTemplate(key, msg) {
+    let batch_size = this._PredictionBatchSize();
+    let output_size = this.Exports()["layer_" + (this.Exports().total_layers()-1) + "_size"]();
+    if(key in this.Exports()) {
+      console.table(this._MakeF32Matrix(this.Exports()[key](), output_size, batch_size));
+    } else {
+      this._WarnNotFound(msg);
+    }
+  }
+
+  _LogPredictionResult() {
+    this._LogPredictionResultTemplate("prediction_result_offset", 
+      "Prediction result function not found");
+  }
+
+  _LogPredictionSoftmaxResult() {
+    this._LogPredictionResultTemplate("prediction_softmax_result_offset", 
+      "Prediction softmax result function not found");
+  }
+
+  _LogPredictionHardmaxResult() {
+    this._LogPredictionResultTemplate("prediction_hardmax_result_offset", 
+      "Prediction hardmax result function not found");
+  }
+
   // Run unit test Wasm function
   UnitTest() {
     Object.keys(this.Exports()).forEach((func) => {
@@ -495,24 +520,43 @@ class CompiledModel {
   }
 
   // Run predict Wasm function
-  Predict(data) {
-    let offset = this._PredictionInputOffset();
+  Predict(data, config) {
+    // Model details
     let batch_size = this._PredictionBatchSize();
 
+    // Verify correct input data
     if (data === undefined || data.length === 0 || batch_size !== data.length) {
-      console.error("Data size should match the batch size %d != %d", data.length, batch_size);
+      console.error("Prediction data size should match the batch size %d != %d", data.length, batch_size);
       return false;
     }
 
-    let index = 0;
-    let memory = new Float32Array(this.Memory().buffer, offset, data[0].length * batch_size);
-    for (let c = 0; c < data[0].length; c++) {
-      for (let r = 0; r < data.length; r++) {
-        memory[index++] = data[r][c];
+    // Configuration        Value                     Default
+    config                  = config                  || {};
+    config.log_time         = config.log_time         || false;
+    config.log_result       = config.log_result       || false;
+    config.result_mode      = config.result_mode      || "default";
+
+    // Insert batch in memory
+    this._InsertBatchInMemory(this._PredictionDataOffset(), data, 0, batch_size);
+    
+    // Predict
+    let time = new Date().getTime();
+    this.Exports().predict_batch();
+    time = new Date().getTime() - time;
+
+    // Log prediction details
+    if(config.log_time) {
+      console.log(">> Prediction time:", time, "ms");
+    }
+    if(config.log_result) {
+      if(config.result_mode === "softmax") {
+        this._LogPredictionSoftmaxResult();
+      } else if(config.result_mode === "hardmax") {
+        this._LogPredictionHardmaxResult();
+      } else {
+        this._LogPredictionResult();
       }
     }
-    this.Exports().predict();
-    return true;
   }
 
   ExtractWeights() {
@@ -559,8 +603,8 @@ class CompiledModel {
     return true;
   }
 
-  _PredictionInputOffset() {
-    return this.Exports().prediction_input_offset();
+  _PredictionDataOffset() {
+    return this.Exports().prediction_data_offset();
   }
 
   _PredictionBatchSize() {
