@@ -160,6 +160,7 @@ class CompiledModel {
     let batch_size = this._TrainingBatchSize();
     let batches_in_memory = this._TrainingBatchesInMemory();
     let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
+    let number_of_batches = data.length / batch_size;
     if(data.length != labels.length) {
       console.error("Data size should be equal to the labels size");
       return false;
@@ -178,41 +179,66 @@ class CompiledModel {
       // Epoch results
       let total_hits = 0;
       let average_cost = 0.0;
-      let subtotal_time = 0.0;
+      let train_time = 0.0;
+      let copy_time = 0.0;
       for(let i=0; i < batches_in_memory_count; i++) {
         // Load new batches in memory and train
+        let time = new Date().getTime();
         let batches_inserted = this._InsertBatchesInMemory(this._TrainingDataOffset(), 
           data, this._TrainingLabelsOffset(), labels, i * batches_in_memory * batch_size, 
           batch_size, batches_in_memory);
-        
+        copy_time += new Date().getTime() - time;
+
         // Start training
-        let time = new Date().getTime();
+        time = new Date().getTime();
         this.Exports().train(batches_inserted);
-        subtotal_time += new Date().getTime() - time;
+        train_time += new Date().getTime() - time;
         
         // Update training details
-        if(config.log_accuracy) total_hits    += this._TrainingBatchesAccuracy();
-        if(config.log_error)    average_cost  += this._TrainingBatchesError();
+        if(config.log_accuracy) {
+          total_hits += this._TrainingBatchesAccuracy();
+        }
+        if(config.log_error) {
+          average_cost += this._TrainingBatchesError();
+        }
       }
       // Update total time
-      total_time += subtotal_time;
+      total_time += train_time + copy_time;
       // Log after end of epoch
-      if(config.log_accuracy) console.log("Training Accuracy in epoch", e,":", total_hits / data.length);
-      if(config.log_error)    console.log("Training Error in epoch", e,":", average_cost / (data.length / batch_size));
-      if(config.log_time)     console.log("Training Time in epoch", e,":", subtotal_time,
-                                      "ms. Total time:",total_time,"ms");
+      console.log("Epoch",e);
+      if(config.log_accuracy) {
+        console.log(">> Accuracy:  ", total_hits / data.length);
+      }
+      if(config.log_error) {
+        console.log(">> Error:     ", average_cost / number_of_batches);
+      }
+      if(config.log_time) {
+        console.log(">> Copy time:", copy_time, "ms");
+        console.log(">> Train time:", train_time, "ms");
+        console.log(">> Epoch time:", train_time + copy_time, "ms")
+        console.log(">> Total time:", total_time, "ms");
+      }
+    }
+    if(config.log_time) {
+      console.log(">> Time/Batch:", total_time / number_of_batches);
     }
   }
 
   _InsertBatchesInMemory(data_offset, data, labels_offset, labels, from, batch_size, num_batches) {
     let count = 0;
     let to = from + batch_size * num_batches;
+    // Compute batch sizes
+    let data_batch_bytes = data[from].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+    let labels_batch_bytes = labels[from].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+    // Copy batches into linear memory
     for(let i=from; i < to && i < data.length; i+=batch_size) {
+      // Copy data and labels
       this._InsertBatchInMemory(data_offset, data, i, batch_size);
       this._InsertBatchInMemory(labels_offset, labels, i, batch_size);
-      // Update offsets
-      data_offset += data[i].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+      // Move to the next batch
+      data_offset += data_batch_bytes;
       labels_offset += labels[i].length * batch_size * Float32Array.BYTES_PER_ELEMENT;
+      // Count how many batches were copied
       count++;
     }
     return count;

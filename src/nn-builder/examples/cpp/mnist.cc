@@ -135,11 +135,11 @@ int main(int argc, char *argv[]) {
   Model model(options);
   model.SetLayers({
      NewLayer<DenseInputLayer>(784)->WeightType(XavierUniform)->KeepProb(1),
-     NewLayer<DenseHiddenLayer>(100, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform)->KeepProb(1),
+     NewLayer<DenseHiddenLayer>(64, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform)->KeepProb(1),
      NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
   });
 
-  uint32_t training_batch_size = 1;
+  uint32_t training_batch_size = 64;
   uint32_t training_batches_in_memory = 1;
   uint32_t testing_batch_size = 1;
   uint32_t prediction_batch_size = 1;
