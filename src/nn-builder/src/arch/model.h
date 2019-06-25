@@ -25,7 +25,6 @@ struct ModelOptions {
   bool log_training_confusion_matrix = false;
   bool log_testing_accuracy = false;
   bool log_testing_error = false;
-  bool log_testing_time = false;
   bool log_testing_confusion_matrix = false;
   bool log_prediction_results = false;
   bool log_prediction_results_softmax = false;
@@ -130,6 +129,7 @@ private:
   wasmpp::Memory* learning_rate_ = nullptr;
   wasmpp::Memory* training_error_ = nullptr;
   wasmpp::Memory* training_hits_ = nullptr;
+  wasmpp::Memory* testing_hits_ = nullptr;
   DenseForwardTimeMembers dense_forward_logging_members_;
   DenseBackwardTimeMembers dense_backward_logging_members_;
 

@@ -21,38 +21,31 @@ if(process.argv.length > 2) {
     compiled_model.SetWasm(wasm);
 
     // Load mnist data
-    let mnist_data = {training:[]};
-    for(let i=0; i < 224*3; i++) {
-      for(let j=0; j < 10; j++) {
-        let l = [0,0,0,0,0,0,0,0,0,0];
-        l[j] = 1;
-        mnist_data.training.push(
-          {input: mnist[j].get(i), output: l}
-        );
-      }
-    }
-    let train_obj = mnist_data.training;
-    let train_data = [];
-    let train_labels = [];
-    for(let i=0; i < train_obj.length; i++) {
-      train_data.push(train_obj[i].input);
-      train_labels.push(train_obj[i].output);
-    }
+    let mnist_data = mnist.set(2240,2240);
+    let train_data    = [];
+    let train_labels  = [];
+    mnist_data.training.forEach((x) => {train_data.push(x.input); train_labels.push(x.output)});
+    let test_data    = [];
+    let test_labels  = [];
+    mnist_data.test.forEach((x) => {test_data.push(x.input); test_labels.push(x.output)});
     
     console.log("Training ...");
     compiled_model.Train(train_data, train_labels, {
-      log_accuracy: true,
-      log_error: true,
-      log_time: true,
-      epochs: 10,
+      // log_accuracy: true,
+      // log_error: true,
+      // log_time: true,
+      epochs: 1,
       learning_rate: 0.02
     });
     //compiled_model.LogTrainForward();
     //compiled_model.LogTrainBackward();
     //compiled_model.PrintTrainingConfusionMatrix();
 
-    // console.log("Testing ...");
-    // compiled_model.Test();
+    console.log("Testing ...");
+    compiled_model.Test(test_data, test_labels, {
+      log_time: true,
+      log_accuracy: true
+    });
 
     // console.log("Predicting ...");
     // compiled_model.Predict(...);
@@ -66,5 +59,5 @@ if(process.argv.length > 2) {
     // ...
   })
 } else {
-    console.log("Missing argument: file.wasm");
+    console.log("Missing argument: mnist.wasm");
 }

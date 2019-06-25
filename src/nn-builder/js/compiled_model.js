@@ -154,9 +154,6 @@ class CompiledModel {
 
   // Run train Wasm function
   Train(data, labels, config) {
-    // Register the total training time
-    let total_time = 0.0;
-    
     // Load model batch information
     let batch_size = this._TrainingBatchSize();
     let batches_in_memory = this._TrainingBatchesInMemory();
@@ -183,6 +180,9 @@ class CompiledModel {
 
     // Update learning rate
     this._SetLearningRate(config.learning_rate);
+ 
+    // Register the total training time
+    let total_time = 0.0;
 
     // Train for each epoch
     for(let e=0; e < config.epochs; e++) {
@@ -231,6 +231,48 @@ class CompiledModel {
         if(e === config.epochs - 1)
           console.log(">> Time/Batch:", total_time / number_of_batches);
       }
+    }
+  }
+  
+  // Run test Wasm function
+  Test(data, labels, config) {
+    // Load model batch information
+    let batch_size = this._TestingBatchSize();
+    // let batches_in_memory = this._TrainingBatchesInMemory();
+    // let batches_in_memory_count = Math.ceil(data.length / (batches_in_memory * batch_size));;
+    // let number_of_batches = data.length / batch_size;
+    
+    // Check if input is valid
+    if(data.length != labels.length) {
+      console.error("Data size should be equal to the labels size");
+      return false;
+    }
+    if(data.length % batch_size != 0) {
+      console.error("Data size",data.length,"should be divisible by the number of batch",batch_size);
+      return false;
+    }
+    
+    // Configuration        Value                     Default
+    config                  = config                  || {};
+    config.log_accuracy     = config.log_accuracy     || false;
+    config.log_error        = config.log_error        || false;
+    config.log_time         = config.log_time         || false;
+
+    // Testing results
+    let total_time = 0.0;
+    let total_hits = 0;
+
+    // Test data
+    this.Exports().test();
+    
+    // Update testing details
+    if(config.log_accuracy) {
+      total_hits += this._TestingBatchesAccuracy();
+    }
+
+    console.log("Testing complete!");
+    if(config.log_accuracy) {
+      console.log(">> Accuracy:  ", total_hits / data.length);
     }
   }
 
@@ -291,6 +333,16 @@ class CompiledModel {
     return 0;
   }
 
+  _TestingBatchesAccuracy() {
+    let key = "testing_batches_hits";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Testing batches accuracy function not found");
+    }
+    return 0;
+  }
+
   _TrainingBatchesError() {
     let key = "training_batches_error";
     if(key in this.Exports()) {
@@ -305,13 +357,12 @@ class CompiledModel {
     return this.Exports().training_batch_size();
   }
 
-  _TrainingBatchesInMemory() {
-    return this.Exports().training_batches_in_memory();
+  _TestingBatchSize() {
+    return this.Exports().testing_batch_size();
   }
 
-  // Run test Wasm function
-  Test() {
-    this.Exports().test();
+  _TrainingBatchesInMemory() {
+    return this.Exports().training_batches_in_memory();
   }
 
   // Log training forward details

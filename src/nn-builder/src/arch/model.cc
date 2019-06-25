@@ -150,6 +150,7 @@ void Model::AllocateMembers() {
   learning_rate_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  testing_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
 #define ALLOCATE_TIME_MEMBERS(name) \
   dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
@@ -453,7 +454,7 @@ void Model::CompileTrainingFunctions() {
     f.Insert(GetLearningRate());
   });
 
-  // Create function to get the learning rate
+  // Create function to set the learning rate
   module_manager_.MakeFunction("set_learning_rate", {{Type::F32},{}}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     f.Insert(SetLearningRate(MakeLocalGet(params[0])));
@@ -555,7 +556,7 @@ void Model::CompileTrainingFunctions() {
     f.Insert(MakeI32Const(TrainingBatchSize()));
   });
 
-  // Create function tot access training batches in memory
+  // Create function to access training batches in memory
   module_manager_.MakeFunction("training_batches_in_memory", {{}, {Type::I32}}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     f.Insert(MakeI32Const(TrainingBatchesInMemory()));
@@ -594,17 +595,16 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
   testing_labels_vals_ = labels;
   AllocateTest();
 
-  std::vector<Type> locals_type = {Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("test", {}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
-    assert(locals.size() == 7);
-    auto time = locals[0];
-    auto cost_mean = locals[1];
-    auto accuracy = locals[2];
-    auto test_addr = locals[3];
-    auto label_addr = locals[4];
-    auto vi32_1 = locals[5];
-    auto vi32_2 = locals[6];
+    assert(locals.size() == 6);
+    auto cost_mean = locals[0];
+    auto hits = locals[1];
+    auto test_addr = locals[2];
+    auto label_addr = locals[3];
+    auto vi32_1 = locals[4];
+    auto vi32_2 = locals[5];
 
     auto test_begin = testing_batch_.front()->Memory()->Begin();
     auto test_end = testing_batch_.back()->Memory()->End();
@@ -612,10 +612,6 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
     auto label_begin = testing_labels_batch_.front()->Memory()->Begin();
     auto label_size = testing_labels_batch_.front()->Memory()->Bytes();
 
-    if(options_.log_testing_time) {
-      // Start testing timer
-      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
-    }
     f.Insert(MakeLocalSet(label_addr, MakeI32Const(label_begin)));
     f.Insert(GenerateRangeLoop(f.Label(), test_addr, test_begin, test_end, test_size, {}, [&](BlockBody* b1){
 
@@ -624,9 +620,9 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
         MakeLocalGet(test_addr)
       }));
 
+      // Count number of correct results
       if(options_.log_testing_accuracy) {
-        // Count number of correct results
-        b1->Insert(GenerateCompoundAssignment(accuracy, Opcode::F32Add, MakeCall(count_correct_predictions_testing_func_, {
+        b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_testing_func_, {
             MakeLocalGet(label_addr)
         })));
       }
@@ -650,24 +646,16 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(label_size)));
     }));
 
+    // Log testing error
     if(options_.log_testing_error) {
-      // Log testing error
       f.Insert(MakeCall(builtins_.message.LogTestingError(), {
         MakeBinary(Opcode::F32Div, MakeLocalGet(cost_mean), MakeF32Const(testing_batch_.size()))
       }));
     }
 
+    // Store number of hits in memory
     if(options_.log_testing_accuracy) {
-      // Log testing accuracy
-      f.Insert(MakeCall(builtins_.message.LogTestingAccuracy(), {
-          MakeBinary(Opcode::F32Div, MakeLocalGet(accuracy), MakeF32Const(testing_vals_.size()))
-      }));
-    }
-
-    if(options_.log_testing_time) {
-      // Log testing time
-      f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
-      f.Insert(MakeCall(builtins_.message.LogTestingTime(), {MakeLocalGet(time)}));
+      f.Insert(MakeF32Store(MakeI32Const(testing_hits_->Begin()), MakeLocalGet(hits)));
     }
 
     if(options_.log_testing_confusion_matrix) {
@@ -684,6 +672,20 @@ void Model::CompileTestingFunction(const std::vector<std::vector<float>> &input,
         assert(!"Not implemented");
       }
     }
+  });
+
+  // Create function to access testing batches hits
+  if(options_.log_testing_accuracy) {
+    module_manager_.MakeFunction("testing_batches_hits", {{},{Type::F32}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF32Load(MakeI32Const(testing_hits_->Begin())));
+    });
+  }
+
+  // Create function to access testing batch size
+  module_manager_.MakeFunction("testing_batch_size", {{}, {Type::I32}}, {},
+                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    f.Insert(MakeI32Const(TestingBatchSize()));
   });
 }
 
