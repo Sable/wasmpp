@@ -12,7 +12,7 @@ using namespace wasmpp;
 using namespace wabt;
 using namespace layer;
 
-#define V128_IF_SIMD(t) (options_.use_simd ? Type::V128 : (t))
+#define V128_IF_SIMD(t) (options_.bytecode_options.use_simd ? Type::V128 : (t))
 
 #define DEFINE_TIME_MEMBERS(name)                                     \
 ExprList* DenseForwardTimeMembers::Get##name() {                      \
@@ -72,16 +72,16 @@ void Model::SetLayers(std::vector<Layer *> layers) {
   // Overwrite some configuration as needed
   if(layers.back()->Type() == FullyConnected) {
     auto out_layer = static_cast<DenseOutputLayer*>(layers.back());
-    if(options_.log_training_confusion_matrix || options_.log_training_accuracy) {
+    if(options_.bytecode_options.gen_training_confusion_matrix || options_.bytecode_options.gen_training_accuracy) {
       out_layer->Hardmax(Training);
     }
-    if(options_.log_testing_confusion_matrix || options_.log_testing_accuracy) {
+    if(options_.bytecode_options.gen_testing_confusion_matrix || options_.bytecode_options.gen_testing_accuracy) {
       out_layer->Hardmax(Testing);
     }
-    if(options_.log_prediction_results_softmax) {
+    if(options_.bytecode_options.gen_prediction_results_softmax) {
       out_layer->Softmax(Prediction);
     }
-    if(options_.log_prediction_results_hardmax) {
+    if(options_.bytecode_options.gen_prediction_results_hardmax) {
       out_layer->Hardmax(Prediction);
     }
   } else {
@@ -97,6 +97,18 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
   InitBuiltinImports();
   InitBuiltinDefinitions();
   InitSnippets();
+}
+
+void Model::Build(uint32_t training_batch_size, uint32_t training_batches_in_memory, uint32_t testing_batch_size,
+                       uint32_t testing_batches_in_memory, uint32_t prediction_batch_size,
+                       nn::builtins::LossFunction loss) {
+  MakeLayersFunctions(training_batch_size, training_batches_in_memory,
+                      testing_batch_size, testing_batches_in_memory,
+                      prediction_batch_size, loss);
+  MakeTrainingFunctions();
+  MakeTestingFunctions();
+  MakePredictionFunctions();
+  MakeData();
 }
 
 void Model::InitBuiltinImports() {
@@ -117,7 +129,7 @@ void Model::InitBuiltinDefinitions() {
 }
 
 void Model::InitSnippets() {
-  if(options_.use_simd) {
+  if(options_.bytecode_options.use_simd) {
     snippets_.matrix = new snippet::MatrixSnippetSimd(&module_manager_.Label(), &builtins_);
     snippets_.analysis = new snippet::AnalysisSnippet(&module_manager_.Label(), &builtins_);
   } else {
@@ -290,7 +302,7 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 
 }
 
-void Model::CompileInitialization() {
+void Model::MakeData() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
   for(int l=1; l < layers_.size(); ++l) {
@@ -298,7 +310,7 @@ void Model::CompileInitialization() {
   }
 }
 
-void Model::CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+void Model::MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_batches_in_memory,
                           uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
                           uint32_t prediction_batch_size, nn::builtins::LossFunction loss) {
   ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
@@ -346,7 +358,7 @@ void Model::GetInputOutputSize(uint32_t *input_size, uint32_t *output_size) {
   }
 }
 
-void Model::CompileTrainingFunctions() {
+void Model::MakeTrainingFunctions() {
 
   // Get the number of input and output
   uint32_t input_size;
@@ -424,14 +436,14 @@ void Model::CompileTrainingFunctions() {
       }));
 
       // Count number of correct results
-      if(options_.log_training_accuracy) {
+      if(options_.bytecode_options.gen_training_accuracy) {
         b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
             MakeLocalGet(label_addr)
         })));
       }
 
       // Compute training error
-      if(options_.log_training_error) {
+      if(options_.bytecode_options.gen_training_error) {
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
           auto compute_cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
@@ -442,7 +454,7 @@ void Model::CompileTrainingFunctions() {
       }
 
       // Update confusion matrix
-      if(options_.log_training_confusion_matrix) {
+      if(options_.bytecode_options.gen_training_confusion_matrix) {
         b1->Insert(MakeCall(confusion_matrix_training_func_, {MakeLocalGet(label_addr)}));
       }
 
@@ -453,18 +465,18 @@ void Model::CompileTrainingFunctions() {
     }));
 
     // Store total cost error in memory
-    if(options_.log_training_error) {
+    if(options_.bytecode_options.gen_training_error) {
       f.Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost)));
     }
 
     // Store accuracy in memory
-    if(options_.log_training_accuracy) {
+    if(options_.bytecode_options.gen_training_accuracy) {
       f.Insert(MakeF32Store(MakeI32Const(training_hits_->Begin()), MakeLocalGet(hits)));
     }
   });
 
   // Create function to access training batches hits
-  if(options_.log_training_accuracy) {
+  if(options_.bytecode_options.gen_training_accuracy) {
     module_manager_.MakeFunction("training_batches_hits", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_hits_->Begin())));
@@ -472,7 +484,7 @@ void Model::CompileTrainingFunctions() {
   }
 
   // Create function to access training batches error
-  if(options_.log_training_accuracy) {
+  if(options_.bytecode_options.gen_training_accuracy) {
     module_manager_.MakeFunction("training_batches_error", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_error_->Begin())));
@@ -492,7 +504,7 @@ void Model::CompileTrainingFunctions() {
   });
 
   // Create forward log functions
-  if(options_.log_forward) {
+  if(options_.bytecode_options.gen_forward) {
 #define LOG_TIME_MEMBER(name)                                                                       \
     module_manager_.MakeFunction("log_forward_" #name, {{}, {Type::F64}}, {},                       \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
@@ -503,7 +515,7 @@ void Model::CompileTrainingFunctions() {
   }
 
   // Create backward log functions
-  if(options_.log_backward) {
+  if(options_.bytecode_options.gen_backward) {
 #define LOG_TIME_MEMBER(name)           \
     module_manager_.MakeFunction("log_backward_" #name, {{}, {Type::F64}}, {},                      \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
@@ -514,7 +526,7 @@ void Model::CompileTrainingFunctions() {
   }
 }
 
-void Model::CompileTestingFunctions() {
+void Model::MakeTestingFunctions() {
 
   // Get the number of input and output
   uint32_t input_size;
@@ -573,14 +585,14 @@ void Model::CompileTestingFunctions() {
       }));
 
       // Count number of correct results
-      if(options_.log_testing_accuracy) {
+      if(options_.bytecode_options.gen_testing_accuracy) {
         b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_testing_func_, {
             MakeLocalGet(label_addr)
         })));
       }
 
       // Compute testing error
-      if(options_.log_testing_error) {
+      if(options_.bytecode_options.gen_testing_error) {
         assert(layers_.back()->Position() == Output);
         if(layers_.back()->Type() == FullyConnected) {
           auto cost_call = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
@@ -591,7 +603,7 @@ void Model::CompileTestingFunctions() {
       }
 
       // Update confusion matrix
-      if(options_.log_testing_confusion_matrix) {
+      if(options_.bytecode_options.gen_testing_confusion_matrix) {
         b1->Insert(MakeCall(confusion_matrix_testing_func_, {MakeLocalGet(label_addr)}));
       }
 
@@ -602,18 +614,18 @@ void Model::CompileTestingFunctions() {
     }));
 
     // Store total cost error in memory
-    if(options_.log_testing_error) {
+    if(options_.bytecode_options.gen_testing_error) {
       f.Insert(MakeF32Store(MakeI32Const(testing_error_->Begin()), MakeLocalGet(cost)));
     }
 
     // Store number of hits in memory
-    if(options_.log_testing_accuracy) {
+    if(options_.bytecode_options.gen_testing_accuracy) {
       f.Insert(MakeF32Store(MakeI32Const(testing_hits_->Begin()), MakeLocalGet(hits)));
     }
   });
 
   // Create function to access testing batches hits
-  if(options_.log_testing_accuracy) {
+  if(options_.bytecode_options.gen_testing_accuracy) {
     module_manager_.MakeFunction("testing_batches_hits", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(testing_hits_->Begin())));
@@ -621,7 +633,7 @@ void Model::CompileTestingFunctions() {
   }
 
   // Create function to access testing batches error
-  if(options_.log_testing_error) {
+  if(options_.bytecode_options.gen_testing_error) {
     module_manager_.MakeFunction("testing_batches_error", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
     f.Insert(MakeF32Load(MakeI32Const(testing_error_->Begin())));
@@ -641,7 +653,7 @@ void Model::CompileTestingFunctions() {
   });
 }
 
-void Model::CompilePredictionFunctions() {
+void Model::MakePredictionFunctions() {
   // Create a function to export the prediction input offset
   auto prediction_input_offset = module_manager_.MakeFunction("prediction_input_offset", {{}, {Type::I32}}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
@@ -659,7 +671,6 @@ void Model::CompilePredictionFunctions() {
     f.Insert(MakeI32Const(PredictionBatchSize()));
   });
 
-  // TODO add options for hardmax and softmax
   // Create prediction function
   auto local_types = {Type::F64, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32};
   module_manager_.MakeFunction("predict", {}, local_types,
@@ -674,7 +685,7 @@ void Model::CompilePredictionFunctions() {
     auto vf32_1 = locals[6];
     auto vf32_2 = locals[7];
 
-    if(options_.log_prediction_time) {
+    if(options_.bytecode_options.gen_prediction_time) {
       // Start prediction timer
       f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
     }
@@ -684,7 +695,7 @@ void Model::CompilePredictionFunctions() {
       MakeCall(prediction_input_offset, {})
     }));
 
-    if(options_.log_prediction_time) {
+    if(options_.bytecode_options.gen_prediction_time) {
       // Log prediction time
       f.Insert(MakeLocalSet(time, MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
       f.Insert(MakeCall(builtins_.message.LogPredictionTime(), {MakeLocalGet(time)}));
@@ -694,21 +705,21 @@ void Model::CompilePredictionFunctions() {
     assert(layers_.back()->Position() == Output);
     if(layers_.back()->Type() == FullyConnected) {
       auto out_layer = static_cast<DenseOutputLayer*>(layers_.back());
-      if(options_.log_prediction_results) {
+      if(options_.bytecode_options.gen_prediction_results) {
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[0]),
             MakeI32Const(out_layer->Predictions(Mode::Prediction)->Shape()[1])
         }));
       }
-      if(options_.log_prediction_results_softmax) {
+      if(options_.bytecode_options.gen_prediction_results_softmax) {
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[0]),
             MakeI32Const(out_layer->PredictionsSoftmax(Mode::Prediction)->Shape()[1])
         }));
       }
-      if(options_.log_prediction_results_hardmax) {
+      if(options_.bytecode_options.gen_prediction_results_hardmax) {
         f.Insert(MakeCall(builtins_.system.PrintTableF32(), {
             MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Begin()),
             MakeI32Const(out_layer->PredictionsHardmax(Mode::Prediction)->Shape()[0]),

@@ -65,15 +65,15 @@ int main(int argc, char *argv[]) {
   }
 
   ModelOptions options;
-  options.log_training_accuracy           = true;
-  options.log_training_error              = true;
-  options.log_training_confusion_matrix   = true;
-  options.log_testing_accuracy            = true;
-  options.log_testing_error               = true;
-  options.log_testing_confusion_matrix    = true;
-  options.log_forward                     = true;
-  options.log_backward                    = true;
-  options.use_simd                        = true;
+  options.bytecode_options.gen_training_accuracy           = true;
+  options.bytecode_options.gen_training_error              = true;
+  options.bytecode_options.gen_training_confusion_matrix   = true;
+  options.bytecode_options.gen_testing_accuracy            = true;
+  options.bytecode_options.gen_testing_error               = true;
+  options.bytecode_options.gen_testing_confusion_matrix    = true;
+  options.bytecode_options.gen_forward                     = true;
+  options.bytecode_options.gen_backward                    = true;
+  options.bytecode_options.use_simd                        = true;
   Model model(options);
   model.SetLayers({
      NewLayer<DenseInputLayer>(784)->WeightType(XavierUniform)->KeepProb(1),
@@ -87,13 +87,9 @@ int main(int argc, char *argv[]) {
   uint32_t testing_batches_in_memory = 1;
   uint32_t prediction_batch_size = 1;
   auto loss = model.Builtins().loss.CrossEntropy();
-  model.CompileLayers(training_batch_size, training_batches_in_memory,
-                      testing_batch_size, testing_batches_in_memory,
-                      prediction_batch_size, loss);
-  model.CompileTrainingFunctions();
-  model.CompileTestingFunctions();
-  model.CompilePredictionFunctions();
-  model.CompileInitialization();
+  model.Build(training_batch_size, training_batches_in_memory,
+              testing_batch_size, testing_batches_in_memory,
+              prediction_batch_size, loss);
 
   assert(model.Validate());
   if(!output_file.empty()) {

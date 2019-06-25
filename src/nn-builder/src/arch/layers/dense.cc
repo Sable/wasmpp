@@ -22,12 +22,12 @@ FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributio
 }
 
 #define START_TIME() \
-  if(NetworkModel()->Options().log_forward) {                                                                         \
+  if(NetworkModel()->Options().bytecode_options.gen_forward) {                                                        \
     Merge(e, NetworkModel()->DenseForwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));  \
   }
 
 #define END_TIME(name)                                                                                \
-  if(NetworkModel()->Options().log_forward) {                                                         \
+  if(NetworkModel()->Options().bytecode_options.gen_forward) {                                        \
     Merge(e, NetworkModel()->DenseForwardTime()                                                       \
     .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
                        NetworkModel()->DenseForwardTime().GetTime())));                               \
@@ -131,12 +131,12 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
 #undef END_TIME
 
 #define START_TIME() \
-  if(NetworkModel()->Options().log_backward) {                                                                        \
+  if(NetworkModel()->Options().bytecode_options.gen_backward) {                                                                        \
     Merge(e, NetworkModel()->DenseBackwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}))); \
   }
 
 #define END_TIME(name)                                                                                \
-  if(NetworkModel()->Options().log_backward) {                                                        \
+  if(NetworkModel()->Options().bytecode_options.gen_backward) {                                       \
     Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
     .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
                        NetworkModel()->DenseBackwardTime().GetTime())));                              \
@@ -494,7 +494,7 @@ void DenseOutputLayer::MakeFunctions() {
   FullyConnectedLayer::MakeFunctions();
 
   // Create training confusion matrix functions
-  if(NetworkModel()->Options().log_training_confusion_matrix) {
+  if(NetworkModel()->Options().bytecode_options.gen_training_confusion_matrix) {
     NetworkModel()->ModuleManager().MakeFunction("training_confusion_matrix_offset", {{},{Type::I32}},{},
                                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
       f.Insert(MakeI32Const(confusion_matrix_[Model::Mode::Training]->Begin()));
@@ -502,7 +502,7 @@ void DenseOutputLayer::MakeFunctions() {
   }
 
   // Create testing confusion matrix functions
-  if(NetworkModel()->Options().log_testing_confusion_matrix) {
+  if(NetworkModel()->Options().bytecode_options.gen_testing_confusion_matrix) {
     NetworkModel()->ModuleManager().MakeFunction("testing_confusion_matrix_offset", {{},{Type::I32}},{},
                                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
       f.Insert(MakeI32Const(confusion_matrix_[Model::Mode::Testing]->Begin()));

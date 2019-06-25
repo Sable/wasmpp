@@ -19,21 +19,28 @@
 namespace nn {
 namespace arch {
 
-struct ModelOptions {
-  // TODO Change names to gen_.._bytecode
-  bool log_training_accuracy = false;
-  bool log_training_error = false;
-  bool log_training_confusion_matrix = false;
-  bool log_testing_accuracy = false;
-  bool log_testing_error = false;
-  bool log_testing_confusion_matrix = false;
-  bool log_prediction_results = false;
-  bool log_prediction_results_softmax = false;
-  bool log_prediction_results_hardmax = false;
-  bool log_prediction_time = false;
-  bool log_forward = false;
-  bool log_backward = false;
+// Specify optional features for the mode
+// Each feature has its corresponding bytecode
+// in model, and it will be injected depending
+// on whether it's enabled or not
+struct ModelBytecodeOptions {
+  bool gen_training_accuracy = false;
+  bool gen_training_error = false;
+  bool gen_training_confusion_matrix = false;
+  bool gen_testing_accuracy = false;
+  bool gen_testing_error = false;
+  bool gen_testing_confusion_matrix = false;
+  bool gen_prediction_results = false;
+  bool gen_prediction_results_softmax = false;
+  bool gen_prediction_results_hardmax = false;
+  bool gen_prediction_time = false;
+  bool gen_forward = false;
+  bool gen_backward = false;
   bool use_simd = false;
+};
+
+struct ModelOptions {
+  ModelBytecodeOptions bytecode_options;
   builtins::ActivationOptions activation_options;
   WeightDistributionOptions weights_options;
 };
@@ -185,6 +192,15 @@ private:
   wabt::Var ConfusionMatrixFunction(uint8_t mode_index);
   wabt::Var CountCorrectPredictionsFunction(uint8_t mode_index);
 
+  // Make functions
+  void MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+                           uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+                           uint32_t prediction_batch_size, builtins::LossFunction loss);
+  void MakeTrainingFunctions();
+  void MakeTestingFunctions();
+  void MakePredictionFunctions();
+  void MakeData();
+
   // Helper
   void GetInputOutputSize(uint32_t *input_size, uint32_t *output_size);
 public:
@@ -193,15 +209,10 @@ public:
   std::vector<layer::Layer*> Layers() const { return layers_; }
   void SetLayers(std::vector<layer::Layer*> layers);
 
-  // Compile functions
-  void CompileLayers(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                     uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
-                     uint32_t prediction_batch_size, builtins::LossFunction loss);
-  // TODO Rename to Make*
-  void CompileTrainingFunctions();
-  void CompileTestingFunctions();
-  void CompilePredictionFunctions();
-  void CompileInitialization();
+  // Build model
+  void Build(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+                           uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+                           uint32_t prediction_batch_size, builtins::LossFunction loss);
 
   // Members accessors
   wabt::ExprList* SetLearningRate(wabt::ExprList* val);
