@@ -191,7 +191,7 @@ class CompiledModel {
 
         // Start training
         time = new Date().getTime();
-        this.Exports().train(batches_inserted);
+        this.Exports().train_batches_in_memory(batches_inserted);
         train_time += new Date().getTime() - time;
         
         // Update training details

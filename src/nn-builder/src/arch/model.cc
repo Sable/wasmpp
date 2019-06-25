@@ -449,7 +449,7 @@ void Model::CompileTrainingFunctions(float learning_rate) {
 
   // Create training function
   std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
-  module_manager_.MakeFunction("train", {{Type::I32},{}}, locals_type, [&](FuncBody f, std::vector<Var> params,
+  module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type, [&](FuncBody f, std::vector<Var> params,
                                                              std::vector<Var> locals) {
     // Set learning rate
     // TODO Move to JavaScript
