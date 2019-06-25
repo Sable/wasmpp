@@ -1,5 +1,5 @@
 const fs = require('fs');
-const {CompiledModel} = require('./compiled_model');
+const {CompiledModel} = require('../js/compiled_model');
 
 process.on('unhandledRejection', error => {
   console.error(">> Make sure SIMD is enabled (e.g. nodejs --experimental-wasm-simd)");

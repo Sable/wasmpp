@@ -175,6 +175,9 @@ class CompiledModel {
     config.log_accuracy     = config.log_accuracy     || false;
     config.log_error        = config.log_error        || false;
     config.log_time         = config.log_time         || false;
+    config.log_forward      = config.log_forward      || false;
+    config.log_backward     = config.log_backward     || false;
+    config.log_conf_mat     = config.log_conf_mat     || false;
     config.epochs           = config.epochs           || 0;
     config.learning_rate    = config.learning_rate    || 0.01;
 
@@ -232,6 +235,15 @@ class CompiledModel {
           console.log(">> Time/Batch:", total_time / number_of_batches);
       }
     }
+    if(config.log_forward) {
+      this._LogTrainForward();
+    }
+    if(config.log_backward) {
+      this._LogTrainBackward();
+    }
+    if(config.log_conf_mat) {
+      this._LogTrainingConfusionMatrix();
+    }
   }
   
   // Run test Wasm function
@@ -257,6 +269,7 @@ class CompiledModel {
     config.log_accuracy     = config.log_accuracy     || false;
     config.log_error        = config.log_error        || false;
     config.log_time         = config.log_time         || false;
+    config.log_conf_mat     = config.log_conf_mat     || false;
 
     // Testing results
     let total_time = 0.0;
@@ -302,6 +315,9 @@ class CompiledModel {
       console.log(">> Test time: ", test_time, "ms");
       console.log(">> Total time:", total_time, "ms");
       console.log(">> Time/Batch:", total_time / number_of_batches);
+    }
+    if(config.log_conf_mat) {
+      this._LogTestingConfusionMatrix();
     }
   }
 
@@ -417,7 +433,7 @@ class CompiledModel {
   }
 
   // Log training forward details
-  LogTrainForward() {
+  _LogTrainForward() {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_forward_")) {
@@ -431,7 +447,7 @@ class CompiledModel {
   }
 
   // Log training backward details
-  LogTrainBackward() {
+  _LogTrainBackward() {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_backward_")) {
@@ -444,7 +460,7 @@ class CompiledModel {
     }
   }
 
-  PrintTrainingConfusionMatrix() {
+  _LogTrainingConfusionMatrix() {
     let matrix_offset_key = "training_confusion_matrix_offset";
     let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
     let matrix_side = this.Exports()[output_size_key]();
@@ -455,7 +471,7 @@ class CompiledModel {
     }
   }
 
-  PrintTestingConfusionMatrix() {
+  _LogTestingConfusionMatrix() {
     let matrix_offset_key = "testing_confusion_matrix_offset";
     let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
     let matrix_side = this.Exports()[output_size_key]();
@@ -606,26 +622,6 @@ class CompiledModel {
     };
 
     let message_imports = {
-      log_training_time: (epoch, time_epoch, time_total) => {
-        console.log("Training time at epoch", epoch + 1, "is", time_epoch, "ms", 
-          "and total time so far is", time_total, "ms");
-      },
-      log_training_error: (epoch, error) => {
-        console.log("Training Error in epoch", epoch + 1, ":", error);
-      },
-      log_training_accuracy: (epoch, acc) => {
-        console.log("Training Accuracy in epoch", epoch + 1, ":",
-          Math.round(acc * 10000) / 10000);
-      },
-      log_testing_time: (time) => {
-        console.log("Testing time:", time, "ms");
-      },
-      log_testing_error: (error) => {
-        console.log("Testing Error:", error);
-      },
-      log_testing_accuracy: (acc) => {
-        console.log("Testing Accuracy:", Math.round(acc * 10000) / 10000);
-      },
       log_prediction_time: (time) => {
         console.log("Prediction time:", time, "ms");
       },

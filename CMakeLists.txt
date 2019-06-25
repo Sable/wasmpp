@@ -29,7 +29,6 @@ set(WASMPP wasmpp)
 set(NN_BUILDER nnb)
 set(NN_BUILDER_JS nnb_js)
 set(NN_TEST nn-test)
-set(LOGIC logic)
 set(MNIST mnist)
 
 # Create wasmpp library
@@ -59,10 +58,6 @@ endif()
 file(GLOB_RECURSE NN_TEST_FILES src/nn-builder/tests/*.cc)
 add_executable(${NN_TEST} ${NN_TEST_FILES})
 target_link_libraries(${NN_TEST} ${NN_BUILDER})
-
-# Create logic example
-add_executable(${LOGIC} src/nn-builder/examples/cpp/logic.cc)
-target_link_libraries(${LOGIC} ${NN_BUILDER})
 
 # Create mnist example
 add_executable(${MNIST} src/nn-builder/examples/cpp/mnist.cc)

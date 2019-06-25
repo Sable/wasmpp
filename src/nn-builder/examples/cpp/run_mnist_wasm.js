@@ -31,15 +31,15 @@ if(process.argv.length > 2) {
     
     console.log("Training ...");
     compiled_model.Train(train_data, train_labels, {
-      // log_accuracy: true,
-      // log_error: true,
-      // log_time: true,
-      epochs: 1000,
+      log_accuracy: true,
+      log_error: true,
+      log_time: true,
+      log_forward: true,
+      log_backward: true,
+      log_conf_mat: true,
+      epochs: 10,
       learning_rate: 0.02
     });
-    //compiled_model.LogTrainForward();
-    //compiled_model.LogTrainBackward();
-    //compiled_model.PrintTrainingConfusionMatrix();
 
     console.log("Testing ...");
     compiled_model.Test(test_data, test_labels, {
@@ -47,7 +47,6 @@ if(process.argv.length > 2) {
       log_accuracy: true,
       log_error: true
     });
-    compiled_model.PrintTestingConfusionMatrix();
 
     // console.log("Predicting ...");
     // compiled_model.Predict(...);
