@@ -85,10 +85,10 @@ int main(int argc, char *argv[]) {
   });
 
   uint32_t training_batch_size = 1;
-  uint32_t training_batches_in_memory = 3;
+  uint32_t training_batches_in_memory = 1;
   uint32_t testing_batch_size = 1;
   uint32_t testing_batches_in_memory = 1;
-  uint32_t prediction_batch_size = 2;
+  uint32_t prediction_batch_size = 1;
   auto loss = model.Builtins().loss.CrossEntropy();
   model.Build(training_batch_size, training_batches_in_memory,
               testing_batch_size, testing_batches_in_memory,

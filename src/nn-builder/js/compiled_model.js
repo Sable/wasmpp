@@ -211,7 +211,7 @@ class CompiledModel {
       console.log("Data cannot be empty");
       return false;
     }
-    if(data.length !== labels.length) {
+    if(labels !== null && data.length !== labels.length) {
       console.log("Data and labels should be equal");
       return false;
     }
@@ -225,22 +225,28 @@ class CompiledModel {
     result.x_size = input_size;
     result.x_count = data.length;
     // Encode labels
-    result.Y = this._EncodeArray(labels, output_size, batch_size);
-    result.y_size = output_size;
-    result.y_count = labels.length;
+    if(labels !== null) {
+      result.Y = this._EncodeArray(labels, output_size, batch_size);
+      result.y_size = output_size;
+      result.y_count = labels.length;
+    }
     // Check if encoding was successful
-    if(result.X !== false && result.Y !== false) {
+    if(result.X !== false && (labels === null || result.Y !== false)) {
       result.good = true;
     }
     return result;
   }
 
-  EncodeTraining(data, labels) {
+  EncodeTrainingData(data, labels) {
     return this._EncodeInput(data, labels, this._TrainingBatchSize());
   }
 
-  EncodeTesting(data, labels) {
+  EncodeTestingData(data, labels) {
     return this._EncodeInput(data, labels, this._TestingBatchSize());
+  }
+
+  EncodePredictionData(data) {
+    return this._EncodeInput(data, null, this._PredictionBatchSize());
   }
 
   _LayerSize(id) {
@@ -349,7 +355,6 @@ class CompiledModel {
     config.log_conf_mat     = config.log_conf_mat     || false;
 
     // Testing results
-    let total_time = 0.0;
     let total_hits = 0;
     let average_cost = 0.0;
     let test_time = 0.0;
@@ -373,8 +378,6 @@ class CompiledModel {
         average_cost += this._TestingBatchesError();
       }
     }
-    // Update total time
-    total_time += test_time;
     // Log testing results
     if(config.log_accuracy) {
       console.log(">> Test Accuracy:  ", total_hits / input.x_count);
@@ -411,34 +414,26 @@ class CompiledModel {
       // Recompute length
       x_length = batch_in_memory * x_batch_float_size;
     }
-    // Compute labels indices
-    let y_batch_float_size  = batch_size * input.y_size;
-    let y_begin             = batch_index * y_batch_float_size;
-    let y_length            = batch_in_memory * y_batch_float_size;
 
-    // Create a float array view
-    let data_array = new Float32Array(input.X.buffer, x_begin* Float32Array.BYTES_PER_ELEMENT, x_length);
-    let labels_array = new Float32Array(input.Y.buffer, y_begin* Float32Array.BYTES_PER_ELEMENT, y_length);
-    let data_memory = new Float32Array(this.Memory().buffer, x_offset, x_length);
-    let labels_memory = new Float32Array(this.Memory().buffer, y_offset, y_length);
-    
     // Copy data
+    let data_array = new Float32Array(input.X.buffer, x_begin* Float32Array.BYTES_PER_ELEMENT, x_length);
+    let data_memory = new Float32Array(this.Memory().buffer, x_offset, x_length);
     data_memory.set(data_array);
-    labels_memory.set(labels_array);
+
+    if(y_offset !== null) {
+      // Compute labels indices
+      let y_batch_float_size  = batch_size * input.y_size;
+      let y_begin             = batch_index * y_batch_float_size;
+      let y_length            = batch_in_memory * y_batch_float_size;
+
+      // Copy labels
+      let labels_array = new Float32Array(input.Y.buffer, y_begin* Float32Array.BYTES_PER_ELEMENT, y_length);
+      let labels_memory = new Float32Array(this.Memory().buffer, y_offset, y_length);
+      labels_memory.set(labels_array);
+    }
 
     // Return number of batches inserted in the memory
     return batch_in_memory;
-  }
-
-  _InsertBatchInMemory(memory_offset, data, from, batch_size) {
-    let index = 0;
-    let entry_size = data[from].length;
-    let memory = new Float32Array(this.Memory().buffer, memory_offset, entry_size * batch_size);
-    for (let c = 0; c < entry_size; c++) {
-      for (let r = 0; r < batch_size; r++) {
-        memory[index++] = data[from + r][c];
-      }
-    }
   }
 
   _TrainingDataOffset() {
@@ -601,42 +596,48 @@ class CompiledModel {
   }
 
   // Run predict Wasm function
-  Predict(data, config) {
-    // Model details
-    let batch_size = this._PredictionBatchSize();
-
-    // Verify correct input data
-    if (data === undefined || data.length === 0 || batch_size !== data.length) {
-      console.error("Prediction data size should match the batch size %d != %d", data.length, batch_size);
+  Predict(input, config) {
+    if(!input.good) {
+      console.log("Prediction input seems bad, skipping ...");
       return false;
     }
 
+    // Load model batch information
+    let batch_size = this._PredictionBatchSize();
+    let number_of_batches = input.x_count / batch_size;
+    
     // Configuration        Value                     Default
     config                  = config                  || {};
     config.log_time         = config.log_time         || false;
     config.log_result       = config.log_result       || false;
     config.result_mode      = config.result_mode      || "default";
 
-    // Insert batch in memory
-    this._InsertBatchInMemory(this._PredictionDataOffset(), data, 0, batch_size);
-    
-    // Predict
-    let time = new Date().getTime();
-    this.Exports().predict_batch();
-    time = new Date().getTime() - time;
+    // Testing results
+    let pred_time = 0.0;
+    let data_offset = this._PredictionDataOffset();
+    for(let i=0; i < number_of_batches; i++) {
+      // Load new batches in memory and test
+      let batches_inserted = this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
 
+      // Start predicting
+      let time = new Date().getTime();
+      this.Exports().predict_batch();
+      pred_time += new Date().getTime() - time;
+
+      // Log result
+      if(config.log_result) {
+        if(config.result_mode === "softmax") {
+          this._LogPredictionSoftmaxResult();
+        } else if(config.result_mode === "hardmax") {
+          this._LogPredictionHardmaxResult();
+        } else {
+          this._LogPredictionResult();
+        }
+      }
+    }
     // Log prediction details
     if(config.log_time) {
-      console.log(">> Prediction time:", time, "ms");
-    }
-    if(config.log_result) {
-      if(config.result_mode === "softmax") {
-        this._LogPredictionSoftmaxResult();
-      } else if(config.result_mode === "hardmax") {
-        this._LogPredictionHardmaxResult();
-      } else {
-        this._LogPredictionResult();
-      }
+      console.log(">> Prediction time:", pred_time, "ms");
     }
   }
 

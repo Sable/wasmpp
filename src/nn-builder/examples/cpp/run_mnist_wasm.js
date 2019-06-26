@@ -21,7 +21,7 @@ if(process.argv.length > 2) {
     compiled_model.SetWasm(wasm);
 
     // Load mnist data
-    let mnist_data = mnist.set(2240,2240);
+    let mnist_data = mnist.set(2240*2,2240);
     let train_data    = [];
     let train_labels  = [];
     mnist_data.training.forEach((x) => {train_data.push(x.input); train_labels.push(x.output)});
@@ -29,18 +29,20 @@ if(process.argv.length > 2) {
     let test_labels  = [];
     mnist_data.test.forEach((x) => {test_data.push(x.input); test_labels.push(x.output)});
     
-    let training = compiled_model.EncodeTraining(train_data, train_labels);
-    let testing = compiled_model.EncodeTesting(test_data, test_labels);
+    // Encode data
+    let training = compiled_model.EncodeTrainingData(train_data, train_labels);
+    let testing = compiled_model.EncodeTestingData(test_data, test_labels);
+    let prediction = compiled_model.EncodePredictionData([train_data[0], train_data[1]]);
 
     console.log("Training ...");
     compiled_model.Train(training, {
-      // log_accuracy: true,
-      // log_error: true,
-      // log_time: true,
+      log_accuracy: true,
+      log_error: true,
+      log_time: true,
       // log_forward: true,
       // log_backward: true,
-      // log_conf_mat: true,
-      epochs: 10,
+      log_conf_mat: true,
+      epochs: 5,
       learning_rate: 0.02
     });
 
@@ -51,11 +53,12 @@ if(process.argv.length > 2) {
       log_error: true
     });
 
-    // console.log("Predicting ...");
-    // compiled_model.Predict([train_data[0],train_data[1]], {
-    //   log_time: true,
-    //   log_result: true,
-    // });
+    console.log("Predicting ...");
+    compiled_model.Predict(prediction, {
+      log_time: true,
+      log_result: true,
+      result_mode: "hardmax"
+    });
   })
 } else {
     console.log("Missing argument: mnist.wasm");
