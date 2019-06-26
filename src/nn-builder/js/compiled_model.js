@@ -645,14 +645,15 @@ class CompiledModel {
     let data_offset = this._PredictionDataOffset();
     for(let i=0; i < number_of_batches; i++) {
       // Load new batches in memory and predict
-      let batches_inserted = this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
+      this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
 
       // Start predicting
-      let time = new Date().getTime();
       this.Exports().predict_batch();
-      pred_time += new Date().getTime() - time;
 
       // Log result
+      if(config.log_time) {
+        pred_time += this._PredictionTime();
+      }
       if(config.log_result) {
         if(config.result_mode === "softmax") {
           this._LogPredictionSoftmaxResult();

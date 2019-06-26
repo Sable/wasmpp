@@ -711,14 +711,36 @@ void Model::MakePredictionFunctions() {
   }
 
   // Create prediction function
-  module_manager_.MakeFunction("predict_batch", {}, {},
+  module_manager_.MakeFunction("predict_batch", {}, {Type::F64},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+
+    assert(locals.size() == 1);
+    auto time = locals[0];
+
+    // Start timer
+    if(options_.bytecode_options.gen_prediction_time) {
+      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
+    }
 
     // Apply forward algorithm
     f.Insert(MakeCall(forward_prediction_func_, {
       MakeI32Const(input_addr)
     }));
+
+    // Store time
+    if(options_.bytecode_options.gen_prediction_time) {
+      f.Insert(MakeF64Store(MakeI32Const(prediction_time_->Begin()),
+                            MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
+    }
   });
+
+  // Create function to access prediction time
+  if(options_.bytecode_options.gen_prediction_time) {
+    module_manager_.MakeFunction("prediction_time", {{},{Type::F64}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF64Load(MakeI32Const(prediction_time_->Begin())));
+    });
+  }
 
   // Create a function to get prediction batch size
   module_manager_.MakeFunction("prediction_batch_size", {{}, {Type::I32}}, {},
