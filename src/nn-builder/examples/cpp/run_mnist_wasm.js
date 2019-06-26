@@ -42,7 +42,7 @@ if(process.argv.length > 2) {
       // log_forward: true,
       // log_backward: true,
       log_conf_mat: true,
-      epochs: 5,
+      epochs: 1,
       learning_rate: 0.02
     });
 
@@ -50,6 +50,7 @@ if(process.argv.length > 2) {
     compiled_model.Test(testing, {
       log_time: true,
       log_accuracy: true,
+      log_conf_mat: true,
       log_error: true
     });
 

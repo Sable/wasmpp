@@ -538,9 +538,8 @@ class CompiledModel {
 
   _LogTrainingConfusionMatrix() {
     let matrix_offset_key = "training_confusion_matrix_offset";
-    let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
-    let matrix_side = this.Exports()[output_size_key]();
-    if(!(matrix_offset_key in Object.keys(this.Exports()))) {
+    let matrix_side = this._LayerSize(this._TotalLayers() - 1);
+    if(matrix_offset_key in this.Exports()) {
       console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Training confusion matrix function not found");
@@ -549,9 +548,8 @@ class CompiledModel {
 
   _LogTestingConfusionMatrix() {
     let matrix_offset_key = "testing_confusion_matrix_offset";
-    let output_size_key = "layer_" + (this.Exports().total_layers()-1) + "_size";
-    let matrix_side = this.Exports()[output_size_key]();
-    if(!(matrix_offset_key in Object.keys(this.Exports()))) {
+    let matrix_side = this._LayerSize(this._TotalLayers() - 1);
+    if(matrix_offset_key in this.Exports()) {
       console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Testing confusion matrix function not found");
@@ -560,7 +558,7 @@ class CompiledModel {
 
   _LogPredictionResultTemplate(key, msg) {
     let batch_size = this._PredictionBatchSize();
-    let output_size = this.Exports()["layer_" + (this.Exports().total_layers()-1) + "_size"]();
+    let output_size = this._LayerSize(this._TotalLayers() - 1);
     if(key in this.Exports()) {
       console.table(this._MakeF32Matrix(this.Exports()[key](), output_size, batch_size));
     } else {
@@ -612,11 +610,11 @@ class CompiledModel {
     config.log_result       = config.log_result       || false;
     config.result_mode      = config.result_mode      || "default";
 
-    // Testing results
+    // Prediction results
     let pred_time = 0.0;
     let data_offset = this._PredictionDataOffset();
     for(let i=0; i < number_of_batches; i++) {
-      // Load new batches in memory and test
+      // Load new batches in memory and predict
       let batches_inserted = this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
 
       // Start predicting
@@ -747,27 +745,13 @@ class CompiledModel {
       random: Math.random
     };
 
-    let message_imports = {
-      log_prediction_time: (time) => {
-        console.log("Prediction time:", time, "ms");
-      },
-    };
-
     let system_imports = {
       print: console.log,
       time: () => {
         return new Date().getTime();
       },
       print_table_f32: (index, rows, cols) => {
-        let view = new Float32Array(this.Memory().buffer, index);
-        let table = [];
-        for (let r = 0; r < rows; ++r) {
-          table.push([]);
-          for (let c = 0; c < cols; ++c) {
-            table[r].push(view[r * cols + c]);
-          }
-        }
-        console.table(table);
+        console.table(this._MakeF32Matrix(index, rows, cols));
       }
     };
 
@@ -787,7 +771,6 @@ class CompiledModel {
     };
     return {
       "Math": math_imports,
-      "Message": message_imports,
       "System": system_imports,
       "Test": test_imports,
     };

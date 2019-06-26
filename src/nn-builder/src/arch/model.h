@@ -116,22 +116,7 @@ private:
   uint32_t training_batches_in_memory_;
   uint32_t testing_batches_in_memory_;
 
-  // Limits
-  // MAX_FLOAT_PER_DATA value is arbitrary, but large
-  // enough to have a total number of data segments
-  // less than 100K which is currently the limit
-  // for WebAssembly engines.
-  // To see how this number is affecting the generated
-  // wasm, generate the wat format, and count the number
-  // of data segments "(data ..."
-  const uint32_t MAX_FLOAT_PER_DATA = 1048576; // 2^20
-
   // Model members
-  // TODO Ideally time, accuracy, etc... should all be
-  //       members of the model. And instead of printing them
-  //       from the generated wasm, we should expose their values
-  //       using exported functions so that the user of the wasm
-  //       decides when, how and where to print them.
   wasmpp::Memory* learning_rate_ = nullptr;
   wasmpp::Memory* training_error_ = nullptr;
   wasmpp::Memory* training_hits_ = nullptr;
