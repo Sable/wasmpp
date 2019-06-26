@@ -107,17 +107,21 @@ public:
   bool Validate() {
     return model_.Validate();
   }
-  void CompileInitialization() {
-    return model_.CompileInitialization();
-  }
-  bool CompileLayers(uint32_t training_batch, uint32_t testing_batch, uint32_t prediction_batch, std::string loss) {
+  void Build(uint32_t training_batch_size, uint32_t training_batches_in_memory,
+             uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+             uint32_t prediction_batch_size, std::string loss) {
+    // Set layers
+    model_.SetLayers(layers_);
+
     // Default "mean-squared-error"
     LossFunction loss_func = model_.Builtins().loss.MeanSquaredError();
     if(loss == "cross-entropy") {
       loss_func = model_.Builtins().loss.CrossEntropy();
     }
-    model_.CompileLayers(training_batch, testing_batch, prediction_batch, loss_func);
-    return true;
+
+    // Build model
+    model_.Build(training_batch_size, training_batches_in_memory, testing_batch_size, testing_batches_in_memory,
+                 prediction_batch_size, loss_func);
   }
   void AddDenseInputLayer(DenseInputLayerDescriptor desc) {
     layers_.push_back(NewLayer<DenseInputLayer>(desc.GetNodes())
@@ -132,84 +136,101 @@ public:
     layers_.push_back(NewLayer<DenseOutputLayer>(desc.GetNodes(), StringToActivationFunction(desc.GetActivationFunction()))
         ->WeightType(StringToWeightDistribution(desc.GetWeightType())));
   }
-  void SetLayers() {
-    model_.SetLayers(layers_);
-  }
-  void CompileTrainingFunction(uint32_t epoch, float learning_rate, std::vector<std::vector<float>> input,
-                       std::vector<std::vector<float>> labels) {
-    model_.CompileTrainingFunction(epoch, learning_rate, input, labels);
-  }
-  void CompileTestingFunction(std::vector<std::vector<float>> input, std::vector<std::vector<float>> labels) {
-    model_.CompileTestingFunction(input, labels);
-  }
-  void CompilePredictionFunctions() {
-    model_.CompilePredictionFunctions();
-  }
-  void CompileWeightsFunctions() {
-    model_.CompileWeightsFunctions();
-  }
 };
 
 EMSCRIPTEN_BINDINGS(model_options) {
 
+#define WEIGHT_DISTRIBUTION_OPTIONS(name) \
+  .property(#name, &WeightDistributionOptions::name)
+
+    class_<WeightDistributionOptions>("WeightDistributionOptions")
+    WEIGHT_DISTRIBUTION_OPTIONS(gaussian_mean)
+    WEIGHT_DISTRIBUTION_OPTIONS(gaussian_std_dev)
+    WEIGHT_DISTRIBUTION_OPTIONS(uniform_low)
+    WEIGHT_DISTRIBUTION_OPTIONS(uniform_high)
+    WEIGHT_DISTRIBUTION_OPTIONS(constant_value)
+    WEIGHT_DISTRIBUTION_OPTIONS(seed);
+
+#define ACTIVATION_OPTIONS(name) \
+  .property(#name, &ActivationOptions::name)
+
+    class_<ActivationOptions>("ActivationOptions")
+        .constructor<>()
+        ACTIVATION_OPTIONS(linear_slope)
+        ACTIVATION_OPTIONS(leaky_relu_slope)
+        ACTIVATION_OPTIONS(elu_slope);
+
+#define MODEL_BYTECODE_OPTIONS(name) \
+  .property(#name, &ModelBytecodeOptions::name)
+
+  class_<ModelBytecodeOptions>("ModelBytecodeOptions")
+      .constructor<>()
+      MODEL_BYTECODE_OPTIONS(gen_training_accuracy)
+      MODEL_BYTECODE_OPTIONS(gen_training_error)
+      MODEL_BYTECODE_OPTIONS(gen_training_confusion_matrix)
+      MODEL_BYTECODE_OPTIONS(gen_testing_accuracy)
+      MODEL_BYTECODE_OPTIONS(gen_testing_error)
+      MODEL_BYTECODE_OPTIONS(gen_testing_confusion_matrix)
+      MODEL_BYTECODE_OPTIONS(gen_prediction_results)
+      MODEL_BYTECODE_OPTIONS(gen_prediction_results_softmax)
+      MODEL_BYTECODE_OPTIONS(gen_prediction_results_hardmax)
+      MODEL_BYTECODE_OPTIONS(gen_forward)
+      MODEL_BYTECODE_OPTIONS(gen_backward)
+      MODEL_BYTECODE_OPTIONS(use_simd);
+
+#define MODEL_OPTIONS(name) \
+  .property(#name, &ModelOptions::name)
+
   class_<ModelOptions>("ModelOptions")
       .constructor<>()
-      .property("log_training_accuracy", &ModelOptions::log_training_accuracy)
-      .property("log_training_error", &ModelOptions::log_training_error)
-      .property("log_training_time", &ModelOptions::log_training_time)
-      .property("log_training_confusion_matrix", &ModelOptions::log_training_confusion_matrix)
-      .property("log_testing_accuracy", &ModelOptions::log_testing_accuracy)
-      .property("log_testing_error", &ModelOptions::log_testing_error)
-      .property("log_testing_time", &ModelOptions::log_testing_time)
-      .property("log_testing_confusion_matrix", &ModelOptions::log_testing_confusion_matrix)
-      .property("log_prediction_results", &ModelOptions::log_prediction_results)
-      .property("log_prediction_results_softmax", &ModelOptions::log_prediction_results_softmax)
-      .property("log_prediction_results_hardmax", &ModelOptions::log_prediction_results_hardmax)
-      .property("log_prediction_time", &ModelOptions::log_prediction_time)
-      .property("log_forward", &ModelOptions::log_forward)
-      .property("log_backward", &ModelOptions::log_backward)
-      .property("use_simd", &ModelOptions::use_simd);
+      MODEL_OPTIONS(bytecode_options)
+      MODEL_OPTIONS(activation_options)
+      MODEL_OPTIONS(weights_options);
+
+#define MODEL_WRAPPER(name) \
+  .function(#name, &ModelWrapper::name)
 
   class_<ModelWrapper>("Model")
       .constructor<ModelOptions>()
-      .function("ToWasm", &ModelWrapper::ToWasm)
-      .function("ToWat", &ModelWrapper::ToWat)
-      .function("Validate", &ModelWrapper::Validate)
-      .function("SetLayers", &ModelWrapper::SetLayers)
-      .function("AddDenseInputLayer", &ModelWrapper::AddDenseInputLayer)
-      .function("AddDenseHiddenLayer", &ModelWrapper::AddDenseHiddenLayer)
-      .function("AddDenseOutputLayer", &ModelWrapper::AddDenseOutputLayer)
-      .function("CompileTrainingFunction", &ModelWrapper::CompileTrainingFunction)
-      .function("CompileTestingFunction", &ModelWrapper::CompileTestingFunction)
-      .function("CompilePredictionFunctions", &ModelWrapper::CompilePredictionFunctions)
-      .function("CompileLayers", &ModelWrapper::CompileLayers)
-      .function("CompileWeightsFunctions", &ModelWrapper::CompileWeightsFunctions)
-      .function("CompileInitialization", &ModelWrapper::CompileInitialization);
+      MODEL_WRAPPER(ToWasm)
+      MODEL_WRAPPER(ToWat)
+      MODEL_WRAPPER(Validate)
+      MODEL_WRAPPER(AddDenseInputLayer)
+      MODEL_WRAPPER(AddDenseHiddenLayer)
+      MODEL_WRAPPER(AddDenseOutputLayer)
+      MODEL_WRAPPER(Build);
+
+#define DENSE_INPUT_LAYER(name) \
+  .function(#name, &DenseInputLayerDescriptor::name)
 
   class_<DenseInputLayerDescriptor>("DenseInputLayerDescriptor")
       .constructor<uint32_t>()
-      .function("GetNodes", &DenseInputLayerDescriptor::GetNodes)
-      .function("SetKeepProb", &DenseInputLayerDescriptor::SetKeepProb)
-      .function("GetKeepProb", &DenseInputLayerDescriptor::GetKeepProb);
+      DENSE_INPUT_LAYER(GetNodes)
+      DENSE_INPUT_LAYER(SetKeepProb)
+      DENSE_INPUT_LAYER(GetKeepProb);
+
+#define DENSE_HIDDEN_LAYER(name) \
+  .function(#name, &DenseHiddenLayerDescriptor::name)
 
   class_<DenseHiddenLayerDescriptor>("DenseHiddenLayerDescriptor")
     .constructor<uint32_t, std::string>()
-    .function("GetNodes", &DenseHiddenLayerDescriptor::GetNodes)
-    .function("GetActivationFunction", &DenseHiddenLayerDescriptor::GetActivationFunction)
-    .function("SetWeightType", &DenseHiddenLayerDescriptor::SetWeightType)
-    .function("GetWeightType", &DenseHiddenLayerDescriptor::GetWeightType)
-    .function("SetKeepProb", &DenseHiddenLayerDescriptor::SetKeepProb)
-    .function("GetKeepProb", &DenseHiddenLayerDescriptor::GetKeepProb);
+    DENSE_HIDDEN_LAYER(GetNodes)
+    DENSE_HIDDEN_LAYER(GetActivationFunction)
+    DENSE_HIDDEN_LAYER(SetWeightType)
+    DENSE_HIDDEN_LAYER(GetWeightType)
+    DENSE_HIDDEN_LAYER(SetKeepProb)
+    DENSE_HIDDEN_LAYER(GetKeepProb);
+
+#define DENSE_OUTPUT_LAYER(name) \
+  .function(#name, &DenseOutputLayerDescriptor::name)
 
   class_<DenseOutputLayerDescriptor>("DenseOutputLayerDescriptor")
     .constructor<uint32_t, std::string>()
-    .function("GetNodes", &DenseOutputLayerDescriptor::GetNodes)
-    .function("GetActivationFunction", &DenseOutputLayerDescriptor::GetActivationFunction)
-    .function("SetWeightType", &DenseOutputLayerDescriptor::SetWeightType)
-    .function("GetWeightType", &DenseOutputLayerDescriptor::GetWeightType);
+    DENSE_OUTPUT_LAYER(GetNodes)
+    DENSE_OUTPUT_LAYER(GetActivationFunction)
+    DENSE_OUTPUT_LAYER(SetWeightType)
+    DENSE_OUTPUT_LAYER(GetWeightType);
 
-  register_vector<float>("F32Array");
-  register_vector<std::vector<float>>("F32Matrix");
   register_vector<uint8_t>("ByteArray");
 }
 
