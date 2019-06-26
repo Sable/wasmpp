@@ -108,7 +108,6 @@ model.AddDenseOutputLayer(l2);</textarea>
       </div>
       <div class="form-group">
         <button type="button" class="btn btn-primary btn-md" onclick="LoadMnistExample()">MNIST example</button>
-        <button type="button" class="btn btn-secondary btn-md" onclick="ClearExample()">Clear</button>
       </div>
       <div class="form-group">
         <label for="train_data">Training data</label>
@@ -401,11 +400,6 @@ model.AddDenseOutputLayer(l2);</textarea>
       msg_obj.innerText = "Build model before importing weights";
       msg_obj.className = "alert alert-danger";
     }
-  }
-
-  function ClearExample() {
-    document.getElementById('train_data').value = "";
-    document.getElementById('train_labels').value = "";
   }
 
   function LoadMnistExample() {
