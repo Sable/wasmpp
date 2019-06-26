@@ -142,6 +142,8 @@ model.AddDenseOutputLayer(l2);</textarea>
         <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWasm()">Download wasm</button>
         <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWat()">Download wat</button>
         <label class="checkbox-inline right"><input type="checkbox" id="use_simd">Use SIMD</label>
+        <label class="checkbox-inline right"><input type="checkbox" id="forward">Log forward</label>
+        <label class="checkbox-inline right"><input type="checkbox" id="backward">Log backward</label>
       </div>
       <div class="" role="alert" id="build_msg"></div>
     </div>
@@ -306,6 +308,8 @@ model.AddDenseOutputLayer(l2);</textarea>
           log_error: true,
           log_accuracy: true,
           log_conf_mat: true,
+          log_forward: document.getElementById('forward').checked,
+          log_backward: document.getElementById('backward').checked,
           epochs: epochs,
           learning_rate: learning_rate
         });
