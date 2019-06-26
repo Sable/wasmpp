@@ -373,7 +373,7 @@ model.AddDenseOutputLayer(l2);</textarea>
   function DownloadWeights() {
     let msg_obj = document.getElementById('use_msg');
     if(window.compiled_model != null) {
-      Download("weights.json", JSON.stringify(window.compiled_model.ExtractWeights()));
+      download(JSON.stringify(window.compiled_model.ExtractWeights()), "weights.json", "text/plain");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
