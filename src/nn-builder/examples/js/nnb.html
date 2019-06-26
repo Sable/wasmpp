@@ -179,6 +179,8 @@ model.AddDenseOutputLayer(l2);</textarea>
 
 <!--Script for the examples-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mnist/1.1.0/mnist.js"></script>
+<!--Script for downloading files-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.js"></script>
 <!--Script required for the Neural Network Library -->
 <script src="./compiled_model.js"></script>
 <script src="./nnb_js.js"></script>
@@ -209,20 +211,11 @@ model.AddDenseOutputLayer(l2);</textarea>
     return matrix;
   }
 
-  function Download(filename, text) {
-    let element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  }
-
   function DownloadWasm() {
     let msg_obj = document.getElementById('build_msg');
     if(window.model != null) {
-      Download("model.wasm", window.model.ToWasm());
+      let buffer = nnb.ToUint8Array(window.model.ToWasm());
+      download(buffer, "model.wasm", "application/wasm");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
@@ -234,7 +227,7 @@ model.AddDenseOutputLayer(l2);</textarea>
   function DownloadWat() {
     let msg_obj = document.getElementById('build_msg');
     if(window.model != null) {
-      Download("model.wat", window.model.ToWat(true, true));
+      download(window.model.ToWat(true, true), "model.wat", "text/plain");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
