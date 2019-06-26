@@ -294,18 +294,18 @@ class CompiledModel {
         // Load new batches in memory and train
         let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
                                                          batch_size, batches_in_memory);
-
         // Start training
-        let time = new Date().getTime();
         this.Exports().train_batches_in_memory(batches_inserted);
-        train_time += new Date().getTime() - time;
-        
+
         // Update training details
         if(config.log_accuracy) {
           total_hits += this._TrainingBatchesAccuracy();
         }
         if(config.log_error) {
           average_cost += this._TrainingBatchesError();
+        }
+        if(config.log_time) {
+          train_time += this._TrainingTime();
         }
       }
       // Update total time
@@ -450,6 +450,36 @@ class CompiledModel {
 
   _TestingLabelsOffset() {
     return this.Exports().testing_labels_offset();
+  }
+
+  _TrainingTime() {
+    let key = "training_time";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Training time function not found");
+    }
+    return 0;
+  }
+
+  _TestingTime() {
+    let key = "testing_time";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Testing time function not found");
+    }
+    return 0;
+  }
+
+  _PredictionTime() {
+    let key = "prediction_time";
+    if(key in this.Exports()) {
+      return this.Exports()[key]();
+    } else {
+      this._WarnNotFound("Prediction time function not found");
+    }
+    return 0;
   }
 
   _TrainingBatchesAccuracy() {

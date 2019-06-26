@@ -42,7 +42,7 @@ if(process.argv.length > 2) {
       // log_forward: true,
       // log_backward: true,
       log_conf_mat: true,
-      epochs: 1,
+      epochs: 5,
       learning_rate: 0.02
     });
 

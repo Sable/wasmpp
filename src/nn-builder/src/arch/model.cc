@@ -152,16 +152,15 @@ void Model::InitNativeImports() {
 }
 #endif
 
-#define ALLOCATE_MATRIX(array, rows, cols) \
-    array = new ds::NDArray(module_manager_.Memory().Allocate((rows) * (cols) * TypeSize(Type::F32)), \
-                            {rows, cols}, TypeSize(Type::F32));
-
 void Model::AllocateMembers() {
   learning_rate_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  training_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   testing_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   testing_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  testing_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
+  prediction_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
 #define ALLOCATE_TIME_MEMBERS(name) \
   dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
@@ -172,16 +171,6 @@ void Model::AllocateMembers() {
   DENSE_BACKWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
 #undef ALLOCATE_TIME_MEMBERS
   }
-
-std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector<std::vector<float>> input) {
-  std::vector<DataEntry> entries;
-  for (uint32_t col = 0; col < array->Shape()[0]; ++col) {
-    for (uint32_t row = 0; row < array->Shape()[1]; ++row) {
-      entries.push_back(DataEntry::MakeF32(input[row][col]));
-    }
-  }
-  return entries;
-}
 
 Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32,
@@ -404,20 +393,22 @@ void Model::MakeTrainingFunctions() {
   });
 
   // Create training function
-  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type,
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(params.size() == 1);
     auto batches_to_train_on = params[0];
 
-    assert(locals.size() == 7);
-    auto cost = locals[0];
-    auto hits = locals[1];        // TODO Change to Type::I32
-    auto counter = locals[2];
-    auto train_addr = locals[3];
-    auto label_addr = locals[4];
-    auto vi32_1 = locals[5];
-    auto vi32_2 = locals[6];
+    assert(locals.size() == 9);
+    auto total_time = locals[0];
+    auto batch_time = locals[1];
+    auto cost = locals[2];
+    auto hits = locals[3];        // TODO Change to Type::I32
+    auto counter = locals[4];
+    auto train_addr = locals[5];
+    auto label_addr = locals[6];
+    auto vi32_1 = locals[7];
+    auto vi32_2 = locals[8];
 
     // Set the training pointer to the address of the first training batch
     f.Insert(MakeLocalSet(train_addr, MakeI32Const(training_data_batches_->Begin())));
@@ -426,6 +417,12 @@ void Model::MakeTrainingFunctions() {
 
     // Loop on batches in memory
     f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_train_on, 1, {}, [&](BlockBody* b1){
+
+      // Start timer
+      if(options_.bytecode_options.gen_training_time) {
+        b1->Insert(MakeLocalSet(batch_time, MakeCall(builtins_.system.TimeF64(), {})));
+      }
+
       // Forward algorithm
       b1->Insert(MakeCall(forward_training_func_, {
         MakeLocalGet(train_addr)
@@ -436,6 +433,13 @@ void Model::MakeTrainingFunctions() {
         MakeLocalGet(train_addr),
         MakeLocalGet(label_addr)
       }));
+
+      // Update time
+      if(options_.bytecode_options.gen_training_time) {
+        b1->Insert(GenerateCompoundAssignment(total_time, Opcode::F64Add,
+                                              MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}),
+                                                         MakeLocalGet(batch_time))));
+      }
 
       // Count number of correct results
       if(options_.bytecode_options.gen_training_accuracy) {
@@ -466,6 +470,11 @@ void Model::MakeTrainingFunctions() {
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
 
+    // Store time
+    if(options_.bytecode_options.gen_training_time) {
+      f.Insert(MakeF64Store(MakeI32Const(training_time_->Begin()), MakeLocalGet(total_time)));
+    }
+
     // Store total cost error in memory
     if(options_.bytecode_options.gen_training_error) {
       f.Insert(MakeF32Store(MakeI32Const(training_error_->Begin()), MakeLocalGet(cost)));
@@ -486,10 +495,18 @@ void Model::MakeTrainingFunctions() {
   }
 
   // Create function to access training batches error
-  if(options_.bytecode_options.gen_training_accuracy) {
+  if(options_.bytecode_options.gen_training_error) {
     module_manager_.MakeFunction("training_batches_error", {{},{Type::F32}}, {},
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
       f.Insert(MakeF32Load(MakeI32Const(training_error_->Begin())));
+    });
+  }
+
+  // Create function to access training time
+  if(options_.bytecode_options.gen_training_error) {
+    module_manager_.MakeFunction("training_time", {{},{Type::F64}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF64Load(MakeI32Const(training_time_->Begin())));
     });
   }
 
