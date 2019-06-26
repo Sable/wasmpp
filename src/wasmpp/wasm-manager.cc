@@ -64,7 +64,7 @@ Memory::Memory(uint32_t begin, uint32_t end) {
   begin_ = begin;
   end_ = end;
 
-  ERROR_UNLESS(begin < end, "begin must be strictly less than end");
+  ERROR_UNLESS(begin < end, "begin must be strictly less than end !(%d < %d)", begin, end);
 }
 
 MemoryManager::~MemoryManager() {
