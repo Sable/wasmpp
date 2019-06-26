@@ -102,9 +102,21 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
 void Model::Build(uint32_t training_batch_size, uint32_t training_batches_in_memory, uint32_t testing_batch_size,
                        uint32_t testing_batches_in_memory, uint32_t prediction_batch_size,
                        nn::builtins::LossFunction loss) {
-  MakeLayersFunctions(training_batch_size, training_batches_in_memory,
-                      testing_batch_size, testing_batches_in_memory,
-                      prediction_batch_size, loss);
+  ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
+  ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
+  ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
+  ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
+  ERROR_UNLESS(testing_batches_in_memory >= 1, "testing batches in memory must be at least 1");
+  training_batch_size_ = training_batch_size;
+  training_batches_in_memory_ = training_batches_in_memory;
+  testing_batch_size_ = testing_batch_size;
+  testing_batches_in_memory_ = testing_batches_in_memory;
+  prediction_batch_size_ = prediction_batch_size;
+  loss_ = loss;
+
+  AllocateMemory();
+  MakeLayersFunctions();
+  MakeAlgorithmsFunctions();
   MakeTrainingFunctions();
   MakeTestingFunctions();
   MakePredictionFunctions();
@@ -152,6 +164,11 @@ void Model::InitNativeImports() {
 }
 #endif
 
+void Model::AllocateMemory() {
+  AllocateMembers();
+  AllocateLayers();
+}
+
 void Model::AllocateMembers() {
   learning_rate_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
   training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
@@ -170,7 +187,13 @@ void Model::AllocateMembers() {
   dense_backward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_BACKWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
 #undef ALLOCATE_TIME_MEMBERS
+}
+
+void Model::AllocateLayers() {
+  for (auto &layer : layers_) {
+    layer->AllocateMemory();
   }
+}
 
 Var Model::ForwardAlgorithmFunction(uint8_t mode_index) {
   std::vector<Type> locals_types = {Type::I32, Type::I32, Type::I32, Type::I32, Type::I32, Type::F32, Type::F32,
@@ -291,33 +314,13 @@ void Model::MakeData() {
   }
 }
 
-void Model::MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                          uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
-                          uint32_t prediction_batch_size, nn::builtins::LossFunction loss) {
-  ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
-  ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
-  ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
-  ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
-  ERROR_UNLESS(testing_batches_in_memory >= 1, "testing batches in memory must be at least 1");
-  training_batch_size_ = training_batch_size;
-  training_batches_in_memory_ = training_batches_in_memory;
-  testing_batch_size_ = testing_batch_size;
-  testing_batches_in_memory_ = testing_batches_in_memory;
-  prediction_batch_size_ = prediction_batch_size;
-  loss_ = loss;
-
-  // Allocate layers should be called before create the model
-  // algorithms. Otherwise the addresses wouldn't be defined.
-  for (auto &layer : layers_) {
-    layer->AllocateMemory();
-  }
-
-  // Create layers specific functions
+void Model::MakeLayersFunctions() {
   for(auto layer : layers_) {
     layer->MakeFunctions();
   }
+}
 
-  // Create algorithms and export them
+void Model::MakeAlgorithmsFunctions() {
   forward_training_func_            = ForwardAlgorithmFunction(Mode::Training);
   forward_testing_func_             = ForwardAlgorithmFunction(Mode::Testing);
   forward_prediction_func_          = ForwardAlgorithmFunction(Mode::Prediction);

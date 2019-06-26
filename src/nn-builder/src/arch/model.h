@@ -172,6 +172,8 @@ private:
 
   // Memory allocation
   void AllocateMembers();
+  void AllocateLayers();
+  void AllocateMemory();
 
   // Generate neural network algorithms
   wabt::Var ForwardAlgorithmFunction(uint8_t mode_index);
@@ -180,9 +182,8 @@ private:
   wabt::Var CountCorrectPredictionsFunction(uint8_t mode_index);
 
   // Make functions
-  void MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                           uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
-                           uint32_t prediction_batch_size, builtins::LossFunction loss);
+  void MakeLayersFunctions();
+  void MakeAlgorithmsFunctions();
   void MakeTrainingFunctions();
   void MakeTestingFunctions();
   void MakePredictionFunctions();
