@@ -577,20 +577,22 @@ void Model::MakeTestingFunctions() {
   });
 
   // Create testing function
-  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("test_batches_in_memory", {{Type::I32},{}}, locals_type,
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(params.size() == 1);
     auto batches_to_test_on = params[0];
 
-    assert(locals.size() == 7);
-    auto cost = locals[0];
-    auto hits = locals[1];
-    auto counter = locals[2];
-    auto test_addr = locals[3];
-    auto label_addr = locals[4];
-    auto vi32_1 = locals[5];
-    auto vi32_2 = locals[6];
+    assert(locals.size() == 9);
+    auto total_time = locals[0];
+    auto batch_time = locals[1];
+    auto cost = locals[2];
+    auto hits = locals[3];
+    auto counter = locals[4];
+    auto test_addr = locals[5];
+    auto label_addr = locals[6];
+    auto vi32_1 = locals[7];
+    auto vi32_2 = locals[8];
 
     // Set the testing pointer to the address of the first testing batch
     f.Insert(MakeLocalSet(test_addr, MakeI32Const(testing_data_batches_->Begin())));
@@ -598,10 +600,23 @@ void Model::MakeTestingFunctions() {
     f.Insert(MakeLocalSet(label_addr, MakeI32Const(testing_labels_batches_->Begin())));
     // Loop on batches in memory
     f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_test_on, 1, {}, [&](BlockBody* b1){
+
+      // Start timer
+      if(options_.bytecode_options.gen_testing_time) {
+        b1->Insert(MakeLocalSet(batch_time, MakeCall(builtins_.system.TimeF64(), {})));
+      }
+
       // Forward algorithm
       b1->Insert(MakeCall(forward_testing_func_, {
         MakeLocalGet(test_addr)
       }));
+
+      // Update time
+      if(options_.bytecode_options.gen_testing_time) {
+        b1->Insert(GenerateCompoundAssignment(total_time, Opcode::F64Add,
+                                              MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}),
+                                                         MakeLocalGet(batch_time))));
+      }
 
       // Count number of correct results
       if(options_.bytecode_options.gen_testing_accuracy) {
@@ -632,6 +647,11 @@ void Model::MakeTestingFunctions() {
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
 
+     // Store time
+     if(options_.bytecode_options.gen_testing_time) {
+       f.Insert(MakeF64Store(MakeI32Const(testing_time_->Begin()), MakeLocalGet(total_time)));
+     }
+
     // Store total cost error in memory
     if(options_.bytecode_options.gen_testing_error) {
       f.Insert(MakeF32Store(MakeI32Const(testing_error_->Begin()), MakeLocalGet(cost)));
@@ -642,6 +662,14 @@ void Model::MakeTestingFunctions() {
       f.Insert(MakeF32Store(MakeI32Const(testing_hits_->Begin()), MakeLocalGet(hits)));
     }
   });
+
+  // Create function to access testing time
+  if(options_.bytecode_options.gen_testing_time) {
+    module_manager_.MakeFunction("testing_time", {{},{Type::F64}}, {},
+                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+      f.Insert(MakeF64Load(MakeI32Const(testing_time_->Begin())));
+    });
+  }
 
   // Create function to access testing batches hits
   if(options_.bytecode_options.gen_testing_accuracy) {

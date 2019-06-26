@@ -364,18 +364,18 @@ class CompiledModel {
       // Load new batches in memory and test
       let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
                                                        batch_size, batches_in_memory);
-
       // Start testing
-      let time = new Date().getTime();
       this.Exports().test_batches_in_memory(batches_inserted);
-      test_time += new Date().getTime() - time;
-      
+
       // Update testing details
       if(config.log_accuracy) {
         total_hits += this._TestingBatchesAccuracy();
       }
       if(config.log_error) {
         average_cost += this._TestingBatchesError();
+      }
+      if(config.log_time) {
+        test_time += this._TestingTime();
       }
     }
     // Log testing results
