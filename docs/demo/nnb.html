@@ -27,59 +27,22 @@
   </div>
   <div class="panel panel-default">
     <div class="panel-heading">
-      <h3 class="panel-title">1 - Select model options</h3>
-    </div>
-    <div class="panel-body">
-        <div class="form-group">
-          <p><b>Training</b></p>
-          <label class="checkbox-inline"><input type="checkbox" id="train_err" checked>log_training_error</label>
-          <label class="checkbox-inline"><input type="checkbox" id="train_acc" checked>log_training_accuracy</label>
-          <label class="checkbox-inline"><input type="checkbox" id="train_conf" checked>log_training_confusion_matrix</label>
-          <label class="checkbox-inline"><input type="checkbox" id="train_time" checked>log_training_time</label>
-          <label class="checkbox-inline"><input type="checkbox" id="forward" checked>log_forward</label>
-          <label class="checkbox-inline"><input type="checkbox" id="backward" checked>log_backward</label>
-        </div>
-      <div class="form-group">
-        <p><b>Testing</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="test_err" checked>log_testing_error</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_acc" checked>log_testing_accuracy</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_conf" checked>log_testing_confusion_matrix</label>
-        <label class="checkbox-inline"><input type="checkbox" id="test_time" checked>log_testing_time</label>
-      </div>
-      <div class="form-group">
-        <p><b>Prediction</b></p>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_res">log_prediction_results</label>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_res_softmax" checked>log_prediction_results_softmax</label>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_res_hardmax">log_prediction_results_hardmax</label>
-        <label class="checkbox-inline"><input type="checkbox" id="pred_time" checked>log_prediction_time</label>
-      </div>
-      <div class="form-group">
-        <p><b>Other</b></p>
-        <label class="checkbox-inline">
-          <input type="checkbox" id="use_simd">use_simd
-        </label>
-      </div>
-    </div>
-  </div>
-
-  <div class="panel panel-default">
-    <div class="panel-heading">
-      <h3 class="panel-title">2 - Create layers</h3>
+      <h3 class="panel-title">1 - Create layers</h3>
     </div>
     <div class="panel-body">
       <div class="form-group">
         <label for="layers">Layers code</label>
         <textarea class="form-control" id="layers" rows="10">
-let l0 = new nnb.DenseInputLayerDescriptor(2);
+let l0 = new nnb.DenseInputLayerDescriptor(784);
 l0.SetKeepProb(1.0);
 model.AddDenseInputLayer(l0);
 
-let l1 = new nnb.DenseHiddenLayerDescriptor(2, "sigmoid");
+let l1 = new nnb.DenseHiddenLayerDescriptor(64, "sigmoid");
 l1.SetKeepProb(1.0);
 l1.SetWeightType("xavier_uniform");
 model.AddDenseHiddenLayer(l1);
 
-let l2 = new nnb.DenseOutputLayerDescriptor(2, "sigmoid");
+let l2 = new nnb.DenseOutputLayerDescriptor(10, "sigmoid");
 l2.SetWeightType("lecun_uniform");
 model.AddDenseOutputLayer(l2);</textarea>
       </div>
@@ -88,19 +51,10 @@ model.AddDenseOutputLayer(l2);</textarea>
 
   <div class="panel panel-default">
     <div class="panel-heading">
-      <h3 class="panel-title">3 - Select functions with their parameters to compile</h3>
+      <h3 class="panel-title">2 - Select model parameters</h3>
     </div>
     <div class="panel-body">
-      <p><b>A - Layers functions (forward, backward, etc...) </b></p>
-      <div class="form-group">
-        <div class="row">
-          <div class="col-xs-12">
-            <label class="checkbox-inline">
-              <input type="checkbox" checked="checked" disabled="disabled" id="layers_compile">Compile this function
-            </label>
-          </div>
-        </div>
-      </div>
+      <p><b>A - Model configuration</b></p>
       <div class="form-group">
         <div class="row">
           <div class="col-xs-3">
@@ -119,40 +73,41 @@ model.AddDenseOutputLayer(l2);</textarea>
             <label for="loss_func">Loss function</label>
             <select class="form-control" id="loss_func">
               <option value="mean-squared-error">Mean Squared Error</option>
-              <option value="cross-entropy">Cross Entropy</option>
+              <option value="cross-entropy" selected>Cross Entropy</option>
             </select>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-3">
+            <label for="train_batch">Training batch in memory</label>
+            <input class="form-control" id="train_batch_in_mem" type="number" value="1">
+          </div>
+          <div class="col-xs-3">
+            <label for="test_batch">Testing batch in memory</label>
+            <input class="form-control" id="test_batch_in_mem" type="number" value="1">
           </div>
         </div>
       </div>
     </div>
 
     <div class="panel-body">
-      <p><b>B - Training function</b></p>
-      <div class="form-group">
-        <div class="row">
-          <div class="col-xs-12">
-            <label class="checkbox-inline">
-              <input type="checkbox" id="train_compile" checked="checked">Compile this function
-            </label>
-          </div>
-        </div>
-      </div>
+      <p><b>B - Training parameters</b></p>
       <div class="form-group">
         <div class="row">
           <div class="col-xs-6">
             <label for="train_batch">Epoch</label>
-            <input class="form-control" id="epoch" type="number" value="1">
+            <input class="form-control" id="epoch" type="number" value="10">
           </div>
           <div class="col-xs-6">
             <label for="test_batch">Learning rate</label>
-            <input class="form-control" id="learning_rate" type="number" value="0.01">
+            <input class="form-control" id="learning_rate" type="number" value="0.02">
           </div>
         </div>
       </div>
       <div class="form-group">
         <button type="button" class="btn btn-primary btn-md" onclick="LoadMnistExample()">MNIST example</button>
-        <button type="button" class="btn btn-primary btn-md" onclick="LoadLogicExample()">Logic example</button>
-        <button type="button" class="btn btn-secondary btn-md" onclick="ClearExample()">Clear</button>
       </div>
       <div class="form-group">
         <label for="train_data">Training data</label>
@@ -165,16 +120,7 @@ model.AddDenseOutputLayer(l2);</textarea>
     </div>
 
     <div class="panel-body">
-      <p><b>C - Testing function</b></p>
-      <div class="form-group">
-        <div class="row">
-          <div class="col-xs-12">
-            <label class="checkbox-inline">
-              <input type="checkbox" id="test_compile" checked="checked">Compile this function
-            </label>
-          </div>
-        </div>
-      </div>
+      <p><b>C - Testing parameters</b></p>
       <div class="form-group">
         <label for="test_data">Testing data</label>
         <textarea class="form-control" id="test_data" rows="4"></textarea>
@@ -184,45 +130,18 @@ model.AddDenseOutputLayer(l2);</textarea>
         <textarea class="form-control" id="test_labels" rows="4"></textarea>
       </div>
     </div>
-
-    <div class="panel-body">
-      <p><b>D - Other functions</b></p>
-      <div class="form-group">
-        <div class="row">
-          <div class="col-xs-3">
-            <label class="checkbox-inline">
-              <input type="checkbox" id="pred_compile" checked="checked">Compile predictions functions
-              <p><small><em>Functions to insert data into linear memory and predict</em></small></p>
-            </label>
-          </div>
-          <div class="col-xs-3">
-            <label class="checkbox-inline">
-              <input type="checkbox" id="weights_compile" checked="checked">Compile weights functions
-              <p><small><em>expose weights addresses through exported WebAssembly functions.
-                Useful for extracting and importing weights</em></small></p>
-            </label>
-          </div>
-          <div class="col-xs-3">
-            <label class="checkbox-inline">
-              <input type="checkbox" checked="checked" disabled="disabled" id="init_compile">
-              Compile initialization functions
-              <p><small><em>Generate "data" sections in WebAssebly</em></small></p>
-            </label>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 
   <div class="panel panel-default">
     <div class="panel-heading">
-      <h3 class="panel-title">4 - Generate WebAssembly model</h3>
+      <h3 class="panel-title">3 - Generate WebAssembly model</h3>
     </div>
     <div class="panel-body">
       <div class="form-group">
         <button type="button" class="btn btn-primary btn-md" onclick="CreateModel()">Build model</button>
         <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWasm()">Download wasm</button>
         <button type="button" class="btn btn-secondary btn-md" onclick="DownloadWat()">Download wat</button>
+        <label class="checkbox-inline right"><input type="checkbox" id="use_simd">Use SIMD</label>
       </div>
       <div class="" role="alert" id="build_msg"></div>
     </div>
@@ -230,7 +149,7 @@ model.AddDenseOutputLayer(l2);</textarea>
 
   <div class="panel panel-default">
     <div class="panel-heading">
-      <h3 class="panel-title">5 - Interact with WebAssembly model</h3>
+      <h3 class="panel-title">4 - Interact with WebAssembly model</h3>
     </div>
     <div class="panel-body">
       <div class="form-group">
@@ -260,6 +179,8 @@ model.AddDenseOutputLayer(l2);</textarea>
 
 <!--Script for the examples-->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mnist/1.1.0/mnist.js"></script>
+<!--Script for downloading files-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/downloadjs/1.4.8/download.js"></script>
 <!--Script required for the Neural Network Library -->
 <script src="./compiled_model.js"></script>
 <script src="./nnb_js.js"></script>
@@ -290,20 +211,11 @@ model.AddDenseOutputLayer(l2);</textarea>
     return matrix;
   }
 
-  function Download(filename, text) {
-    let element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-    element.style.display = 'none';
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
-  }
-
   function DownloadWasm() {
     let msg_obj = document.getElementById('build_msg');
     if(window.model != null) {
-      Download("model.wasm", window.model.ToWasm());
+      let buffer = nnb.ToUint8Array(window.model.ToWasm());
+      download(buffer, "model.wasm", "application/wasm");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
@@ -315,7 +227,7 @@ model.AddDenseOutputLayer(l2);</textarea>
   function DownloadWat() {
     let msg_obj = document.getElementById('build_msg');
     if(window.model != null) {
-      Download("model.wat", window.model.ToWat(true, true));
+      download(window.model.ToWat(true, true), "model.wat", "text/plain");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
@@ -332,60 +244,36 @@ model.AddDenseOutputLayer(l2);</textarea>
     build_obj.className = "alert alert-warning";
 
     // Create model options
+    let bytecode_options = new nnb.ModelBytecodeOptions();
+    bytecode_options.gen_training_error                = true;
+    bytecode_options.gen_training_accuracy             = true;
+    bytecode_options.gen_training_confusion_matrix     = true;
+    bytecode_options.gen_forward                       = true;
+    bytecode_options.gen_backward                      = true;
+    bytecode_options.gen_testing_error                 = true;
+    bytecode_options.gen_testing_accuracy              = true;
+    bytecode_options.gen_testing_confusion_matrix      = true;
+    bytecode_options.gen_prediction_results            = true;
+    bytecode_options.gen_prediction_results_softmax    = true;
+    bytecode_options.gen_prediction_results_hardmax    = true;
+    bytecode_options.use_simd                          = document.getElementById('use_simd').checked;
     let options = new nnb.ModelOptions();
-    options.log_training_error                = document.getElementById('train_err').checked;
-    options.log_training_accuracy             = document.getElementById('train_acc').checked;
-    options.log_training_confusion_matrix     = document.getElementById('train_conf').checked;
-    options.log_training_time                 = document.getElementById('train_time').checked;
-    options.log_forward                       = document.getElementById('forward').checked;
-    options.log_backward                      = document.getElementById('backward').checked;
-    options.log_testing_error                 = document.getElementById('test_err').checked;
-    options.log_testing_accuracy              = document.getElementById('test_acc').checked;
-    options.log_testing_confusion_matrix      = document.getElementById('test_conf').checked;
-    options.log_testing_time                  = document.getElementById('test_time').checked;
-    options.log_prediction_results            = document.getElementById('pred_res').checked;
-    options.log_prediction_results_softmax    = document.getElementById('pred_res_softmax').checked;
-    options.log_prediction_results_hardmax    = document.getElementById('pred_res_hardmax').checked;
-    options.log_prediction_time               = document.getElementById('pred_time').checked;
-    options.use_simd                          = document.getElementById('use_simd').checked;
+    options.bytecode_options = bytecode_options;
+
+    // Load data
+    let training_batch          = parseInt(document.getElementById('train_batch').value);
+    let training_batch_in_mem   = parseInt(document.getElementById('train_batch_in_mem').value);
+    let testing_batch           = parseInt(document.getElementById('test_batch').value);
+    let testing_batch_in_mem    = parseInt(document.getElementById('test_batch_in_mem').value);
+    let prediction_batch        = parseInt(document.getElementById('pred_batch').value);
+    let loss                    = document.getElementById('loss_func').value;
 
     // Create model
     window.model = new nnb.Model(options);
-
-    // Create layers
     eval(document.getElementById('layers').value);
-    window.model.SetLayers();
-
-    // Load data
-    let train_data              = TextareaToF32Matrix('train_data');
-    let train_labels            = TextareaToF32Matrix('train_labels');
-    let test_data               = TextareaToF32Matrix('test_data');
-    let test_labels             = TextareaToF32Matrix('test_labels');
-    let epoch                   = parseInt(document.getElementById('epoch').value);
-    let training_batch          = parseInt(document.getElementById('train_batch').value);
-    let testing_batch           = parseInt(document.getElementById('test_batch').value);
-    let prediction_batch        = parseInt(document.getElementById('pred_batch').value);
-    let loss                    = document.getElementById('loss_func').value;
-    let learning_rate           = parseFloat(document.getElementById('learning_rate').value);
-
-    if(document.getElementById('layers_compile').checked) {
-      window.model.CompileLayers(training_batch, testing_batch, prediction_batch, loss);
-    }
-    if(document.getElementById('train_compile').checked) {
-      window.model.CompileTrainingFunction(epoch, learning_rate, nnb.ToMatrix(train_data), nnb.ToMatrix(train_labels));
-    }
-    if(document.getElementById('test_compile').checked) {
-      window.model.CompileTestingFunction(nnb.ToMatrix(test_data), nnb.ToMatrix(test_labels));
-    }
-    if(document.getElementById('pred_compile').checked) {
-      window.model.CompilePredictionFunctions();
-    }
-    if(document.getElementById('weights_compile').checked) {
-      window.model.CompileWeightsFunctions();
-    }
-    if(document.getElementById('init_compile').checked) {
-      window.model.CompileInitialization();
-    }
+    window.model.Build(training_batch, training_batch_in_mem,
+      testing_batch, testing_batch_in_mem,
+      prediction_batch, loss);
 
     if(window.model.Validate()) {
       let buffer = nnb.ToUint8Array(window.model.ToWasm());
@@ -405,9 +293,28 @@ model.AddDenseOutputLayer(l2);</textarea>
   function RunTrain() {
     let msg_obj = document.getElementById('use_msg');
     if(window.compiled_model != null) {
-      window.compiled_model.Train();
-      msg_obj.innerText = "";
-      msg_obj.className = "";
+      // Load dom values
+      let train_data    = TextareaToF32Matrix('train_data');
+      let train_labels  = TextareaToF32Matrix('train_labels');
+      let epochs        = parseInt(document.getElementById('epoch').value);
+      let learning_rate = parseFloat(document.getElementById('learning_rate').value);
+      // Encode training
+      let training = window.compiled_model.EncodeTrainingData(train_data, train_labels);
+      if(training.good) {
+        window.compiled_model.Train(training, {
+          log_time: true,
+          log_error: true,
+          log_accuracy: true,
+          log_conf_mat: true,
+          epochs: epochs,
+          learning_rate: learning_rate
+        });
+        msg_obj.innerText = "";
+        msg_obj.className = "";
+      } else {
+        msg_obj.innerText = "Error occurred";
+        msg_obj.className = "alert alert-danger";
+      }
     } else {
       msg_obj.innerText = "Build model before training";
       msg_obj.className = "alert alert-danger";
@@ -417,9 +324,23 @@ model.AddDenseOutputLayer(l2);</textarea>
   function RunTest() {
     let msg_obj = document.getElementById('use_msg');
     if(window.compiled_model != null) {
-      window.compiled_model.Test();
-      msg_obj.innerText = "";
-      msg_obj.className = "";
+      let test_data   = TextareaToF32Matrix('test_data');
+      let test_labels = TextareaToF32Matrix('test_labels');
+      // Encode testing
+      let testing = window.compiled_model.EncodeTestingData(test_data, test_labels);
+      if(testing.good) {
+        window.compiled_model.Test(testing, {
+          log_time: true,
+          log_accuracy: true,
+          log_error: true,
+          log_conf_mat: true
+        });
+        msg_obj.innerText = "";
+        msg_obj.className = "";
+      } else {
+        msg_obj.innerText = "Error occurred";
+        msg_obj.className = "alert alert-danger";
+      }
     } else {
       msg_obj.innerText = "Build model before testing";
       msg_obj.className = "alert alert-danger";
@@ -429,9 +350,20 @@ model.AddDenseOutputLayer(l2);</textarea>
   function RunPredictions() {
     let msg_obj = document.getElementById('use_msg');
     if(window.compiled_model != null) {
-      window.compiled_model.Predict(TextareaToF32Matrix('pred_data'));
-      msg_obj.innerText = "";
-      msg_obj.className = "";
+      let pred_data = TextareaToF32Matrix('pred_data');
+      // Encode predictions
+      let predictions = window.compiled_model.EncodePredictionData(pred_data);
+      if(predictions.good) {
+        window.compiled_model.Predict(predictions, {
+          log_time: true,
+          log_result: true
+        });
+        msg_obj.innerText = "";
+        msg_obj.className = "";
+      } else {
+        msg_obj.innerText = "Error occurred";
+        msg_obj.className = "alert alert-danger";
+      }
     } else {
       msg_obj.innerText = "Build model before predicting";
       msg_obj.className = "alert alert-danger";
@@ -441,7 +373,7 @@ model.AddDenseOutputLayer(l2);</textarea>
   function DownloadWeights() {
     let msg_obj = document.getElementById('use_msg');
     if(window.compiled_model != null) {
-      Download("weights.json", JSON.stringify(window.compiled_model.ExtractWeights()));
+      download(JSON.stringify(window.compiled_model.ExtractWeights()), "weights.json", "text/plain");
       msg_obj.innerText = "";
       msg_obj.className = "";
     } else {
@@ -463,13 +395,8 @@ model.AddDenseOutputLayer(l2);</textarea>
     }
   }
 
-  function ClearExample() {
-    document.getElementById('train_data').value = "";
-    document.getElementById('train_labels').value = "";
-  }
-
   function LoadMnistExample() {
-    let mnist_data = mnist.set(2000, 500);
+    let mnist_data = mnist.set(2240, 2240);
     // Load training
     let train_data_str = "";
     let train_labels_str = "";
@@ -499,18 +426,6 @@ model.AddDenseOutputLayer(l2);</textarea>
     document.getElementById('test_data').value = test_data_str;
     document.getElementById('test_labels').value = test_labels_str;
   }
-
-  function LoadLogicExample() {
-    let data = "0 0\n0 1\n1 0\n1 1";
-    let labels = "1 0\n0 1\n0 1\n0 1";
-    // Update training fields
-    document.getElementById('train_data').value = data;
-    document.getElementById('train_labels').value = labels;
-    // Update testing fields
-    document.getElementById('test_data').value = data;
-    document.getElementById('test_labels').value = labels;
-  }
-
 </script>
 </body>
 </html>
