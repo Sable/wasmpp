@@ -173,12 +173,6 @@ void Model::AllocateMembers() {
 #undef ALLOCATE_TIME_MEMBERS
   }
 
-void Model::AllocateLayers() {
-  for (auto &layer : layers_) {
-    layer->AllocateMemory();
-  }
-}
-
 std::vector<wasmpp::DataEntry> MakeTransposeData(ds::NDArray* array, std::vector<std::vector<float>> input) {
   std::vector<DataEntry> entries;
   for (uint32_t col = 0; col < array->Shape()[0]; ++col) {
@@ -325,7 +319,9 @@ void Model::MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_
 
   // Allocate layers should be called before create the model
   // algorithms. Otherwise the addresses wouldn't be defined.
-  AllocateLayers();
+  for (auto &layer : layers_) {
+    layer->AllocateMemory();
+  }
 
   // Create layers specific functions
   for(auto layer : layers_) {
@@ -333,14 +329,22 @@ void Model::MakeLayersFunctions(uint32_t training_batch_size, uint32_t training_
   }
 
   // Create algorithms and export them
-  forward_training_func_ = ForwardAlgorithmFunction(Mode::Training);
-  forward_testing_func_ = ForwardAlgorithmFunction(Mode::Testing);
-  forward_prediction_func_ = ForwardAlgorithmFunction(Mode::Prediction);
-  backward_func_ = BackwardAlgorithmFunction();
-  confusion_matrix_training_func_ = ConfusionMatrixFunction(Mode::Training);
-  confusion_matrix_testing_func_ = ConfusionMatrixFunction(Mode::Testing);
-  count_correct_predictions_training_func_ = CountCorrectPredictionsFunction(Mode::Training);
-  count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
+  forward_training_func_            = ForwardAlgorithmFunction(Mode::Training);
+  forward_testing_func_             = ForwardAlgorithmFunction(Mode::Testing);
+  forward_prediction_func_          = ForwardAlgorithmFunction(Mode::Prediction);
+  backward_func_                    = BackwardAlgorithmFunction();
+  if(options_.bytecode_options.gen_training_confusion_matrix) {
+    confusion_matrix_training_func_ = ConfusionMatrixFunction(Mode::Training);
+  }
+  if(options_.bytecode_options.gen_testing_confusion_matrix) {
+    confusion_matrix_testing_func_ = ConfusionMatrixFunction(Mode::Testing);
+  }
+  if(options_.bytecode_options.gen_training_accuracy) {
+    count_correct_predictions_training_func_ = CountCorrectPredictionsFunction(Mode::Training);
+  }
+  if(options_.bytecode_options.gen_testing_accuracy) {
+    count_correct_predictions_testing_func_ = CountCorrectPredictionsFunction(Mode::Testing);
+  }
 }
 
 void Model::GetInputOutputSize(uint32_t *input_size, uint32_t *output_size) {

@@ -166,7 +166,6 @@ private:
 
   // Memory allocation
   void AllocateMembers();
-  void AllocateLayers();
 
   // Generate neural network algorithms
   wabt::Var ForwardAlgorithmFunction(uint8_t mode_index);

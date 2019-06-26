@@ -518,7 +518,7 @@ void DenseOutputLayer::MakeFunctions() {
   }
 
   // Create function to get the prediction hardmax result offset
-  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_softmax) {
+  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_hardmax) {
     NetworkModel()->ModuleManager().MakeFunction("prediction_hardmax_result_offset", {{},{Type::I32}},{},
                                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
       f.Insert(MakeI32Const(PredictionsHardmax(Model::Mode::Prediction)->Begin()));
@@ -526,7 +526,7 @@ void DenseOutputLayer::MakeFunctions() {
   }
 
   // Create function to get the prediction softmax result offset
-  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_hardmax) {
+  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_softmax) {
     NetworkModel()->ModuleManager().MakeFunction("prediction_softmax_result_offset", {{},{Type::I32}},{},
                                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
       f.Insert(MakeI32Const(PredictionsSoftmax(Model::Mode::Prediction)->Begin()));
