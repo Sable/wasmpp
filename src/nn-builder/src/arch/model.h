@@ -23,18 +23,18 @@ namespace arch {
 // in model, and it will be injected depending
 // on whether it's enabled or not
 struct ModelBytecodeOptions {
-  bool gen_training_accuracy = false;
-  bool gen_training_error = false;
-  bool gen_training_confusion_matrix = false;
-  bool gen_testing_accuracy = false;
-  bool gen_testing_error = false;
-  bool gen_testing_confusion_matrix = false;
-  bool gen_prediction_results = false;
-  bool gen_prediction_results_softmax = false;
-  bool gen_prediction_results_hardmax = false;
-  bool gen_forward = false;
-  bool gen_backward = false;
-  bool use_simd = false;
+  bool gen_training_accuracy            = false;
+  bool gen_training_error               = false;
+  bool gen_training_confusion_matrix    = false;
+  bool gen_testing_accuracy             = false;
+  bool gen_testing_error                = false;
+  bool gen_testing_confusion_matrix     = false;
+  bool gen_prediction_results           = false;
+  bool gen_prediction_results_softmax   = false;
+  bool gen_prediction_results_hardmax   = false;
+  bool gen_forward                      = false;
+  bool gen_backward                     = false;
+  bool use_simd                         = false;
 };
 
 struct ModelOptions {
