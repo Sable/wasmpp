@@ -81,11 +81,11 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
     }));
   });
 
-  // Cross-Entropy function
+  // Sigmoid Cross-Entropy function
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
   // - cost(Y, Y_Hat, rows, cols)      : - 1/|cols| * SUM(Y * log(Y_HAT))
   // - loss(Y, Y_Hat, DST, rows, cols) : DST =  ((1 - Y) / (1 - Y_Hat)) - (Y / Y_Hat)
-  cross_entropy_.cost = module_manager->MakeFunction(nullptr,
+  sigmoid_cross_entropy_.cost = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32}, {Type::F32}}, {Type::I32, Type::F32, Type::F32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
@@ -114,7 +114,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
     f.Insert(GenerateCompoundAssignment(cost_val, Opcode::F32Mul, MakeUnary(Opcode::F32Neg, scalar)));
     f.Insert(MakeLocalGet(cost_val));
   });
-  cross_entropy_.loss = module_manager->MakeFunction(nullptr,
+  sigmoid_cross_entropy_.loss = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32, Type::I32}, {}}, {Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
