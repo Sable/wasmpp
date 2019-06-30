@@ -99,6 +99,14 @@ public:
 
   // Square sum all elements in a matrix
   virtual wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals);
+
+  // Scale right operand then add both operands
+  virtual wabt::ExprList* MatrixAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
+                                              std::vector<wabt::Var> locals);
+
+  // Sign right operand then add both operands
+  virtual wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
+                                             std::vector<wabt::Var> locals);
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {

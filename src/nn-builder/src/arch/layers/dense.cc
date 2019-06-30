@@ -257,8 +257,8 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       // C) dW[l] = (1/m) dZ[l] . A[l-1]^T + (l2_decay/m) W[l] + (l1_decay/m) sign(W[l])
       //          = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))
       //    1) dW[l] = dZ[l] . A[l-1]^T
-      //    2) dW[l] = dW[l] + l2_decay W[l]
-      //    3) dW[l] = dW[l] + l1_decay sign(W[l])
+      //    2) dW[l] = dW[l] + l1_decay sign(W[l])
+      //    3) dW[l] = dW[l] + l2_decay W[l]
       //    4) dW[l] = (1/m) dW[l]
       START_TIME()
 #ifdef WABT_EXPERIMENTAL
@@ -279,11 +279,23 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
 #endif
       END_TIME(C_1)
       START_TIME()
+      if(NetworkModel()->L1Regularizer() > 0) {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightSignScale(dW_, W_, dW_, NetworkModel()->L1Regularizer(),
+                                                                        {vi32_1, vi32_2}));
+      }
+      END_TIME(C_2)
+      START_TIME()
+      if(NetworkModel()->L2Regularizer() > 0) {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightScale(dW_, W_, dW_, NetworkModel()->L2Regularizer(),
+                                                                        {vi32_1, vi32_2}));
+      }
+      END_TIME(C_3)
+      START_TIME()
       if(NetworkModel()->TrainingBatchSize() > 1) {
         Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, MakeF32Const(1.0f / NetworkModel()->TrainingBatchSize()),
                                                                  dW_, {vi32_1, vi32_2, vf32_1}));
       }
-      END_TIME(C_2)
+      END_TIME(C_4)
 
       // D) db[l] = (1/m) dZ[l]
       //    1) db[l] = SUM(dZ[l], row wise)

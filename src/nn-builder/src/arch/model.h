@@ -93,6 +93,8 @@ struct DenseForwardTimeMembers {
   V(B_2)                                \
   V(C_1)                                \
   V(C_2)                                \
+  V(C_3)                                \
+  V(C_4)                                \
   V(D_1)                                \
   V(D_2)                                \
   V(E)                                  \

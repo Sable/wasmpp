@@ -86,8 +86,8 @@ int main(int argc, char *argv[]) {
   uint32_t testing_batch_size = 1;
   uint32_t testing_batches_in_memory = 1;
   uint32_t prediction_batch_size = 1;
-  float l1_regularizer = 0.1;
-  float l2_regularizer = 0.1;
+  float l1_regularizer = 0.0001;
+  float l2_regularizer = 0.0001;
   auto loss = model.Builtins().loss.SoftmaxCrossEntropy();
   model.Build(training_batch_size, training_batches_in_memory,
               testing_batch_size, testing_batches_in_memory,
