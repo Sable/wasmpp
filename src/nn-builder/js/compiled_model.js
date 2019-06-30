@@ -74,7 +74,10 @@ class ModelLogger {
     console.log("\n>> Backward algorithm steps time:");
   }
   log_backward_A(time) {
-    console.log("A) dA[L] = L(T, A[L]):", time);
+    console.log("A) dA[L] = dJ(T, A[L]):", time);
+  }
+  log_backward_B_Softmax(time) {
+    console.log("B) [Softmax] dZ[L] = dJ(T, A[L]):", time);
   }
   log_backward_B_1(time) {
     console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
@@ -551,7 +554,7 @@ class CompiledModel {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_forward_")) {
-        this._logger[func](this.Exports()[func]());
+        this._logger[func](this._CallExport(func));
         found = true;
       }
     });

@@ -170,20 +170,18 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
   if(Position() != Input) {
     assert(LayerIndex() > 0);
 
-    if(Position() == Output) {
-      START_TIME()
+    if(Position() == Output && NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
       // A) dA[L] = dJ(T, A[L])
       // Note: For softmax, we should skip this step because
       // we can directly store the result in dZ[L]
-      if(NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
-        Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
-            MakeLocalGet(target_begin),
-            MakeI32Const(A_[Model::Mode::Training]->Begin()),
-            MakeI32Const(dA_->Begin()),
-            MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
-            MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
-        }));
-      }
+      START_TIME()
+      Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
+          MakeLocalGet(target_begin),
+          MakeI32Const(A_[Model::Mode::Training]->Begin()),
+          MakeI32Const(dA_->Begin()),
+          MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
+          MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
+      }));
       END_TIME(A)
     }
 
@@ -194,6 +192,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       // Special case for softmax
       if(Position() == Output && NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
         // B_Softmax) dZ[L] = dJ(T, A[L])
+        START_TIME()
         Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
             MakeLocalGet(target_begin),
             MakeI32Const(A_[Model::Mode::Training]->Begin()),
@@ -201,7 +200,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
             MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
             MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
         }));
-
+        END_TIME(B_Softmax)
       } else {
         // B) dZ[l] = dA[l] * g'(Z[l])
         //    1) dZ[l] = g'(Z[l])

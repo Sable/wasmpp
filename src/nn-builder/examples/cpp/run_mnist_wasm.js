@@ -39,8 +39,8 @@ if(process.argv.length > 2) {
       log_accuracy: true,
       log_error: true,
       log_time: true,
-      // log_forward: true,
-      // log_backward: true,
+      log_forward: true,
+      log_backward: true,
       log_conf_mat: true,
       epochs: 5,
       learning_rate: 0.02
