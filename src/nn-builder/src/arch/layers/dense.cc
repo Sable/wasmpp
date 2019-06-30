@@ -148,8 +148,6 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
   // 1) local = SUM(W[l] * W[l])
   // 2) local = (l2_decay/m) local
   // 3) res   = res + local
-
-  return e;
 }
 
 #undef START_TIME
