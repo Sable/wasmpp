@@ -135,6 +135,21 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
       MakeI32Const(A_[mode_index]->Shape()[0]),
       MakeI32Const(A_[mode_index]->Shape()[1])
   });
+
+  // Compute l1_loss
+  // cost + (l1_decay/2m) SUM(ABS(W[l]))
+  // 1) local = SUM(ABS(W[l]))
+  // 2) local = (l1_decay/2m) local
+  // 3) res   = res + Local
+
+
+  // Compute l2 loss
+  // cost + (l2_decay/m) SUM(W[l] * W[l])
+  // 1) local = SUM(W[l] * W[l])
+  // 2) local = (l2_decay/m) local
+  // 3) res   = res + local
+
+  return e;
 }
 
 #undef START_TIME
@@ -214,9 +229,12 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
         END_TIME(B_2)
       }
 
-      // C) dW[l] = (1/m) dZ[l] . A[l-1]^T
+      // C) dW[l] = (1/m) dZ[l] . A[l-1]^T + (l2_decay/m) W[l] + (l1_decay/m) sign(W[l])
+      //          = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))
       //    1) dW[l] = dZ[l] . A[l-1]^T
-      //    2) dW[l] = (1/m) dW[l]
+      //    2) dW[l] = dW[l] + l2_decay W[l]
+      //    3) dW[l] = dW[l] + l1_decay sign(W[l])
+      //    4) dW[l] = (1/m) dW[l]
       START_TIME()
 #ifdef WABT_EXPERIMENTAL
       Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_rt, {
@@ -276,7 +294,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       }
 
       // F) W[l] = W[l] - alpha * dW[l]
-      //    1) dW[l] = alpha * dW[l]
+      //    1) dW[l] = alpha * dW[l] // TODO Shorten this to sub_mul operation
       //    2) W[l] = W[l] - dW[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, NetworkModel()->GetLearningRate(), dW_,
@@ -287,7 +305,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       END_TIME(F_2)
 
       // G) b[l] = b[l] - alpha * db[l]
-      //    1) db[l] = alpha * db[l]
+      //    1) db[l] = alpha * db[l] // TODO Shorten this to sub_mu operation
       //    2) b[l] = b[l] - db[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, NetworkModel()->GetLearningRate(), db_,
