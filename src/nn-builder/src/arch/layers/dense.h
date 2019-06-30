@@ -64,15 +64,8 @@ public:
   void AllocateMemory() override ;
   // Get arrays
   ds::NDArray* Predictions(uint8_t mode_index) const;
-  ds::NDArray* PredictionsHardmax(uint8_t mode_index) const;
-  ds::NDArray* PredictionsSoftmax(uint8_t mode_index) const;
-  ds::NDArray* ConfusionMatrix(uint8_t mode_index) const;
   // Error out on keep probability on the output layer
   FullyConnectedLayer* KeepProb(float keep_prob) override ;
-  // Apply softmax to predictions
-  DenseOutputLayer* Softmax(uint8_t mode_index);
-  // Apply hardmax to predictions
-  DenseOutputLayer* Hardmax(uint8_t mode_index);
   // Augment forward algorithm
   wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
   void MakeFunctions() override ;
@@ -84,11 +77,10 @@ public:
   // Count number of correct predictions
   wabt::ExprList* CountCorrectPredictions(uint8_t mode_index, wabt::Var target_begin, wabt::Var result, std::vector<wabt::Var> locals);
 private:
-  bool softmax_[3] = {false, false, false}; // Training, Testing, Prediction
-  bool hardmax_[3] = {false, false, false}; // Training, Testing, Prediction
-  ds::NDArray* A_hardmax_[3]; // Training, Testing, Prediction
-  ds::NDArray* A_softmax_[3]; // Training, Testing, Prediction
-  ds::NDArray* confusion_matrix_[2]; // Training, Testing
+  // Check if hardmax is required
+  bool ShouldHardmax(uint8_t mode_index) const;
+  ds::NDArray* hardmax_[2]          = {nullptr, nullptr}; // Training, Testing
+  ds::NDArray* confusion_matrix_[2] = {nullptr, nullptr}; // Training, Testing
 };
 
 class DenseInputLayer : public FullyConnectedLayer {

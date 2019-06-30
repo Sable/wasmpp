@@ -156,6 +156,14 @@ class CompiledModel {
     return this._wasm.instance.exports;
   }
 
+  _CallExport(key, ...args) {
+    if(key in this.Exports()) {
+      return this.Exports()[key].apply(null, args);
+    }
+    this._WarnNotFound("Function '"+key+"' not found")
+    return null;
+  }
+
   // Get imports from JS to Wasm
   Imports() {
     return this._imports;
@@ -586,29 +594,11 @@ class CompiledModel {
     }
   }
 
-  _LogPredictionResultTemplate(key, msg) {
-    let batch_size = this._PredictionBatchSize();
-    let output_size = this._LayerSize(this._TotalLayers() - 1);
-    if(key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[key](), output_size, batch_size));
-    } else {
-      this._WarnNotFound(msg);
-    }
-  }
-
   _LogPredictionResult() {
-    this._LogPredictionResultTemplate("prediction_result_offset", 
-      "Prediction result function not found");
-  }
-
-  _LogPredictionSoftmaxResult() {
-    this._LogPredictionResultTemplate("prediction_softmax_result_offset", 
-      "Prediction softmax result function not found");
-  }
-
-  _LogPredictionHardmaxResult() {
-    this._LogPredictionResultTemplate("prediction_hardmax_result_offset", 
-      "Prediction hardmax result function not found");
+    let offset = this._CallExport("prediction_result_offset");
+    if(offset != null) {
+      console.table(this._MakeF32Matrix(offset, this._LayerSize(this._TotalLayers() - 1), this._PredictionBatchSize()));
+    }
   }
 
   // Run unit test Wasm function
@@ -638,7 +628,6 @@ class CompiledModel {
     config                  = config                  || {};
     config.log_time         = config.log_time         || false;
     config.log_result       = config.log_result       || false;
-    config.result_mode      = config.result_mode      || "default";
 
     // Prediction results
     let pred_time = 0.0;
@@ -655,13 +644,7 @@ class CompiledModel {
         pred_time += this._PredictionTime();
       }
       if(config.log_result) {
-        if(config.result_mode === "softmax") {
-          this._LogPredictionSoftmaxResult();
-        } else if(config.result_mode === "hardmax") {
-          this._LogPredictionHardmaxResult();
-        } else {
-          this._LogPredictionResult();
-        }
+        this._LogPredictionResult();
       }
     }
     // Log prediction details

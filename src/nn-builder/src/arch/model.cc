@@ -68,25 +68,6 @@ void Model::SetLayers(std::vector<Layer *> layers) {
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     f.Insert(MakeI32Const((uint32_t)layers_.size()));
   });
-
-  // Overwrite some configuration as needed
-  if(layers.back()->Type() == FullyConnected) {
-    auto out_layer = static_cast<DenseOutputLayer*>(layers.back());
-    if(options_.bytecode_options.gen_training_confusion_matrix || options_.bytecode_options.gen_training_accuracy) {
-      out_layer->Hardmax(Training);
-    }
-    if(options_.bytecode_options.gen_testing_confusion_matrix || options_.bytecode_options.gen_testing_accuracy) {
-      out_layer->Hardmax(Testing);
-    }
-    if(options_.bytecode_options.gen_prediction_results_softmax) {
-      out_layer->Softmax(Prediction);
-    }
-    if(options_.bytecode_options.gen_prediction_results_hardmax) {
-      out_layer->Hardmax(Prediction);
-    }
-  } else {
-    assert(!"Not implemented!");
-  }
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {

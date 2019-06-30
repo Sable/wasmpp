@@ -72,8 +72,6 @@ int main(int argc, char *argv[]) {
   options.bytecode_options.gen_testing_error               = true;
   options.bytecode_options.gen_testing_confusion_matrix    = true;
   options.bytecode_options.gen_prediction_results          = true;
-  options.bytecode_options.gen_prediction_results_softmax  = true;
-  options.bytecode_options.gen_prediction_results_hardmax  = true;
   options.bytecode_options.gen_forward                     = true;
   options.bytecode_options.gen_backward                    = true;
   options.bytecode_options.use_simd                        = true;
