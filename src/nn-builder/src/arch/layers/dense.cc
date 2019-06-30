@@ -119,7 +119,7 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
 
 wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var target_begin) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
-  return MakeCall(NetworkModel()->Loss().cost, {
+  return MakeCall(NetworkModel()->Loss().J, {
       MakeLocalGet(target_begin),
       MakeI32Const(A_[mode_index]->Begin()),
       MakeI32Const(A_[mode_index]->Shape()[0]),
@@ -162,8 +162,8 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
 
     if(Position() == Output) {
       START_TIME()
-      // A) dA[L] = L(T, A[L])
-      Merge(e, MakeCall(NetworkModel()->Loss().loss, {
+      // A) dA[L] = dJ(T, A[L])
+      Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
           MakeLocalGet(target_begin),
           MakeI32Const(A_[Model::Mode::Training]->Begin()),
           MakeI32Const(dA_->Begin()),

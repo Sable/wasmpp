@@ -7,8 +7,8 @@ namespace nn {
 namespace builtins {
 
 struct LossFunction {
-  wabt::Var cost;
-  wabt::Var loss;
+  wabt::Var J;
+  wabt::Var dJ;
 };
 
 class Loss : public Builtin {
@@ -22,6 +22,7 @@ public:
 
   const LossFunction& MeanSquaredError() const { return mean_squared_error_; }
   const LossFunction& SigmoidCrossEntropy() const { return sigmoid_cross_entropy_; }
+  const LossFunction& SoftmaxCrossEntropy() const { return softmax_cross_entropy_; }
 };
 
 } // namespace builtins

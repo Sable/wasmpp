@@ -20,9 +20,9 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
 
   // Mean Squared Error function
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
-  // - cost(Y, Y_Hat, rows, cols)      : return (1/(|rows|*|cols|)) * SUM((Y_Hat - Y)^2)
-  // - loss(Y, Y_Hat, DST, rows, cols) : DST = Y_Hat - Y
-  mean_squared_error_.cost = module_manager->MakeFunction(nullptr,
+  // - J(Y, Y_Hat, rows, cols)       : return (1/(|rows|*|cols|)) * SUM((Y_Hat - Y)^2)
+  // - dJ(Y, Y_Hat, DST, rows, cols) : DST = Y_Hat - Y
+  mean_squared_error_.J = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32}, {Type::F32}}, {Type::I32, Type::F32, Type::F32},
           [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
@@ -56,7 +56,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
     f.Insert(GenerateCompoundAssignment(cost_val, Opcode::F32Mul, scalar));
     f.Insert(MakeLocalGet(cost_val));
   });
-  mean_squared_error_.loss = module_manager->MakeFunction(nullptr,
+  mean_squared_error_.dJ = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32, Type::I32}, {}}, {Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
@@ -83,9 +83,9 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
 
   // Sigmoid Cross-Entropy function
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
-  // - cost(Y, Y_Hat, rows, cols)      : - 1/|cols| * SUM(Y * log(Y_HAT))
-  // - loss(Y, Y_Hat, DST, rows, cols) : DST =  ((1 - Y) / (1 - Y_Hat)) - (Y / Y_Hat)
-  sigmoid_cross_entropy_.cost = module_manager->MakeFunction(nullptr,
+  // - J(Y, Y_Hat, rows, cols)       : - 1/|cols| * SUM(Y * log(Y_HAT))
+  // - dJ(Y, Y_Hat, DST, rows, cols) : DST =  ((1 - Y) / (1 - Y_Hat)) - (Y / Y_Hat)
+  sigmoid_cross_entropy_.J = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32}, {Type::F32}}, {Type::I32, Type::F32, Type::F32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
@@ -114,7 +114,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
     f.Insert(GenerateCompoundAssignment(cost_val, Opcode::F32Mul, MakeUnary(Opcode::F32Neg, scalar)));
     f.Insert(MakeLocalGet(cost_val));
   });
-  sigmoid_cross_entropy_.loss = module_manager->MakeFunction(nullptr,
+  sigmoid_cross_entropy_.dJ = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32, Type::I32}, {}}, {Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     auto y_begin = params[0];
@@ -142,6 +142,15 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
       b->Insert(GenerateCompoundAssignment(y_hat_begin, Opcode::I32Add, MakeI32Const(TypeSize(Type::F32))));
     }));
   });
+
+  // Softmax Cross-Entropy function
+  // - J is same as Sigmoid Cross-Entropy function
+  // - dJ is same as Mean Squared Error
+  // Also refer to the backward algorithm to see the full details
+  // of how it's being used.
+  // Reference: deeplearning.ai - Multi-class classification - Training a softmax classifier (C2W3L09)
+  softmax_cross_entropy_.J = sigmoid_cross_entropy_.J;
+  softmax_cross_entropy_.dJ = mean_squared_error_.dJ;
 }
 
 } // namespace builtins
