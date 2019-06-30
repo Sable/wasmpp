@@ -45,6 +45,10 @@ public:
   // Create functions
   void MakeFunctions() override;
 
+  // Compute cost
+  wabt::ExprList* ComputeL1Cost(uint8_t mode_index, std::vector<wabt::Var>locals);
+  wabt::ExprList* ComputeL2Cost(uint8_t mode_index, std::vector<wabt::Var>locals);
+
   // Layer configuration
   virtual FullyConnectedLayer* KeepProb(float keep_prob);
   FullyConnectedLayer* WeightType(WeightDistributionType type);

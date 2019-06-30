@@ -116,6 +116,8 @@ private:
   uint32_t prediction_batch_size_;
   uint32_t training_batches_in_memory_;
   uint32_t testing_batches_in_memory_;
+  float l1_regularizer_ = 0.0;
+  float l2_regularizer_ = 0.0;
 
   // Model members
   wasmpp::Memory* learning_rate_ = nullptr;
@@ -134,6 +136,8 @@ private:
   wabt::Var forward_testing_func_;
   wabt::Var forward_prediction_func_;
   wabt::Var backward_func_;
+  wabt::Var compute_cost_training_func_;
+  wabt::Var compute_cost_testing_func_;
   wabt::Var confusion_matrix_training_func_;
   wabt::Var confusion_matrix_testing_func_;
   wabt::Var count_correct_predictions_training_func_;
@@ -178,6 +182,7 @@ private:
   wabt::Var BackwardAlgorithmFunction();
   wabt::Var ConfusionMatrixFunction(uint8_t mode_index);
   wabt::Var CountCorrectPredictionsFunction(uint8_t mode_index);
+  wabt::Var ComputeCostFunction(uint8_t mode_index);
 
   // Make functions
   void MakeLayersFunctions();
@@ -197,8 +202,9 @@ public:
 
   // Build model
   void Build(uint32_t training_batch_size, uint32_t training_batches_in_memory,
-                           uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
-                           uint32_t prediction_batch_size, builtins::LossFunction loss);
+             uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
+             uint32_t prediction_batch_size, builtins::LossFunction loss,
+             float l1_regularizer, float l2_regularizer);
 
   // Members accessors
   wabt::ExprList* SetLearningRate(wabt::ExprList* val);
@@ -215,10 +221,13 @@ public:
   uint32_t TrainingBatchSize() const { return training_batch_size_; }
   uint32_t TrainingBatchesInMemory() const { return training_batches_in_memory_; }
   uint32_t TestingBatchSize() const { return testing_batch_size_; }
+  uint32_t BatchSzie(uint8_t mode_index) const;
   uint32_t TestingBatchesInMemory() const { return testing_batches_in_memory_; }
   uint32_t PredictionBatchSize() const { return prediction_batch_size_; }
   const ModelOptions& Options() const { return options_; }
   const builtins::LossFunction& Loss() const { return loss_; }
+  float L1Regularizer() const { return l1_regularizer_; }
+  float L2Regularizer() const { return l2_regularizer_; }
 
   enum Mode : uint8_t {
     Training = 0,

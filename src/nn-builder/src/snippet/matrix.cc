@@ -359,6 +359,41 @@ wabt::ExprList* MatrixSnippet::MatrixHorizontalSum(nn::ds::NDArray *matrix, nn::
   return e;
 }
 
+wabt::ExprList* MatrixSnippet::MatrixAbsSum(nn::ds::NDArray *matrix, wabt::Var result, std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(matrix);
+
+  assert(locals.size() == 1);
+  auto dst_addr = locals[0];
+
+  uint32_t type_size = TypeSize(Type::F32);
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(result, MakeF32Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, matrix->Begin(), matrix->End(), type_size, {}, [&](BlockBody* b){
+    b->Insert(GenerateCompoundAssignment(result, Opcode::F32Add, MakeUnary(Opcode::F32Abs, MakeF32Load(MakeLocalGet(dst_addr)))));
+  }));
+  return e;
+}
+
+wabt::ExprList* MatrixSnippet::MatrixSquareSum(nn::ds::NDArray *matrix, wabt::Var result, std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(matrix);
+
+  assert(locals.size() == 2);
+  auto dst_addr = locals[0];
+  auto cache = locals[1];
+
+  uint32_t type_size = TypeSize(Type::F32);
+
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(result, MakeF32Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, matrix->Begin(), matrix->End(), type_size, {}, [&](BlockBody* b){
+    b->Insert(MakeLocalSet(cache, MakeF32Load(MakeLocalGet(dst_addr))));
+    b->Insert(GenerateCompoundAssignment(result, Opcode::F32Add, MakeBinary(Opcode::F32Mul,
+                                                                            MakeLocalGet(cache), MakeLocalGet(cache))));
+  }));
+  return e;
+}
+
 wabt::ExprList* MatrixSnippetSimd::ElementWiseBinaryOperation(Opcode op, NDArray *lhs, NDArray *rhs, NDArray *dst,
                                                               std::vector<Var> locals) {
   MATRIX_CHECK(lhs);

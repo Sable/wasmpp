@@ -93,6 +93,12 @@ public:
 
   // Sum row values and store them in destination vector
   virtual wabt::ExprList* MatrixHorizontalSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals);
+
+  // Absolute sum all elements in a matrix
+  virtual wabt::ExprList* MatrixAbsSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals);
+
+  // Square sum all elements in a matrix
+  virtual wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals);
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {

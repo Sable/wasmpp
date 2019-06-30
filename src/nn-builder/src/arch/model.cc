@@ -48,6 +48,17 @@ wabt::ExprList* Model::GetLearningRate() {
   return MakeF32Load(MakeI32Const(learning_rate_->Begin()));
 }
 
+uint32_t Model::BatchSzie(uint8_t mode_index) const {
+  if(mode_index == Mode::Training) {
+    return TrainingBatchSize();
+  }
+  if(mode_index == Mode::Testing) {
+    return TestingBatchesInMemory();
+  }
+  assert(mode_index == Mode::Prediction);
+  return PredictionBatchSize();
+}
+
 void Model::SetLayers(std::vector<Layer *> layers) {
   ERROR_UNLESS(layers.size() >= 2, "At least an input and output layer should be defined");
   for(uint32_t index = 0; index < layers.size(); index++) {
@@ -81,18 +92,22 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
 }
 
 void Model::Build(uint32_t training_batch_size, uint32_t training_batches_in_memory, uint32_t testing_batch_size,
-                       uint32_t testing_batches_in_memory, uint32_t prediction_batch_size,
-                       nn::builtins::LossFunction loss) {
+                  uint32_t testing_batches_in_memory, uint32_t prediction_batch_size, nn::builtins::LossFunction loss,
+                  float l1_regularizer, float l2_regularizer) {
   ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
   ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
   ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
   ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
   ERROR_UNLESS(testing_batches_in_memory >= 1, "testing batches in memory must be at least 1");
+  ERROR_UNLESS(l1_regularizer >= 0, "l1 regularizer cannot be negative");
+  ERROR_UNLESS(l2_regularizer >= 0, "l2 regularizer cannot be negative");
   training_batch_size_ = training_batch_size;
   training_batches_in_memory_ = training_batches_in_memory;
   testing_batch_size_ = testing_batch_size;
   testing_batches_in_memory_ = testing_batches_in_memory;
   prediction_batch_size_ = prediction_batch_size;
+  l1_regularizer_ = l1_regularizer;
+  l2_regularizer_ = l2_regularizer;
   loss_ = loss;
 
   // Validate all layers now that
@@ -293,6 +308,50 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 
 }
 
+wabt::Var Model::ComputeCostFunction(uint8_t mode_index) {
+  std::vector<Type> locals = {Type::F32, Type::I32, Type::F32, Type::F32};
+  return module_manager_.MakeFunction(nullptr, {{Type::I32}, {Type::F32}}, locals,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(locals.size() == 4);
+    auto cost = locals[0];
+    auto vi32_1 = locals[1];
+    auto vf32_1 = locals[2];
+    auto vf32_2 = locals[3];
+
+    assert(params.size() == 1);
+    auto target_begin = params[0];
+
+    for(auto &layer : layers_) {
+      if(layer->Type() == FullyConnected) {
+        if(layer->Position() != Input) {
+          auto fc_layer = static_cast<FullyConnectedLayer*>(layer);
+
+          // Compute cost
+          if(fc_layer->Position() == Output) {
+            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, static_cast<DenseOutputLayer*>(fc_layer)
+                ->ComputeCost(mode_index, target_begin)));
+          }
+
+          // Compute L1 cost
+          if(L1Regularizer() > 0) {
+            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL1Cost(mode_index, {vi32_1, vf32_1})));
+          }
+
+          // Compute L2 cost
+          if(L2Regularizer() > 0) {
+             f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL2Cost(mode_index, {vi32_1, vf32_1, vf32_2})));
+          }
+        }
+      } else {
+        assert(!"Not implemented!");
+      }
+    }
+
+    // Return final cost
+    f.Insert(MakeLocalGet(cost));
+  });
+}
+
 void Model::MakeData() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
@@ -312,6 +371,8 @@ void Model::MakeAlgorithmsFunctions() {
   forward_testing_func_             = ForwardAlgorithmFunction(Mode::Testing);
   forward_prediction_func_          = ForwardAlgorithmFunction(Mode::Prediction);
   backward_func_                    = BackwardAlgorithmFunction();
+  compute_cost_training_func_       = ComputeCostFunction(Mode::Training);
+  compute_cost_testing_func_        = ComputeCostFunction(Mode::Testing);
   if(options_.bytecode_options.gen_training_confusion_matrix) {
     confusion_matrix_training_func_ = ConfusionMatrixFunction(Mode::Training);
   }
@@ -440,13 +501,9 @@ void Model::MakeTrainingFunctions() {
 
       // Compute training error
       if(options_.bytecode_options.gen_training_error) {
-        assert(layers_.back()->Position() == Output);
-        if(layers_.back()->Type() == FullyConnected) {
-          auto compute_cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, compute_cost));
-        } else {
-          assert(!"Compute cost not implemented");
-        }
+        b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, MakeCall(compute_cost_training_func_, {
+          MakeLocalGet(label_addr)
+        })));
       }
 
       // Update confusion matrix
@@ -617,13 +674,9 @@ void Model::MakeTestingFunctions() {
 
       // Compute testing error
       if(options_.bytecode_options.gen_testing_error) {
-        assert(layers_.back()->Position() == Output);
-        if(layers_.back()->Type() == FullyConnected) {
-          auto cost_call = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, cost_call));
-        } else {
-          assert(!"Compute cost not implemented");
-        }
+        b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, MakeCall(compute_cost_testing_func_, {
+          MakeLocalGet(label_addr)
+        })));
       }
 
       // Update confusion matrix

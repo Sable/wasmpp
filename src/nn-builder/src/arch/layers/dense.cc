@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/arch/layers/dense.h>
 #include <src/nn-builder/src/arch/model.h>
+#include <src/wasmpp/wasm-instructions-gen.h>
 #include <sstream>
 
 namespace nn {
@@ -135,19 +136,45 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
       MakeI32Const(A_[mode_index]->Shape()[0]),
       MakeI32Const(A_[mode_index]->Shape()[1])
   });
+}
+
+wabt::ExprList* FullyConnectedLayer::ComputeL1Cost(uint8_t mode_index, std::vector<Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+
+  assert(locals.size() == 2);
+  auto vi32_1 = locals[0];
+  auto result = locals[1];
 
   // Compute l1_loss
-  // cost + (l1_decay/2m) SUM(ABS(W[l]))
+  // (l1_decay/2m) SUM(ABS(W[l]))
   // 1) local = SUM(ABS(W[l]))
   // 2) local = (l1_decay/2m) local
-  // 3) res   = res + Local
+  ExprList* e = new ExprList();
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixAbsSum(W_, result, {vi32_1}));
+  Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L1Regularizer() /
+                                                                           (2 * NetworkModel()->BatchSzie(mode_index)))));
+  Merge(e, MakeLocalGet(result));
+  return e;
+}
 
+wabt::ExprList* FullyConnectedLayer::ComputeL2Cost(uint8_t mode_index, std::vector<Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+
+  assert(locals.size() == 3);
+  auto vi32_1 = locals[0];
+  auto vf32_1 = locals[1];
+  auto result = locals[2];
 
   // Compute l2 loss
-  // cost + (l2_decay/m) SUM(W[l] * W[l])
+  // (l2_decay/2m) SUM(W[l] * W[l])
   // 1) local = SUM(W[l] * W[l])
-  // 2) local = (l2_decay/m) local
-  // 3) res   = res + local
+  // 2) local = (l2_decay/2m) local
+  ExprList* e = new ExprList();
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixSquareSum(W_, result, {vi32_1, vf32_1}));
+  Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L2Regularizer() /
+                                                                           (2 * NetworkModel()->BatchSzie(mode_index)))));
+  Merge(e, MakeLocalGet(result));
+  return e;
 }
 
 #undef START_TIME
