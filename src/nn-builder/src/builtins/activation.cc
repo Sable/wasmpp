@@ -163,7 +163,7 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
   // - df(X) = not defined - check backward algorithm for details
   softmax_.type = ActivationFunction::SOFTMAX;
   softmax_.function = module_manager->MakeFunction(nullptr, {{Type::I32, Type::I32, Type::I32, Type::I32}, {}},
-      {Type::I32, Type::I32, Type::I32, Type::F32, Type::F32, Type::I32, Type::I32},
+      {Type::I32, Type::I32, Type::I32, Type::F32, Type::F32, Type::F32, Type::I32, Type::I32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
 
     assert(params.size() == 4);
@@ -172,14 +172,15 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     auto row_count = params[2];
     auto col_count = params[3];
 
-    assert(locals.size() == 7);
+    assert(locals.size() == 8);
     auto row = locals[0];
     auto col = locals[1];
     auto cell_addr = locals[2];
     auto total_exp = locals[3];
     auto cell_exp = locals[4];
-    auto width_bytes = locals[5];
-    auto height_bytes = locals[6];
+    auto max_val = locals[5];
+    auto width_bytes = locals[6];
+    auto height_bytes = locals[7];
 
     uint32_t type_size = TypeSize(Type::F32);
 
@@ -187,9 +188,25 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
     f.Insert(MakeLocalSet(height_bytes, MakeBinary(Opcode::I32Mul, MakeLocalGet(row_count), MakeLocalGet(width_bytes))));
     f.Insert(GenerateRangeLoop(f.Label(), col, 0, width_bytes, type_size, {}, [&](BlockBody* b1) {
       b1->Insert(MakeLocalSet(total_exp, MakeF32Const(0)));
-      // TODO Find max and subtract
+      // First find max(x[i] column wise
+      // Start by setting max value to value of top cell
+      b1->Insert(MakeLocalSet(max_val, MakeF32Load(MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeLocalGet(src_begin)))));
+      b1->Insert(GenerateRangeLoop(f.Label(), row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
+        // Compute src current cell address
+        auto src_curr_addr = MakeBinary(Opcode::I32Add,
+                                        MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col), MakeLocalGet(src_begin)));
 
-      // First compute the e(x[i]) column wise
+        // Cache src address
+        b2->Insert(MakeLocalSet(cell_addr, src_curr_addr));
+
+        // Update max value
+        auto cond = MakeBinary(Opcode::F32Gt, MakeF32Load(MakeLocalGet(cell_addr)), MakeLocalGet(max_val));
+        b2->Insert(MakeIf(f.Label(), cond, {}, [&](BlockBody true_body, Var label) {
+          true_body.Insert(MakeLocalSet(max_val, MakeF32Load(MakeLocalGet(cell_addr))));
+        }));
+      }));
+
+      // Second compute the e(x[i]) column wise
       // store the result of each cell in the destination matrix
       // keep track of the total SUM(exp(x[i]))
       b1->Insert(GenerateRangeLoop(f.Label(), row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
@@ -201,7 +218,7 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
                                         MakeLocalGet(row), MakeBinary(Opcode::I32Add, MakeLocalGet(col),MakeLocalGet(dst_begin)));
         // Compute exp(x) and store it in a local
         b2->Insert(MakeLocalSet(cell_exp, MakeCall(model->Builtins().math.Exp(), {
-            MakeF32Load(src_curr_addr)
+            MakeBinary(Opcode::F32Sub, MakeF32Load(src_curr_addr), MakeLocalGet(max_val))
         })));
         // Store exp(x) at the destination cell
         b2->Insert(MakeF32Store(dst_curr_addr, MakeLocalGet(cell_exp)));
@@ -209,9 +226,8 @@ void Activation::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* modu
         b2->Insert(GenerateCompoundAssignment(total_exp, Opcode::F32Add, MakeLocalGet(cell_exp)));
       }));
 
-      // Now that we have all the exp(x[i]) for a column
-      // in the destination matrix, divide them by
-      // SUM(exp(e[i]))
+      // Third divide each cell value them by
+      // the SUM(exp(e[i]))
       b1->Insert(GenerateRangeLoop(f.Label(), row, 0, height_bytes, width_bytes, {}, [&](BlockBody* b2) {
         // Compute dst current cell address and cache it in a local
         b2->Insert(MakeLocalSet(cell_addr, MakeBinary(Opcode::I32Add,
