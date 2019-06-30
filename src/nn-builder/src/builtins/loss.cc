@@ -9,6 +9,14 @@ namespace builtins {
 using namespace wabt;
 using namespace wasmpp;
 
+bool LossFunction::operator==(const nn::builtins::LossFunction &loss_function) const {
+  return type == loss_function.type;
+}
+
+bool LossFunction::operator!=(const nn::builtins::LossFunction &loss_function) const {
+  return !(operator==(loss_function));
+}
+
 void Loss::InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) {
   assert(model != nullptr);
   assert(module_manager != nullptr);
@@ -22,6 +30,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
   // - J(Y, Y_Hat, rows, cols)       : return (1/(|rows|*|cols|)) * SUM((Y_Hat - Y)^2)
   // - dJ(Y, Y_Hat, DST, rows, cols) : DST = Y_Hat - Y
+  mean_squared_error_.type = LossFunction::MSE;
   mean_squared_error_.J = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32}, {Type::F32}}, {Type::I32, Type::F32, Type::F32},
           [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -85,6 +94,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
   // - J(Y, Y_Hat, rows, cols)       : - 1/|cols| * SUM(Y * log(Y_HAT))
   // - dJ(Y, Y_Hat, DST, rows, cols) : DST =  ((1 - Y) / (1 - Y_Hat)) - (Y / Y_Hat)
+  sigmoid_cross_entropy_.type = LossFunction::SIGMOID_CE;
   sigmoid_cross_entropy_.J = module_manager->MakeFunction(nullptr,
       {{Type::I32, Type::I32, Type::I32, Type::I32}, {Type::F32}}, {Type::I32, Type::F32, Type::F32},
       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
@@ -149,6 +159,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
   // Also refer to the backward algorithm to see the full details
   // of how it's being used.
   // Reference: deeplearning.ai - Multi-class classification - Training a softmax classifier (C2W3L09)
+  softmax_cross_entropy_.type = LossFunction::SOFTMAX_CE;
   softmax_cross_entropy_.J = sigmoid_cross_entropy_.J;
   softmax_cross_entropy_.dJ = mean_squared_error_.dJ;
 }

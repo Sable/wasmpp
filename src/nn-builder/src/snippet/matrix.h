@@ -91,9 +91,6 @@ public:
   // Apply hard-max on each matrix column
   virtual wabt::ExprList* MatrixColumnHardmax(ds::NDArray* src, ds::NDArray* dst, std::vector<wabt::Var> locals);
 
-  // Apply soft-max on each matrix column
-  virtual wabt::ExprList* MatrixColumnSoftmax(ds::NDArray* src, ds::NDArray* dst, std::vector<wabt::Var> locals);
-
   // Sum row values and store them in destination vector
   virtual wabt::ExprList* MatrixHorizontalSum(ds::NDArray* matrix, ds::NDArray* dst_vector, std::vector<wabt::Var> locals);
 };

@@ -7,8 +7,15 @@ namespace nn {
 namespace builtins {
 
 struct LossFunction {
+  enum Type {
+    MSE,
+    SIGMOID_CE,
+    SOFTMAX_CE
+  } type;
   wabt::Var J;
   wabt::Var dJ;
+  bool operator==(const LossFunction &loss_function) const;
+  bool operator!=(const LossFunction &loss_function) const;
 };
 
 class Loss : public Builtin {

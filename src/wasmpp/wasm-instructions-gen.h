@@ -23,6 +23,38 @@ wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, ui
                                   wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
 
 // Generate
+//   i32.const {start}
+//   set_local {var}
+//   loop {label}
+//   {content}
+//   get_local {var}
+//   get_local {inc}
+//   i32.add
+//   tee_local {var}
+//   get_local {end}
+//   i32.ne
+//   br_if {label}
+//   end
+wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, wabt::Var end, wabt::Var inc,
+                                    wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
+
+// Generate
+//   i32.const {start}
+//   set_local {var}
+//   loop {label}
+//   {content}
+//   get_local {var}
+//   i32.const {inc}
+//   i32.add
+//   tee_local {var}
+//   get_local {end}
+//   i32.ne
+//   br_if {label}
+//   end
+  wabt::ExprList* GenerateRangeLoop(LabelManager* label_manager, wabt::Var var, uint32_t start, wabt::Var end, uint32_t inc,
+                                    wabt::FuncSignature sig, std::function<void(BlockBody*)> content);
+
+// Generate
 //   loop {label}
 //   {content}
 //   get_local {var}

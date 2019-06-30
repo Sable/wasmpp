@@ -95,6 +95,12 @@ void Model::Build(uint32_t training_batch_size, uint32_t training_batches_in_mem
   prediction_batch_size_ = prediction_batch_size;
   loss_ = loss;
 
+  // Validate all layers now that
+  // all parameters has been set
+  for(auto &layer : layers_) {
+    layer->Validate();
+  }
+
   AllocateMemory();
   MakeLayersFunctions();
   MakeAlgorithmsFunctions();

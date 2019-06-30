@@ -50,10 +50,21 @@ public:
   FullyConnectedLayer* WeightType(WeightDistributionType type);
 };
 
+class DenseInputLayer : public FullyConnectedLayer {
+public:
+  // Input Dense Layer does not have an activation function
+  // and it will not be used in the forward or
+  // the backward algorithms
+  DenseInputLayer(uint32_t nodes) : FullyConnectedLayer(Input, nodes, builtins::ActivationFunction()) {}
+  ds::NDArray* InputArray(uint8_t mode_index) const;
+  void MakeFunctions() override ;
+};
+
 class DenseHiddenLayer : public FullyConnectedLayer {
 public:
   DenseHiddenLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
       FullyConnectedLayer(Hidden, nodes, act_func) {}
+  void Validate() override ;
 };
 
 class DenseOutputLayer : public FullyConnectedLayer {
@@ -69,6 +80,7 @@ public:
   // Augment forward algorithm
   wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
   void MakeFunctions() override ;
+  void Validate() override ;
 
   // Compute cost value
   wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);
@@ -81,16 +93,6 @@ private:
   bool ShouldHardmax(uint8_t mode_index) const;
   ds::NDArray* hardmax_[2]          = {nullptr, nullptr}; // Training, Testing
   ds::NDArray* confusion_matrix_[2] = {nullptr, nullptr}; // Training, Testing
-};
-
-class DenseInputLayer : public FullyConnectedLayer {
-public:
-  // Input Dense Layer does not have an activation function
-  // and it will not be used in the forward or
-  // the backward algorithms
-  DenseInputLayer(uint32_t nodes) : FullyConnectedLayer(Input, nodes, builtins::ActivationFunction()) {}
-  ds::NDArray* InputArray(uint8_t mode_index) const;
-  void MakeFunctions() override ;
 };
 
 } // namespace layer

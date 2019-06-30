@@ -81,8 +81,18 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
 
       // B) A[l] = g(Z[l])
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
-                                                                   {vi32_1, vi32_2}, false));
+      // Special case for softmax
+      if(activation_func_ == NetworkModel()->Builtins().activation.Softmax()) {
+        Merge(e, MakeCall(activation_func_.function, {
+          MakeI32Const(Z_[mode_index]->Begin()),
+          MakeI32Const(A_[mode_index]->Begin()),
+          MakeI32Const(Z_[mode_index]->Shape()[0]),
+          MakeI32Const(Z_[mode_index]->Shape()[1])
+        }));
+      } else {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
+                                                                     {vi32_1, vi32_2}, false));
+      }
       END_TIME(B)
     } else {
       assert(!"Not implemented!");
@@ -163,29 +173,47 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
     if(Position() == Output) {
       START_TIME()
       // A) dA[L] = dJ(T, A[L])
-      Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
-          MakeLocalGet(target_begin),
-          MakeI32Const(A_[Model::Mode::Training]->Begin()),
-          MakeI32Const(dA_->Begin()),
-          MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
-          MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
-      }));
+      // Note: For softmax, we should skip this step because
+      // we can directly store the result in dZ[L]
+      if(NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
+        Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
+            MakeLocalGet(target_begin),
+            MakeI32Const(A_[Model::Mode::Training]->Begin()),
+            MakeI32Const(dA_->Begin()),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
+        }));
+      }
       END_TIME(A)
     }
 
     auto prev_layer = NetworkModel()->Layers()[LayerIndex()-1];
     if(prev_layer->Type() == FullyConnected) {
       auto prev_fc_layer = static_cast<FullyConnectedLayer*>(prev_layer);
-      // B) dZ[l] = dA[l] * g'(Z[l])
-      //    1) dZ[l] = g'(Z[l])
-      //    2) dZ[l] = dA[l] * dZ[l]
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
-                                                                   activation_func_, dZ_, {vi32_1, vi32_2}, true));
-      END_TIME(B_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
-      END_TIME(B_2)
+
+      // Special case for softmax
+      if(Position() == Output && NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
+        // B_Softmax) dZ[L] = dJ(T, A[L])
+        Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
+            MakeLocalGet(target_begin),
+            MakeI32Const(A_[Model::Mode::Training]->Begin()),
+            MakeI32Const(dZ_->Begin()),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
+        }));
+
+      } else {
+        // B) dZ[l] = dA[l] * g'(Z[l])
+        //    1) dZ[l] = g'(Z[l])
+        //    2) dZ[l] = dA[l] * dZ[l]
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
+                                                                     activation_func_, dZ_, {vi32_1, vi32_2}, true));
+        END_TIME(B_1)
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
+        END_TIME(B_2)
+      }
 
       // C) dW[l] = (1/m) dZ[l] . A[l-1]^T
       //    1) dW[l] = dZ[l] . A[l-1]^T
@@ -469,6 +497,25 @@ wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_be
                                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
   }
   return e;
+}
+
+void DenseHiddenLayer::Validate() {
+  ERROR_UNLESS(activation_func_ != NetworkModel()->Builtins().activation.Softmax(),
+               "Hidden layer cannot have softmax activation function");
+}
+
+void DenseOutputLayer::Validate() {
+  ERROR_UNLESS(activation_func_ == NetworkModel()->Builtins().activation.Softmax()
+               || activation_func_ == NetworkModel()->Builtins().activation.Sigmoid() ,
+               "Output layer must sigmoid or softmax as activation function");
+  if(activation_func_ == NetworkModel()->Builtins().activation.Softmax()) {
+    ERROR_UNLESS(NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy(),
+                 "Loss function not compatible with softmax activation function");
+  }
+  if(activation_func_ == NetworkModel()->Builtins().activation.Sigmoid()) {
+    ERROR_UNLESS(NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy(),
+                 "Loss function not compatible with sigmoid activation function");
+  }
 }
 
 void DenseOutputLayer::MakeFunctions() {

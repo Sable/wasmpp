@@ -88,6 +88,7 @@ struct DenseForwardTimeMembers {
 #define DENSE_BACKWARD_TIME_MEMBERS(V)  \
   V(Time)                               \
   V(A)                                  \
+  V(B_Softmax)                          \
   V(B_1)                                \
   V(B_2)                                \
   V(C_1)                                \
