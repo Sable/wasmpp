@@ -71,9 +71,8 @@ int main(int argc, char *argv[]) {
   options.bytecode_options.gen_testing_accuracy            = true;
   options.bytecode_options.gen_testing_error               = true;
   options.bytecode_options.gen_testing_confusion_matrix    = true;
-  options.bytecode_options.gen_prediction_results          = true;
-  options.bytecode_options.gen_forward                     = true;
-  options.bytecode_options.gen_backward                    = true;
+  options.bytecode_options.gen_forward_profiling           = true;
+  options.bytecode_options.gen_backward_profiling          = true;
   options.bytecode_options.use_simd                        = true;
   Model model(options);
   model.SetLayers({

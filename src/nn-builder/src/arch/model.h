@@ -31,10 +31,9 @@ struct ModelBytecodeOptions {
   bool gen_testing_error                = false;
   bool gen_testing_confusion_matrix     = false;
   bool gen_testing_time                 = true;
-  bool gen_prediction_results           = false;
   bool gen_prediction_time              = true;
-  bool gen_forward                      = false;
-  bool gen_backward                     = false;
+  bool gen_forward_profiling            = false;
+  bool gen_backward_profiling           = false;
   bool use_simd                         = false;
 };
 

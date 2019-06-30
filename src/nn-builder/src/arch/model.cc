@@ -507,7 +507,7 @@ void Model::MakeTrainingFunctions() {
   });
 
   // Create forward log functions
-  if(options_.bytecode_options.gen_forward) {
+  if(options_.bytecode_options.gen_forward_profiling) {
 #define LOG_TIME_MEMBER(name)                                                                       \
     module_manager_.MakeFunction("log_forward_" #name, {{}, {Type::F64}}, {},                       \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
@@ -518,7 +518,7 @@ void Model::MakeTrainingFunctions() {
   }
 
   // Create backward log functions
-  if(options_.bytecode_options.gen_backward) {
+  if(options_.bytecode_options.gen_backward_profiling) {
 #define LOG_TIME_MEMBER(name)           \
     module_manager_.MakeFunction("log_backward_" #name, {{}, {Type::F64}}, {},                      \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
