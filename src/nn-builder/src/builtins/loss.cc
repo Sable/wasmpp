@@ -28,7 +28,7 @@ void Loss::InitDefinitions(arch::Model* model, wasmpp::ModuleManager* module_man
 
   // Mean Squared Error function
   // ! Note:  `Y` is matrix of true labels, `Y_Hat` is matrix of predicted values
-  // - J(Y, Y_Hat, rows, cols)       : return (1/(|rows|*|cols|)) * SUM((Y_Hat - Y)^2)
+  // - J(Y, Y_Hat, rows, cols)       : return (1/(|rows|*|cols|)) * SUM((Y_Hat - Y)^2) // TODO Verify 1/|rows| part
   // - dJ(Y, Y_Hat, DST, rows, cols) : DST = Y_Hat - Y
   mean_squared_error_.type = LossFunction::MSE;
   mean_squared_error_.J = module_manager->MakeFunction(nullptr,
