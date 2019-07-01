@@ -233,7 +233,7 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
 
       // Special case for softmax
       if(Position() == Output && NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
-        // B_Softmax) dZ[L] = dJ(T, A[L])
+        // B) dZ[L] = dJ(T, A[L])
         START_TIME()
         Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
             MakeLocalGet(target_begin),
@@ -242,26 +242,27 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
             MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
             MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
         }));
-        END_TIME(B_Softmax)
+        END_TIME(B)
       } else {
-        // B) dZ[l] = dA[l] * g'(Z[l])
+        // C) dZ[l] = dA[l] * g'(Z[l])
         //    1) dZ[l] = g'(Z[l])
         //    2) dZ[l] = dA[l] * dZ[l]
         START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
                                                                      activation_func_, dZ_, {vi32_1, vi32_2}, true));
-        END_TIME(B_1)
+        END_TIME(C_1)
         START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
-        END_TIME(B_2)
+        END_TIME(C_2)
       }
 
-      // C) dW[l] = (1/m) dZ[l] . A[l-1]^T + (l2_decay/m) W[l] + (l1_decay/m) sign(W[l])
+      // D) dW[l] = (1/m) dZ[l] . A[l-1]^T + (l2_decay/m) W[l] + (l1_decay/m) sign(W[l])
       //          = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))
       //    1) dW[l] = dZ[l] . A[l-1]^T
-      //    2) dW[l] = dW[l] + l1_decay sign(W[l])
-      //    3) dW[l] = dW[l] + l2_decay W[l]
-      //    4) dW[l] = (1/m) dW[l]
+      //    2) 1) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]
+      //       2) 1) dW[l] = dW[l] + l1_decay sign(W[l])
+      //          2) dW[l] = dW[l] + l2_decay W[l]
+      //    3) dW[l] = (1/m) dW[l]
       START_TIME()
 #ifdef WABT_EXPERIMENTAL
       Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_rt, {
@@ -279,43 +280,50 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training]), dW_,
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
-      END_TIME(C_1)
-      START_TIME()
-      if(NetworkModel()->L1Regularizer() > 0) {
+      END_TIME(D_1)
+      if(NetworkModel()->L1Regularizer() > 0 && NetworkModel()->L2Regularizer() > 0) {
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix
+            ->MatrixAddRightSignScaleAddRightScale(dW_, W_, dW_, NetworkModel()->L1Regularizer(),
+                                                   NetworkModel()->L2Regularizer(), {vi32_1, vi32_2, vf32_1, v128_1}));
+        END_TIME(D_2_1)
+      }
+      if(NetworkModel()->L1Regularizer() > 0 && NetworkModel()->L2Regularizer() == 0) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightSignScale(dW_, W_, dW_, NetworkModel()->L1Regularizer(),
                                                                         {vi32_1, vi32_2}));
+        END_TIME(D_2_2_1)
       }
-      END_TIME(C_2)
-      START_TIME()
-      if(NetworkModel()->L2Regularizer() > 0) {
+      if(NetworkModel()->L2Regularizer() > 0 && NetworkModel()->L1Regularizer() == 0) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightScale(dW_, W_, dW_,
                                                                         MakeF32Const(NetworkModel()->L2Regularizer()),
                                                                         {vi32_1, vi32_2, vf32_1}));
+        END_TIME(D_2_2_2)
       }
-      END_TIME(C_3)
-      START_TIME()
       if(NetworkModel()->TrainingBatchSize() > 1) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, MakeF32Const(1.0f / NetworkModel()->TrainingBatchSize()),
                                                                  dW_, {vi32_1, vi32_2, vf32_1}));
+        END_TIME(D_3)
       }
-      END_TIME(C_4)
 
-      // D) db[l] = (1/m) dZ[l]
+      // E) db[l] = (1/m) dZ[l]
       //    1) db[l] = SUM(dZ[l], row wise)
       //    2) db[l] = (1/m) db[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixHorizontalSum(dZ_, db_,
                                                                       {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
-      END_TIME(D_1)
-      START_TIME()
+      END_TIME(E_1)
       if(NetworkModel()->TrainingBatchSize() > 1) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
                                                                  db_, {vi32_1, vi32_2, vf32_1}));
+        END_TIME(E_2)
       }
-      END_TIME(D_2)
 
       if(LayerIndex() > 1) {
-        // E) dA[l-1] = W[l]^T . dZ[l]
+        // F) dA[l-1] = W[l]^T . dZ[l]
         START_TIME()
 #ifdef WABT_EXPERIMENTAL
         Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_lt, {
@@ -330,20 +338,20 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
         Merge(e, NetworkModel()->Snippets().matrix->MatrixDotLT(W_, dZ_, prev_fc_layer->dA_,
                                                                 {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
-        END_TIME(E)
+        END_TIME(F)
       }
 
-      // F) W[l] = W[l] - alpha * dW[l]
+      // G) W[l] = W[l] - alpha * dW[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(W_, dW_, W_, NetworkModel()->GetLearningRate(),
                                                                       {vi32_1, vi32_2, vf32_1}));
-      END_TIME(F)
+      END_TIME(G)
 
-      // G) b[l] = b[l] - alpha * db[l]
+      // H) b[l] = b[l] - alpha * db[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(b_, db_, b_, NetworkModel()->GetLearningRate(),
                                                                {vi32_1, vi32_2, vf32_1}));
-      END_TIME(G)
+      END_TIME(H)
     } else {
       assert(!"Not implemented!");
     }

@@ -76,44 +76,48 @@ class ModelLogger {
   log_backward_A(time) {
     console.log("A) dA[L] = dJ(T, A[L]):", time);
   }
-  log_backward_B_Softmax(time) {
+  log_backward_B(time) {
     console.log("B) [Softmax] dZ[L] = dJ(T, A[L]):", time);
   }
-  log_backward_B_1(time) {
-    console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
+  log_backward_C_1(time) {
+    console.log("C) dZ[l] = dA[l] * g'[l](Z[l])");
     console.log("    1) dZ[l] = g'[l](Z[l]):", time);
   }
-  log_backward_B_2(time) {
+  log_backward_C_2(time) {
     console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
   }
-  log_backward_C_1(time) {
-    console.log("C) dW[l] = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))");
+  log_backward_D_1(time) {
+    console.log("D) dW[l] = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))");
     console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
   }
-  log_backward_C_2(time) {
-    console.log("    2) dW[l] = dW[l] + l1_decay sign(W[l]):", time);
+  log_backward_D_2_1(time) {
+    console.log("    2) 1) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]:", time);
   }
-  log_backward_C_3(time) {
-    console.log("    3) dW[l] = dW[l] + l2_decay W[l]:", time);
+  log_backward_D_2_2_1(time) {
+    console.log("       2) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]");
+    console.log("          1) dW[l] = dW[l] + l1_decay W[l]:", time);
   }
-  log_backward_C_4(time) {
-    console.log("    4) dW[l] = (1/m) dW[l]:", time);
+  log_backward_D_2_2_2(time) {
+    console.log("          2) dW[l] = dW[l] + l2_decay W[l]:", time);
   }
-  log_backward_D_1(time) {
-    console.log("D) db[l] = (1/m) dZ[l]");
+  log_backward_D_3(time) {
+    console.log("    3) dW[l] = (1/m) dW[l]:", time);
+  }
+  log_backward_E_1(time) {
+    console.log("E) db[l] = (1/m) dZ[l]");
     console.log("    1) db[l] = SUM(dZ[l], row wise):", time);
   }
-  log_backward_D_2(time) {
+  log_backward_E_2(time) {
     console.log("    2) db[l] = (1/m) db[l]:", time);
   }
-  log_backward_E(time) {
-    console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
-  }
   log_backward_F(time) {
-    console.log("F) W[l] = W[l] - alpha * dW[l]:", time);
+    console.log("F) dA[l-1] = W[l]^T . dZ[l]:", time);
   }
   log_backward_G(time) {
-    console.log("G) b[l] = b[l] - alpha * db[l]:", time);
+    console.log("G) W[l] = W[l] - alpha * dW[l]:", time);
+  }
+  log_backward_H(time) {
+    console.log("H) b[l] = b[l] - alpha * db[l]:", time);
   }
 }
 
