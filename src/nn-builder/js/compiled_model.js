@@ -419,7 +419,7 @@ class CompiledModel {
 
     // Copy data
     let data_array = new Float32Array(input.X.buffer, x_begin* Float32Array.BYTES_PER_ELEMENT, x_length);
-    let data_memory = new Float32Array(this.Memory().buffer, x_offset, x_length);
+    let data_memory = new Float32Array(CompiledModel.Memory().buffer, x_offset, x_length);
     data_memory.set(data_array);
 
     if(y_offset !== null) {
@@ -430,7 +430,7 @@ class CompiledModel {
 
       // Copy labels
       let labels_array = new Float32Array(input.Y.buffer, y_begin* Float32Array.BYTES_PER_ELEMENT, y_length);
-      let labels_memory = new Float32Array(this.Memory().buffer, y_offset, y_length);
+      let labels_memory = new Float32Array(CompiledModel.Memory().buffer, y_offset, y_length);
       labels_memory.set(labels_array);
     }
 
@@ -542,7 +542,7 @@ class CompiledModel {
     let matrix_offset_key = "training_confusion_matrix_offset";
     let matrix_side = this._LayerSize(this._TotalLayers() - 1);
     if(matrix_offset_key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+      console.table(CompiledModel._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Training confusion matrix function not found");
     }
@@ -552,7 +552,7 @@ class CompiledModel {
     let matrix_offset_key = "testing_confusion_matrix_offset";
     let matrix_side = this._LayerSize(this._TotalLayers() - 1);
     if(matrix_offset_key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+      console.table(CompiledModel._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Testing confusion matrix function not found");
     }
@@ -561,7 +561,7 @@ class CompiledModel {
   _LogPredictionResult() {
     let offset = this._CallExport("prediction_result_offset");
     if(offset != null) {
-      console.table(this._MakeF32Matrix(offset, this._LayerSize(this._TotalLayers() - 1), this._PredictionBatchSize()));
+      console.table(CompiledModel._MakeF32Matrix(offset, this._LayerSize(this._TotalLayers() - 1), this._PredictionBatchSize()));
     }
   }
 
@@ -624,8 +624,8 @@ class CompiledModel {
       let bias_info = this._BiasInfo(l);
       if (weight_info != null && bias_info != null) {
         let layer_weight = new LayerWeights(l);
-        layer_weight.ImportWeightsFromBuffer(this.Memory().buffer, weight_info.offset, weight_info.byte_size);
-        layer_weight.ImportBiasFromBuffer(this.Memory().buffer, bias_info.offset, bias_info.byte_size);
+        layer_weight.ImportWeightsFromBuffer(CompiledModel.Memory().buffer, weight_info.offset, weight_info.byte_size);
+        layer_weight.ImportBiasFromBuffer(CompiledModel.Memory().buffer, bias_info.offset, bias_info.byte_size);
         weights.push(layer_weight.ToJson());
       }
     }
@@ -644,9 +644,9 @@ class CompiledModel {
       if (weights_info != null && bias_info != null) {
         // Wrap Wasm model weight in a LayerWeight object
         let model_layer_weights = new LayerWeights(weights_array[i].layer);
-        model_layer_weights.ImportWeightsFromBuffer(this.Memory().buffer,
+        model_layer_weights.ImportWeightsFromBuffer(CompiledModel.Memory().buffer,
           weights_info.offset, weights_info.byte_size);
-        model_layer_weights.ImportBiasFromBuffer(this.Memory().buffer,
+        model_layer_weights.ImportBiasFromBuffer(CompiledModel.Memory().buffer,
           bias_info.offset, bias_info.byte_size);
         // Set weights
         if (!model_layer_weights.CopyWeights(imported_layer_weights)) {

@@ -291,10 +291,9 @@ model.AddDenseOutputLayer(l2);</textarea>
 
     if(window.model.Validate()) {
       let buffer = nnb.ToUint8Array(window.model.ToWasm());
-      window.compiled_model = new CompiledModel();
-      const lib = WebAssembly.instantiate(buffer, window.compiled_model.Imports());
+      const lib = WebAssembly.instantiate(buffer, CompiledModel.Imports());
       lib.then(wasm => {
-        window.compiled_model.SetWasm(wasm);
+        window.compiled_model = new CompiledModel(wasm);
         build_obj.innerText = "Build successful!";
         build_obj.className = "alert alert-success";
       });

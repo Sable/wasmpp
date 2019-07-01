@@ -173,12 +173,9 @@ EMSCRIPTEN_BINDINGS(model_options) {
       MODEL_BYTECODE_OPTIONS(gen_training_accuracy)
       MODEL_BYTECODE_OPTIONS(gen_training_error)
       MODEL_BYTECODE_OPTIONS(gen_training_confusion_matrix)
-      MODEL_BYTECODE_OPTIONS(gen_training_time)
       MODEL_BYTECODE_OPTIONS(gen_testing_accuracy)
       MODEL_BYTECODE_OPTIONS(gen_testing_error)
       MODEL_BYTECODE_OPTIONS(gen_testing_confusion_matrix)
-      MODEL_BYTECODE_OPTIONS(gen_testing_time)
-      MODEL_BYTECODE_OPTIONS(gen_prediction_time)
       MODEL_BYTECODE_OPTIONS(gen_forward_profiling)
       MODEL_BYTECODE_OPTIONS(gen_backward_profiling)
       MODEL_BYTECODE_OPTIONS(use_simd);
