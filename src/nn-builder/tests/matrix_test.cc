@@ -1215,9 +1215,8 @@ void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
   NN_TEST() {
     float scale = 0.01234;
 
-    // TODO Fails on 13 , 21
-    uint32_t rows = 5;
-    uint32_t cols = 10;
+    uint32_t rows = 13;
+    uint32_t cols = 21;
 
     NEW_MATRIX(lhs, rows, cols);
     NEW_MATRIX(rhs, rows, cols);
@@ -1238,7 +1237,7 @@ void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
 
     val = 1.2;
     uint32_t i = 0;
-    float v128[4] = {0, 0, 0, 0};
+    index = 0;
     auto end = rows * cols;
     auto simd_end = end - end % 4;
     for(; i < simd_end; i++) {
