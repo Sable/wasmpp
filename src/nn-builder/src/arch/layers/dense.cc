@@ -333,26 +333,16 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       }
 
       // F) W[l] = W[l] - alpha * dW[l]
-      //    1) dW[l] = alpha * dW[l] // TODO Shorten this to sub_mul operation
-      //    2) W[l] = W[l] - dW[l]
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, NetworkModel()->GetLearningRate(), dW_,
-                                                               {vi32_1, vi32_2, vf32_1}));
-      END_TIME(F_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(W_, dW_, W_, {vi32_1, vi32_2}));
-      END_TIME(F_2)
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(W_, dW_, W_, NetworkModel()->GetLearningRate(),
+                                                                      {vi32_1, vi32_2, vf32_1}));
+      END_TIME(F)
 
       // G) b[l] = b[l] - alpha * db[l]
-      //    1) db[l] = alpha * db[l] // TODO Shorten this to sub_mu operation
-      //    2) b[l] = b[l] - db[l]
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, NetworkModel()->GetLearningRate(), db_,
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(b_, db_, b_, NetworkModel()->GetLearningRate(),
                                                                {vi32_1, vi32_2, vf32_1}));
-      END_TIME(G_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(b_, db_, b_, {vi32_1, vi32_2}));
-      END_TIME(G_2)
+      END_TIME(G)
     } else {
       assert(!"Not implemented!");
     }

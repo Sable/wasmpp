@@ -98,10 +98,8 @@ struct DenseForwardTimeMembers {
   V(D_1)                                \
   V(D_2)                                \
   V(E)                                  \
-  V(F_1)                                \
-  V(F_2)                                \
-  V(G_1)                                \
-  V(G_2)
+  V(F)                                  \
+  V(G)
 struct DenseBackwardTimeMembers {
   DENSE_BACKWARD_TIME_MEMBERS(DEFINE_MEMBERS)
 };

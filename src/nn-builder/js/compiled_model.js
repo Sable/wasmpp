@@ -109,19 +109,11 @@ class ModelLogger {
   log_backward_E(time) {
     console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
   }
-  log_backward_F_1(time) {
-    console.log("F) W[l] = W[l] - alpha * dW[l]");
-    console.log("    1) dW[l] = alpha * dW[l]:", time);
+  log_backward_F(time) {
+    console.log("F) W[l] = W[l] - alpha * dW[l]:", time);
   }
-  log_backward_F_2(time) {
-    console.log("    2) W[l] = W[l] - dW[l]:", time);
-  }
-  log_backward_G_1(time) {
-    console.log("G) b[l] = b[l] - alpha * db[l]");
-    console.log("    1) db[l] = alpha * db[l]:", time);
-  }
-  log_backward_G_2(time) {
-    console.log("    2) b[l] = b[l] - db[l]:", time);
+  log_backward_G(time) {
+    console.log("G) b[l] = b[l] - alpha * db[l]:", time);
   }
 }
 
