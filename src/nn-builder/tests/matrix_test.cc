@@ -1,5 +1,6 @@
 #include <src/nn-builder/tests/matrix_test.h>
 #include <src/nn-builder/src/data_structure/ndarray.h>
+#include <cmath>
 
 namespace nn {
 namespace test {
@@ -426,6 +427,40 @@ void MatrixSnippetTest::MatrixAddRightScale_test_1() {
     }));
   };
   ADD_NN_TEST(module_manager_, "MatrixAddRightScale_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetTest::MatrixAddRightSignScale_test_1() {
+  NN_TEST() {
+    float scale = 0.01234;
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        float s_val = val * (col %2 == 0 ? 1 : -1);
+        float s_scale = copysignf(1.0, s_val);
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(s_val + (s_scale * scale))));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixAddRightSignScale(lhs, rhs, dst, scale, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddRightSignScale_1", Type::I32, Type::I32);
 }
 
 void MatrixSnippetTest::MatrixHorizontalSum_test_1() {

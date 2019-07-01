@@ -28,6 +28,7 @@ public:
   void MatrixAbsSum_test_1();
   void MatrixSquareSum_test_1();
   void MatrixAddRightScale_test_1();
+  void MatrixAddRightSignScale_test_1();
 };
 
 class MatrixSnippetSimdTest {
