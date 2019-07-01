@@ -149,6 +149,10 @@ public:
   // The SIMD version of this function generates exact results as the non-SIMD
   wabt::ExprList* MatrixAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
                                       std::vector<wabt::Var> locals) override ;
+
+  // The SIMD version of this function generates exact results as the non-SIMD
+  wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
+                                                  std::vector<wabt::Var> locals) override ;
 };
 
 #define MATRIX_CHECK(x) \

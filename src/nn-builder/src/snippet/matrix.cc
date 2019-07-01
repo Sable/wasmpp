@@ -1052,7 +1052,7 @@ wabt::ExprList* MatrixSnippetSimd::MatrixSquareSum(nn::ds::NDArray *matrix, wabt
 
   // Cannot optimize
   if(matrix->Memory()->Bytes() < WASMPP_V128_SIZE) {
-    return MatrixSnippet::MatrixAbsSum(matrix, result, locals);
+    return MatrixSnippet::MatrixSquareSum(matrix, result, locals);
   }
 
   assert(locals.size() == 3);
@@ -1129,6 +1129,64 @@ wabt::ExprList* MatrixSnippetSimd::MatrixAddRightScale(nn::ds::NDArray *lhs, nn:
       auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
       // Compute right scale
       auto rhs_val = MakeBinary(Opcode::F32Mul, MakeF32Load(rhs_addr), MakeF32Const(scale));
+      b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F32Add, MakeF32Load(lhs_addr), rhs_val)));
+      // Move to next element
+      b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
+    }));
+  }
+  return e;
+}
+
+ExprList* MatrixSnippetSimd::MatrixAddRightSignScale(ds::NDArray *lhs, ds::NDArray *rhs, ds::NDArray *dst,
+                                                           float scale, std::vector<Var> locals) {
+  MATRIX_CHECK(lhs);
+  MATRIX_CHECK(rhs);
+  MATRIX_CHECK(dst);
+  MATRIX_SAME_SHAPE(lhs, rhs);
+  MATRIX_SAME_SHAPE(rhs, dst);
+  assert(locals.size() == 2);
+
+  // Cannot optimize
+  if(lhs->Memory()->Bytes() < WASMPP_V128_SIZE) {
+    return MatrixSnippet::MatrixAddRightSignScale(lhs, rhs, dst, scale, locals);
+  }
+
+  auto dst_addr = locals[0];
+  auto addr = locals[1];
+
+  uint32_t simd_type_size = TypeSize(Type::V128);
+  auto remainder = dst->Memory()->Bytes() % WASMPP_V128_SIZE;
+  auto dst_simd_end = dst->Memory()->End() - remainder;
+
+  // Use SIMD while possible
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(addr, MakeI32Const(0)));
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, dst->Memory()->Begin(), dst_simd_end, simd_type_size, {}, [&](BlockBody* b) {
+    auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
+    auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
+    // Compute right sign scale
+    // 1) [-1, 2, -3, 4] >= [0, 0, 0, 0]      = [0, 1, 0, 1]
+    // 2) [0, 1, 0, 1]      to-float          = [0.0, 1.0. 0.0, 1.0]
+    // 3) [0, 1, 0, 1]   *  [2s, 2s, 2s, 2s]  = [0, 2s, 0, 2s]
+    // 4) [0, 2s, 0, 2s] -  [s, s, s, s]      = [-s, s, -s, s]
+    auto rhs_ge = MakeBinary(Opcode::F32X4Ge, MakeV128Load(rhs_addr), MakeUnary(Opcode::F32X4Splat, MakeF32Const(0)));
+    auto rhs_cnvt = MakeUnary(Opcode::F32X4ConvertI32X4S, rhs_ge);
+    auto rhs_mul = MakeBinary(Opcode::F32X4Mul, rhs_cnvt, MakeUnary(Opcode::F32X4Splat, MakeF32Const(2*scale)));
+    auto rhs_add = MakeBinary(Opcode::F32X4Sub, rhs_mul, MakeUnary(Opcode::F32X4Splat, MakeF32Const(scale)));
+    b->Insert(MakeV128Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F32X4Add, MakeV128Load(lhs_addr), rhs_add)));
+    // Move to next elements
+    b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(simd_type_size)));
+  }));
+
+  // Fallback to regular computation
+  if(remainder > 0) {
+    auto type_size = TypeSize(Type::F32);
+    Merge(e, GenerateDoWhileLoop(label_manager_, dst_addr, dst->Memory()->End(), type_size, {}, [&](BlockBody* b) {
+      auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
+      auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
+      // Compute right scale sign addition
+      auto rhs_sign = MakeBinary(Opcode::F32Copysign, MakeF32Const(1), MakeF32Load(rhs_addr));
+      auto rhs_val = MakeBinary(Opcode::F32Mul, rhs_sign, MakeF32Const(scale));
       b->Insert(MakeF32Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F32Add, MakeF32Load(lhs_addr), rhs_val)));
       // Move to next element
       b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(type_size)));
