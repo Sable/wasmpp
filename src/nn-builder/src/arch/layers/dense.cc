@@ -161,17 +161,18 @@ wabt::ExprList* FullyConnectedLayer::ComputeL1Cost(uint8_t mode_index, std::vect
 wabt::ExprList* FullyConnectedLayer::ComputeL2Cost(uint8_t mode_index, std::vector<Var> locals) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
 
-  assert(locals.size() == 3);
+  assert(locals.size() == 4);
   auto vi32_1 = locals[0];
   auto vf32_1 = locals[1];
-  auto result = locals[2];
+  auto v128_1 = locals[2];
+  auto result = locals[3];
 
   // Compute l2 loss
   // (l2_decay/2m) SUM(W[l] * W[l])
   // 1) local = SUM(W[l] * W[l])
   // 2) local = (l2_decay/2m) local
   ExprList* e = new ExprList();
-  Merge(e, NetworkModel()->Snippets().matrix->MatrixSquareSum(W_, result, {vi32_1, vf32_1}));
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixSquareSum(W_, result, {vi32_1, vf32_1, v128_1}));
   Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L2Regularizer() /
                                                                            (2 * NetworkModel()->BatchSzie(mode_index)))));
   Merge(e, MakeLocalGet(result));

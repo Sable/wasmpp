@@ -141,6 +141,10 @@ public:
   // The SIMD version of this function generates a result slightly different
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixAbsSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals) override ;
+
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float addition
+  wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals);
 };
 
 #define MATRIX_CHECK(x) \

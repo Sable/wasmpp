@@ -340,7 +340,7 @@ wabt::Var Model::ComputeCostFunction(uint8_t mode_index) {
 
           // Compute L2 cost
           if(L2Regularizer() > 0) {
-             f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL2Cost(mode_index, {vi32_1, vf32_1, vf32_2})));
+             f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL2Cost(mode_index, {vi32_1, vf32_1, v128_1, vf32_2})));
           }
         }
       } else {

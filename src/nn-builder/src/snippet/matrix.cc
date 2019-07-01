@@ -379,9 +379,10 @@ wabt::ExprList* MatrixSnippet::MatrixAbsSum(nn::ds::NDArray *matrix, wabt::Var r
 wabt::ExprList* MatrixSnippet::MatrixSquareSum(nn::ds::NDArray *matrix, wabt::Var result, std::vector<wabt::Var> locals) {
   MATRIX_CHECK(matrix);
 
-  assert(locals.size() == 2);
+  assert(locals.size() == 3);
   auto dst_addr = locals[0];
   auto cache = locals[1];
+  auto used_by_simd = locals[2];
 
   uint32_t type_size = TypeSize(Type::F32);
 
@@ -1040,6 +1041,47 @@ wabt::ExprList* MatrixSnippetSimd::MatrixAbsSum(nn::ds::NDArray *matrix, wabt::V
     auto type_size = TypeSize(Type::F32);
     Merge(e, GenerateDoWhileLoop(label_manager_, dst_addr, matrix->End(), type_size, {}, [&](BlockBody* b) {
       b->Insert(GenerateCompoundAssignment(result, Opcode::F32Add, MakeUnary(Opcode::F32Abs, MakeF32Load(MakeLocalGet(dst_addr)))));
+    }));
+  }
+  return e;
+}
+
+wabt::ExprList* MatrixSnippetSimd::MatrixSquareSum(nn::ds::NDArray *matrix, wabt::Var result,
+                                                   std::vector<wabt::Var> locals) {
+  MATRIX_CHECK(matrix);
+
+  // Cannot optimize
+  if(matrix->Memory()->Bytes() < WASMPP_V128_SIZE) {
+    return MatrixSnippet::MatrixAbsSum(matrix, result, locals);
+  }
+
+  assert(locals.size() == 3);
+  auto dst_addr = locals[0];
+  auto cache = locals[1];
+  auto v128_result = locals[2];
+
+  uint32_t simd_type_size = TypeSize(Type::V128);
+  auto remainder = matrix->Memory()->Bytes() % WASMPP_V128_SIZE;
+  auto dst_simd_end = matrix->Memory()->End() - remainder;
+
+  // Use SIMD while possible
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, MakeLocalSet(v128_result, MakeUnary(Opcode::F32X4Splat, MakeF32Const(0))));
+  Merge(e, GenerateRangeLoop(label_manager_, dst_addr, matrix->Begin(), dst_simd_end, simd_type_size, {}, [&](BlockBody* b) {
+    auto square = MakeBinary(Opcode::F32X4Mul, MakeV128Load(MakeLocalGet(dst_addr)), MakeV128Load(MakeLocalGet(dst_addr)));
+    b->Insert(GenerateCompoundAssignment(v128_result, Opcode::F32X4Add, square));
+  }));
+
+  // Store v128 into f32
+  Merge(e, MakeLocalSet(result, GenerateF32X4HorizontalLTRSum(v128_result)));
+
+  // Fallback to regular computation
+  if(remainder > 0) {
+    auto type_size = TypeSize(Type::F32);
+    Merge(e, GenerateDoWhileLoop(label_manager_, dst_addr, matrix->End(), type_size, {}, [&](BlockBody* b) {
+      b->Insert(MakeLocalSet(cache, MakeF32Load(MakeLocalGet(dst_addr))));
+      b->Insert(GenerateCompoundAssignment(result, Opcode::F32Add, MakeBinary(Opcode::F32Mul, MakeLocalGet(cache),
+                                                                              MakeLocalGet(cache))));
     }));
   }
   return e;
