@@ -117,6 +117,10 @@ public:
   // Sign right operand then add both operands
   virtual wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
                                              std::vector<wabt::Var> locals);
+
+  // Combine both add right sign scale and right scale
+  virtual wabt::ExprList* MatrixAddRightSignScaleAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                                                               float scale1, float scale2, std::vector<wabt::Var> locals);
 };
 
 class MatrixSnippetSimd : public MatrixSnippet {
@@ -164,6 +168,11 @@ public:
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
                                                   std::vector<wabt::Var> locals) override ;
+
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float addition
+  wabt::ExprList* MatrixAddRightSignScaleAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                                                       float scale1, float scale2, std::vector<wabt::Var> locals) override ;
 };
 
 #define MATRIX_CHECK(x) \
