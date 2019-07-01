@@ -8,6 +8,7 @@ namespace test {
 
 struct TestBuiltins {
   wabt::Var assert_matrix_eq;
+  wabt::Var assert_f32_eq;
 };
 
 #define NN_TEST(desc) \

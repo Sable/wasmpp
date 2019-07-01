@@ -335,6 +335,36 @@ void MatrixSnippetTest::MatrixVectorAddition_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixVectorAddition_1", Type::I32, Type::I32, Type::I32, Type::I32);
 }
 
+void MatrixSnippetTest::MatrixAbsSum_test_1() {
+  NN_TEST() {
+    auto vi32_1 = locals[0];
+    auto result = locals[1];
+
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(matrix, rows, cols);
+
+    float add = 0;
+    float mat_val = 1.2;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(matrix->GetLinearIndex({row, col})), MakeF32Const(mat_val)));
+        auto val = mat_val * (col % 2 == 0 ? 1 : -1);
+        add += abs(val);
+        mat_val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixAbsSum(matrix, result, {vi32_1}));
+    f.Insert(MakeCall(test_builtins_->assert_f32_eq, {
+      MakeF32Const(add),
+      MakeLocalGet(result)
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAbsSum_1", Type::I32, Type::F32);
+}
+
 void MatrixSnippetTest::MatrixHorizontalSum_test_1() {
   NN_TEST() {
     uint32_t rows = 5;

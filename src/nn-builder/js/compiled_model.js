@@ -779,6 +779,11 @@ class CompiledModel {
     };
 
     let test_imports = {
+      assert_f32_eq: (val1, val2) => {
+        if(val1 !== val2) {
+          console.error("F32 equality failed!", val1, "!=", val2);
+        }
+      },
       assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
         let mat1 = new Float32Array(this.Memory().buffer, mat1_index, rows * cols);
         let mat2 = new Float32Array(this.Memory().buffer, mat2_index, rows * cols);

@@ -25,6 +25,7 @@ public:
   void MatrixDotRT_test_1();
   void MatrixVectorAddition_test_1();
   void MatrixHorizontalSum_test_1();
+  void MatrixAbsSum_test_1();
 };
 
 class MatrixSnippetSimdTest {

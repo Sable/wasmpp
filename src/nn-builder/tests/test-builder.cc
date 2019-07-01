@@ -63,6 +63,8 @@ int main(int argc, char *argv[]) {
   nn::test::TestBuiltins test_builtins;
   test_builtins.assert_matrix_eq = module_manager.MakeFuncImport("Test", "assert_matrix_eq",
       {{wabt::Type ::I32, wabt::Type::I32, wabt::Type::I32, wabt::Type::I32},{}});
+  test_builtins.assert_f32_eq = module_manager.MakeFuncImport("Test", "assert_f32_eq",
+      {{wabt::Type ::F32, wabt::Type::F32},{}});
 
   // Allocate enough memory
   auto memory = module_manager.MakeMemory(500);
@@ -79,6 +81,7 @@ int main(int argc, char *argv[]) {
   matrix_snippet_test.MatrixDotRT_test_1();
   matrix_snippet_test.MatrixVectorAddition_test_1();
   matrix_snippet_test.MatrixHorizontalSum_test_1();
+  matrix_snippet_test.MatrixAbsSum_test_1();
 
   // Create matrix simd tests
   nn::test::MatrixSnippetSimdTest matrix_snippet_simd_test(&module_manager, &test_builtins);
