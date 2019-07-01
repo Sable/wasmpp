@@ -463,6 +463,42 @@ void MatrixSnippetTest::MatrixSubRightScale_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixSubRightScale_1", Type::I32, Type::I32, Type::F32);
 }
 
+void MatrixSnippetTest::MatrixAddRightSignScaleAddRightScale_test_1() {
+  NN_TEST() {
+    float scale1 = 0.01234;
+    float scale2 = 0.05678;
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        float s_val = val * (col %2 == 0 ? 1 : -1);
+        float s_scale = copysignf(1.0, s_val);
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        float add = (s_scale * scale1) + (s_val * scale2);
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(s_val + add)));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_.MatrixAddRightSignScaleAddRightScale(lhs, rhs, dst, scale1, scale2, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddRightSignScaleAddRightScale_1", Type::I32, Type::I32, Type::F32, Type::V128);
+}
+
 void MatrixSnippetTest::MatrixAddRightSignScale_test_1() {
   NN_TEST() {
     float scale = 0.01234;
@@ -1267,6 +1303,68 @@ void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
     }));
   };
   ADD_NN_TEST(module_manager_, "MatrixAddRightSignScaleSimd_1", Type::I32, Type::I32);
+}
+
+void MatrixSnippetSimdTest::MatrixAddRightSignScaleAddRightScale_test_1() {
+  NN_TEST() {
+    float scale1 = 0.01234;
+    float scale2 = 0.05678;
+
+    uint32_t rows = 13;
+    uint32_t cols = 21;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    uint32_t index = 0;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        float s_val = val * (index % 2 == 0 ? 1 : -1);
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        val++;
+        index++;
+      }
+    }
+
+    val = 1.2;
+    uint32_t i = 0;
+    index = 0;
+    auto end = rows * cols;
+    auto simd_end = end - end % 4;
+    for(; i < simd_end; i++) {
+      float s_val = val * (index % 2 == 0 ? 1 : -1);
+      signed int ge = (s_val >= 0 ? -1 : 0);
+      float cnvt = (float) ge;
+      float mul = cnvt * (2*scale1);
+      float add = scale1 + mul;
+      float rhs_scale2 = s_val * scale2;
+      float rhs_val = add + rhs_scale2;
+      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + rhs_val)));
+      index++;
+      val++;
+    }
+    for(; i < end; i++) {
+      float s_val = val * (index % 2 == 0 ? 1 : -1);
+      float s_scale = copysignf(1.0, s_val);
+      float rhs_val = (s_scale * scale1) + (s_val * scale2);
+      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + rhs_val)));
+      index++;
+      val++;
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixAddRightSignScaleAddRightScale(lhs, rhs, dst, scale1, scale2, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddRightSignScaleAddRightScaleSimd_1", Type::I32, Type::I32, Type::F32, Type::V128);
 }
 
 } // namespace test

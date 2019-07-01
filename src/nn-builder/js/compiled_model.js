@@ -142,9 +142,11 @@ class CompiledModel {
   _wasm = null;
   _imports = {};
   _logger = new ModelLogger();
+  static _memory;
 
   constructor(wasm) {
     this._wasm = wasm;
+    CompiledModel._memory = this.Exports().memory;
   }
 
   // Get exports from Wasm to JS
@@ -164,8 +166,8 @@ class CompiledModel {
     return null;
   }
 
-  Memory() {
-    return this.Exports().memory;
+  static Memory() {
+    return CompiledModel._memory;
   }
 
   _EncodeArray(data, entry_size, batch_size) {
@@ -701,8 +703,8 @@ class CompiledModel {
     console.log(pre_msg +". Make sure you compiled the model with the correct options.");
   }
 
-  _MakeF32Matrix(index, rows, cols) {
-    let view = new Float32Array(this.Memory().buffer, index);
+  static _MakeF32Matrix(index, rows, cols) {
+    let view = new Float32Array(CompiledModel.Memory().buffer, index);
     let table = [];
     for (let r = 0; r < rows; ++r) {
       table.push([]);
@@ -727,7 +729,7 @@ class CompiledModel {
         return new Date().getTime();
       },
       print_table_f32: (index, rows, cols) => {
-        console.table(this._MakeF32Matrix(index, rows, cols));
+        console.table(CompiledModel._MakeF32Matrix(index, rows, cols));
       }
     };
 
@@ -738,8 +740,8 @@ class CompiledModel {
         }
       },
       assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
-        let mat1 = new Float32Array(this.Memory().buffer, mat1_index, rows * cols);
-        let mat2 = new Float32Array(this.Memory().buffer, mat2_index, rows * cols);
+        let mat1 = new Float32Array(CompiledModel.Memory().buffer, mat1_index, rows * cols);
+        let mat2 = new Float32Array(CompiledModel.Memory().buffer, mat2_index, rows * cols);
         for (let i = 0; i < rows * cols; i++) {
           if (mat1[i] !== mat2[i]) {
             console.error("Matrix equality failed!");

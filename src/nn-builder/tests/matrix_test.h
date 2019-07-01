@@ -30,6 +30,7 @@ public:
   void MatrixAddRightScale_test_1();
   void MatrixSubRightScale_test_1();
   void MatrixAddRightSignScale_test_1();
+  void MatrixAddRightSignScaleAddRightScale_test_1();
 };
 
 class MatrixSnippetSimdTest {
@@ -57,6 +58,7 @@ public:
   void MatrixAddRightScaleSimd_test_1();
   void MatrixSubRightScaleSimd_test_1();
   void MatrixAddRightSignScaleSimd_test_1();
+  void MatrixAddRightSignScaleAddRightScale_test_1();
 };
 
 } // namespace test
