@@ -32,8 +32,14 @@ class MatrixSnippet : public Snippet {
 protected:
   // Apply an element wise binary operation
   // e.g. dst[i] = lhs[i] + rhs[i]
-  virtual wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray*
-  dst, std::vector<wabt::Var> locals);
+  virtual wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray*dst,
+                                                     std::vector<wabt::Var> locals);
+
+  // Apply an element wise binary scalar operation
+  // e.g. dst[i] = lhs[i] + (scalar * rhs[i])
+  virtual wabt::ExprList* ElementWiseBinaryScalarOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs,
+                                                           ds::NDArray*dst, wabt::ExprList* scalar,
+                                                           std::vector<wabt::Var> locals);
 
   // Apply an element wise function
   // e.g. dst[i] = func(args[0][i], args[1][i], ...)
@@ -101,9 +107,8 @@ public:
   virtual wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals);
 
   // Scale right operand then add both operands
-  // TODO Merge Matrix[Add/Sub]RightScalar using a ElementBinaryRightScalar
-  virtual wabt::ExprList* MatrixAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
-                                              std::vector<wabt::Var> locals);
+  virtual wabt::ExprList* MatrixAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
+                                              wabt::ExprList* scalar, std::vector<wabt::Var> locals);
 
   // Scale right operand then sub both operands
   virtual wabt::ExprList* MatrixSubRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
@@ -118,6 +123,10 @@ class MatrixSnippetSimd : public MatrixSnippet {
 private:
   wabt::ExprList* ElementWiseBinaryOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
                                              std::vector<wabt::Var> locals) override;
+
+  wabt::ExprList* ElementWiseBinaryScalarOperation(wabt::Opcode op, ds::NDArray* lhs, ds::NDArray* rhs,
+                                                   ds::NDArray*dst, wabt::ExprList* scalar,
+                                                   std::vector<wabt::Var> locals) override;
 
   wabt::ExprList* MatrixVectorBinaryOperation(wabt::Opcode op, ds::NDArray* matrix, ds::NDArray* vector,
                                               ds::NDArray* dst_matrix, std::vector<wabt::Var> locals) override;
@@ -150,14 +159,6 @@ public:
   // The SIMD version of this function generates a result slightly different
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals) override ;
-
-  // The SIMD version of this function generates exact results as the non-SIMD
-  wabt::ExprList* MatrixAddRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
-                                      std::vector<wabt::Var> locals) override ;
-
-  // The SIMD version of this function generates exact results as the non-SIMD
-  wabt::ExprList* MatrixSubRightScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst,
-                                      wabt::ExprList* scalar, std::vector<wabt::Var> locals) override ;
 
   // The SIMD version of this function generates exact results as the non-SIMD
   wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,

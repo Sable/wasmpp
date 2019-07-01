@@ -288,8 +288,9 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
       END_TIME(C_2)
       START_TIME()
       if(NetworkModel()->L2Regularizer() > 0) {
-        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightScale(dW_, W_, dW_, NetworkModel()->L2Regularizer(),
-                                                                        {vi32_1, vi32_2}));
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightScale(dW_, W_, dW_,
+                                                                        MakeF32Const(NetworkModel()->L2Regularizer()),
+                                                                        {vi32_1, vi32_2, vf32_1}));
       }
       END_TIME(C_3)
       START_TIME()
