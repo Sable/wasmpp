@@ -141,16 +141,17 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
 wabt::ExprList* FullyConnectedLayer::ComputeL1Cost(uint8_t mode_index, std::vector<Var> locals) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
 
-  assert(locals.size() == 2);
+  assert(locals.size() == 3);
   auto vi32_1 = locals[0];
-  auto result = locals[1];
+  auto v128_1 = locals[1];
+  auto result = locals[2];
 
   // Compute l1_loss
   // (l1_decay/2m) SUM(ABS(W[l]))
   // 1) local = SUM(ABS(W[l]))
   // 2) local = (l1_decay/2m) local
   ExprList* e = new ExprList();
-  Merge(e, NetworkModel()->Snippets().matrix->MatrixAbsSum(W_, result, {vi32_1}));
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixAbsSum(W_, result, {vi32_1, v128_1}));
   Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L1Regularizer() /
                                                                            (2 * NetworkModel()->BatchSzie(mode_index)))));
   Merge(e, MakeLocalGet(result));

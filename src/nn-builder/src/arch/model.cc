@@ -309,14 +309,15 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 }
 
 wabt::Var Model::ComputeCostFunction(uint8_t mode_index) {
-  std::vector<Type> locals = {Type::F32, Type::I32, Type::F32, Type::F32};
+  std::vector<Type> locals = {Type::F32, Type::I32, Type::F32, Type::F32, V128_IF_SIMD(Type::I32)};
   return module_manager_.MakeFunction(nullptr, {{Type::I32}, {Type::F32}}, locals,
                                       [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-    assert(locals.size() == 4);
+    assert(locals.size() == 5);
     auto cost = locals[0];
     auto vi32_1 = locals[1];
     auto vf32_1 = locals[2];
     auto vf32_2 = locals[3];
+    auto v128_1 = locals[4];
 
     assert(params.size() == 1);
     auto target_begin = params[0];
@@ -334,7 +335,7 @@ wabt::Var Model::ComputeCostFunction(uint8_t mode_index) {
 
           // Compute L1 cost
           if(L1Regularizer() > 0) {
-            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL1Cost(mode_index, {vi32_1, vf32_1})));
+            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL1Cost(mode_index, {vi32_1, v128_1, vf32_1})));
           }
 
           // Compute L2 cost
