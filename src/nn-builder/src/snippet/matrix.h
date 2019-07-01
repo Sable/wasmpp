@@ -160,7 +160,8 @@ public:
   // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixSquareSum(ds::NDArray* matrix, wabt::Var result, std::vector<wabt::Var> locals) override ;
 
-  // The SIMD version of this function generates exact results as the non-SIMD
+  // The SIMD version of this function generates a result slightly different
+  // than the non-SIMD one because of the order of float addition
   wabt::ExprList* MatrixAddRightSignScale(ds::NDArray* lhs, ds::NDArray* rhs, ds::NDArray* dst, float scale,
                                                   std::vector<wabt::Var> locals) override ;
 };

@@ -1181,14 +1181,14 @@ ExprList* MatrixSnippetSimd::MatrixAddRightSignScale(ds::NDArray *lhs, ds::NDArr
     auto lhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(lhs->Memory()->Begin()), MakeLocalGet(addr));
     auto rhs_addr = MakeBinary(Opcode::I32Add, MakeI32Const(rhs->Memory()->Begin()), MakeLocalGet(addr));
     // Compute right sign scale
-    // 1) [-1, 2, -3, 4] >= [0, 0, 0, 0]      = [0, 1, 0, 1]
-    // 2) [0, 1, 0, 1]      to-float          = [0.0, 1.0. 0.0, 1.0]
-    // 3) [0, 1, 0, 1]   *  [2s, 2s, 2s, 2s]  = [0, 2s, 0, 2s]
-    // 4) [0, 2s, 0, 2s] -  [s, s, s, s]      = [-s, s, -s, s]
+    // 1) [-1, 2, -3, 4]          >=        [0, 0, 0, 0]      = [0, -1, 0, -1]
+    // 2) [0, -1, 0, -1]          to-float                    = [0.0, -1.0. 0.0, -1.0]
+    // 3) [0.0, -1.0, 0.0, 1.0]   *         [2s, 2s, 2s, 2s]  = [0, -2s, 0, -2s]
+    // 4) [0, -2s, 0, -2s]        +         [s, s, s, s]      = [-s, s, -s, s]
     auto rhs_ge = MakeBinary(Opcode::F32X4Ge, MakeV128Load(rhs_addr), MakeUnary(Opcode::F32X4Splat, MakeF32Const(0)));
     auto rhs_cnvt = MakeUnary(Opcode::F32X4ConvertI32X4S, rhs_ge);
     auto rhs_mul = MakeBinary(Opcode::F32X4Mul, rhs_cnvt, MakeUnary(Opcode::F32X4Splat, MakeF32Const(2*scale)));
-    auto rhs_add = MakeBinary(Opcode::F32X4Sub, rhs_mul, MakeUnary(Opcode::F32X4Splat, MakeF32Const(scale)));
+    auto rhs_add = MakeBinary(Opcode::F32X4Add, rhs_mul, MakeUnary(Opcode::F32X4Splat, MakeF32Const(scale)));
     b->Insert(MakeV128Store(MakeLocalGet(dst_addr), MakeBinary(Opcode::F32X4Add, MakeV128Load(lhs_addr), rhs_add)));
     // Move to next elements
     b->Insert(GenerateCompoundAssignment(addr, Opcode::I32Add, MakeI32Const(simd_type_size)));

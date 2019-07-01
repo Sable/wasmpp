@@ -1147,6 +1147,63 @@ void MatrixSnippetSimdTest::MatrixSquareSumSimd_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixSquareSumSimd_1", Type::I32, Type::F32, Type::V128, Type::F32);
 }
 
+void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
+  NN_TEST() {
+    float scale = 0.01234;
+    uint32_t rows = 5;
+    uint32_t cols = 10;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    uint32_t index = 0;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        float s_val = val * (index % 2 == 0 ? 1 : -1);
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(s_val)));
+        val++;
+        index++;
+      }
+    }
+
+    val = 1.2;
+    uint32_t i = 0;
+    float v128[4] = {0, 0, 0, 0};
+    auto end = rows * cols;
+    auto simd_end = end - end % 4;
+    for(; i < simd_end; i++) {
+      float s_val = val * (index % 2 == 0 ? 1 : -1);
+      signed int ge = (s_val >= 0 ? -1 : 0);
+      float cnvt = (float) ge;
+      float mul = cnvt * (2*scale);
+      float add = scale + mul;
+      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + add)));
+      index++;
+      val++;
+    }
+    for(; i < end; i++) {
+      float s_val = val * (index % 2 == 0 ? 1 : -1);
+      float s_scale = copysignf(1.0, s_val);
+      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + (s_scale * scale))));
+      index++;
+      val++;
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixAddRightSignScale(lhs, rhs, dst, scale, locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddRightSignScaleSimd_1", Type::I32, Type::I32);
+}
+
 } // namespace test
 } // namespace nn
 
