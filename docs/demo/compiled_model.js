@@ -74,7 +74,10 @@ class ModelLogger {
     console.log("\n>> Backward algorithm steps time:");
   }
   log_backward_A(time) {
-    console.log("A) dA[L] = L(T, A[L]):", time);
+    console.log("A) dA[L] = dJ(T, A[L]):", time);
+  }
+  log_backward_B_Softmax(time) {
+    console.log("B) [Softmax] dZ[L] = dJ(T, A[L]):", time);
   }
   log_backward_B_1(time) {
     console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
@@ -84,11 +87,17 @@ class ModelLogger {
     console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
   }
   log_backward_C_1(time) {
-    console.log("C) dW[l] = (1/m) dZ[l] . A[l-1]^T");
+    console.log("C) dW[l] = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))");
     console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
   }
   log_backward_C_2(time) {
-    console.log("    2) dW[l] = (1/m) dW[l]:", time);
+    console.log("    2) dW[l] = dW[l] + l1_decay sign(W[l]):", time);
+  }
+  log_backward_C_3(time) {
+    console.log("    3) dW[l] = dW[l] + l2_decay W[l]:", time);
+  }
+  log_backward_C_4(time) {
+    console.log("    4) dW[l] = (1/m) dW[l]:", time);
   }
   log_backward_D_1(time) {
     console.log("D) db[l] = (1/m) dZ[l]");
@@ -100,19 +109,11 @@ class ModelLogger {
   log_backward_E(time) {
     console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
   }
-  log_backward_F_1(time) {
-    console.log("F) W[l] = W[l] - alpha * dW[l]");
-    console.log("    1) dW[l] = alpha * dW[l]:", time);
+  log_backward_F(time) {
+    console.log("F) W[l] = W[l] - alpha * dW[l]:", time);
   }
-  log_backward_F_2(time) {
-    console.log("    2) W[l] = W[l] - dW[l]:", time);
-  }
-  log_backward_G_1(time) {
-    console.log("G) b[l] = b[l] - alpha * db[l]");
-    console.log("    1) db[l] = alpha * db[l]:", time);
-  }
-  log_backward_G_2(time) {
-    console.log("    2) b[l] = b[l] - db[l]:", time);
+  log_backward_G(time) {
+    console.log("G) b[l] = b[l] - alpha * db[l]:", time);
   }
 }
 
@@ -154,6 +155,14 @@ class CompiledModel {
       return null;
     }
     return this._wasm.instance.exports;
+  }
+
+  _CallExport(key, ...args) {
+    if(key in this.Exports()) {
+      return this.Exports()[key].apply(null, args);
+    }
+    this._WarnNotFound("Function '"+key+"' not found")
+    return null;
   }
 
   // Get imports from JS to Wasm
@@ -543,7 +552,7 @@ class CompiledModel {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_forward_")) {
-        this._logger[func](this.Exports()[func]());
+        this._logger[func](this._CallExport(func));
         found = true;
       }
     });
@@ -586,29 +595,11 @@ class CompiledModel {
     }
   }
 
-  _LogPredictionResultTemplate(key, msg) {
-    let batch_size = this._PredictionBatchSize();
-    let output_size = this._LayerSize(this._TotalLayers() - 1);
-    if(key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[key](), output_size, batch_size));
-    } else {
-      this._WarnNotFound(msg);
-    }
-  }
-
   _LogPredictionResult() {
-    this._LogPredictionResultTemplate("prediction_result_offset", 
-      "Prediction result function not found");
-  }
-
-  _LogPredictionSoftmaxResult() {
-    this._LogPredictionResultTemplate("prediction_softmax_result_offset", 
-      "Prediction softmax result function not found");
-  }
-
-  _LogPredictionHardmaxResult() {
-    this._LogPredictionResultTemplate("prediction_hardmax_result_offset", 
-      "Prediction hardmax result function not found");
+    let offset = this._CallExport("prediction_result_offset");
+    if(offset != null) {
+      console.table(this._MakeF32Matrix(offset, this._LayerSize(this._TotalLayers() - 1), this._PredictionBatchSize()));
+    }
   }
 
   // Run unit test Wasm function
@@ -638,7 +629,6 @@ class CompiledModel {
     config                  = config                  || {};
     config.log_time         = config.log_time         || false;
     config.log_result       = config.log_result       || false;
-    config.result_mode      = config.result_mode      || "default";
 
     // Prediction results
     let pred_time = 0.0;
@@ -655,13 +645,7 @@ class CompiledModel {
         pred_time += this._PredictionTime();
       }
       if(config.log_result) {
-        if(config.result_mode === "softmax") {
-          this._LogPredictionSoftmaxResult();
-        } else if(config.result_mode === "hardmax") {
-          this._LogPredictionHardmaxResult();
-        } else {
-          this._LogPredictionResult();
-        }
+        this._LogPredictionResult();
       }
     }
     // Log prediction details
@@ -787,6 +771,11 @@ class CompiledModel {
     };
 
     let test_imports = {
+      assert_f32_eq: (val1, val2) => {
+        if(val1 !== val2) {
+          console.error("F32 equality failed!", val1, "!=", val2);
+        }
+      },
       assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
         let mat1 = new Float32Array(this.Memory().buffer, mat1_index, rows * cols);
         let mat2 = new Float32Array(this.Memory().buffer, mat2_index, rows * cols);
