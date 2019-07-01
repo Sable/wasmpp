@@ -91,7 +91,13 @@ class ModelLogger {
     console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
   }
   log_backward_C_2(time) {
-    console.log("    2) dW[l] = (1/m) dW[l]:", time);
+    console.log("    2) dW[l] = dW[l] + l1_decay sign(W[l]):", time);
+  }
+  log_backward_C_3(time) {
+    console.log("    3) dW[l] = dW[l] + l2_decay W[l]:", time);
+  }
+  log_backward_C_4(time) {
+    console.log("    4) dW[l] = (1/m) dW[l]:", time);
   }
   log_backward_D_1(time) {
     console.log("D) db[l] = (1/m) dZ[l]");

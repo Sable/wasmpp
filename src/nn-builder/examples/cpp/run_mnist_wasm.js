@@ -32,7 +32,7 @@ if(process.argv.length > 2) {
     // Encode data
     let training = compiled_model.EncodeTrainingData(train_data, train_labels);
     let testing = compiled_model.EncodeTestingData(test_data, test_labels);
-    let prediction = compiled_model.EncodePredictionData(train_data);
+    let prediction = compiled_model.EncodePredictionData([train_data[0]]);
 
     console.log("Training ...");
     compiled_model.Train(training, {
