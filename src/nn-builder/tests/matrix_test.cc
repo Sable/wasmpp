@@ -1147,9 +1147,75 @@ void MatrixSnippetSimdTest::MatrixSquareSumSimd_test_1() {
   ADD_NN_TEST(module_manager_, "MatrixSquareSumSimd_1", Type::I32, Type::F32, Type::V128, Type::F32);
 }
 
+void MatrixSnippetSimdTest::MatrixAddRightScaleSimd_test_1() {
+  NN_TEST() {
+    float scale = 0.01234;
+    uint32_t rows = 13;
+    uint32_t cols = 21;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val + (val * scale))));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixAddRightScale(lhs, rhs, dst, MakeF32Const(scale), locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixAddRightScaleSimd_1", Type::I32, Type::I32, Type::F32);
+}
+
+void MatrixSnippetSimdTest::MatrixSubRightScaleSimd_test_1() {
+  NN_TEST() {
+    float scale = 0.01234;
+    uint32_t rows = 13;
+    uint32_t cols = 21;
+
+    NEW_MATRIX(lhs, rows, cols);
+    NEW_MATRIX(rhs, rows, cols);
+    NEW_MATRIX(dst, rows, cols);
+    NEW_MATRIX(expected, rows, cols);
+
+    float val = 1.2;
+    for (uint32_t row = 0; row < rows; row++) {
+      for (uint32_t col = 0; col < cols; col++) {
+        f.Insert(MakeF32Store(MakeI32Const(lhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(rhs->GetLinearIndex({row, col})), MakeF32Const(val)));
+        f.Insert(MakeF32Store(MakeI32Const(expected->GetLinearIndex({row, col})), MakeF32Const(val - (val * scale))));
+        val++;
+      }
+    }
+
+    f.Insert(matrix_snippet_simd_.MatrixSubRightScale(lhs, rhs, dst, MakeF32Const(scale), locals));
+    f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
+        MakeI32Const(dst->Memory()->Begin()),
+        MakeI32Const(expected->Memory()->Begin()),
+        MakeI32Const(dst->Shape()[0]),
+        MakeI32Const(dst->Shape()[1])
+    }));
+  };
+  ADD_NN_TEST(module_manager_, "MatrixSubRightScaleSimd_1", Type::I32, Type::I32, Type::F32);
+}
+
 void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
   NN_TEST() {
     float scale = 0.01234;
+
+    // TODO Fails on 13 , 21
     uint32_t rows = 5;
     uint32_t cols = 10;
 

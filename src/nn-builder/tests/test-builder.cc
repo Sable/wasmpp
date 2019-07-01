@@ -102,8 +102,8 @@ int main(int argc, char *argv[]) {
   matrix_snippet_simd_test.MatrixHorizontalSumSimd_test_1();
   matrix_snippet_simd_test.MatrixAbsSumSimd_test_1();
   matrix_snippet_simd_test.MatrixSquareSumSimd_test_1();
-//  matrix_snippet_simd_test.MatrixAddRightScaleSimd_test_1();
-//  matrix_snippet_simd_test.MatrixSubRightScaleSimd_test_1();
+  matrix_snippet_simd_test.MatrixAddRightScaleSimd_test_1();
+  matrix_snippet_simd_test.MatrixSubRightScaleSimd_test_1();
   matrix_snippet_simd_test.MatrixAddRightSignScaleSimd_test_1();
 
   assert(module_manager.Validate());
