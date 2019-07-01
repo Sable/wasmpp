@@ -139,12 +139,7 @@ class CompiledModel {
   _imports = {};
   _logger = new ModelLogger();
 
-  constructor() {
-    this._imports = this._InitImports();
-  }
-
-  // Set the wasm instance
-  SetWasm(wasm) {
+  constructor(wasm) {
     this._wasm = wasm;
   }
 
@@ -163,11 +158,6 @@ class CompiledModel {
     }
     this._WarnNotFound("Function '"+key+"' not found")
     return null;
-  }
-
-  // Get imports from JS to Wasm
-  Imports() {
-    return this._imports;
   }
 
   Memory() {
@@ -753,7 +743,7 @@ class CompiledModel {
   }
 
   // Initialize imports
-  _InitImports() {
+  static Imports() {
     let math_imports = {
       exp: Math.exp,
       log: Math.log,
