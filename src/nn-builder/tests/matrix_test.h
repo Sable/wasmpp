@@ -28,6 +28,7 @@ public:
   void MatrixAbsSum_test_1();
   void MatrixSquareSum_test_1();
   void MatrixAddRightScale_test_1();
+  void MatrixSubRightScale_test_1();
   void MatrixAddRightSignScale_test_1();
 };
 
@@ -51,6 +52,11 @@ public:
   void MatrixDotRTSimd_test_2();
   void MatrixVectorAdditionSimd_test_1();
   void MatrixHorizontalSumSimd_test_1();
+  void MatrixAbsSumSimd_test_1();
+  void MatrixSquareSumSimd_test_1();
+  void MatrixAddRightScaleSimd_test_1();
+  void MatrixSubRightScaleSimd_test_1();
+  void MatrixAddRightSignScaleSimd_test_1();
 };
 
 } // namespace test
