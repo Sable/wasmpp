@@ -26,12 +26,9 @@ struct ModelBytecodeOptions {
   bool gen_training_accuracy            = false;
   bool gen_training_error               = false;
   bool gen_training_confusion_matrix    = false;
-  bool gen_training_time                = true;
   bool gen_testing_accuracy             = false;
   bool gen_testing_error                = false;
   bool gen_testing_confusion_matrix     = false;
-  bool gen_testing_time                 = true;
-  bool gen_prediction_time              = true;
   bool gen_forward_profiling            = false;
   bool gen_backward_profiling           = false;
   bool use_simd                         = false;
@@ -120,14 +117,11 @@ private:
   float l2_regularizer_ = 0.0;
 
   // Model members
-  wasmpp::Memory* learning_rate_ = nullptr;
+  wasmpp::Memory* learning_rate_  = nullptr;
   wasmpp::Memory* training_error_ = nullptr;
-  wasmpp::Memory* training_hits_ = nullptr;
-  wasmpp::Memory* training_time_ = nullptr;
-  wasmpp::Memory* testing_hits_ = nullptr;
-  wasmpp::Memory* testing_error_ = nullptr;
-  wasmpp::Memory* testing_time_ = nullptr;
-  wasmpp::Memory* prediction_time_ = nullptr;
+  wasmpp::Memory* training_hits_  = nullptr;
+  wasmpp::Memory* testing_hits_   = nullptr;
+  wasmpp::Memory* testing_error_  = nullptr;
   DenseForwardTimeMembers dense_forward_logging_members_;
   DenseBackwardTimeMembers dense_backward_logging_members_;
 

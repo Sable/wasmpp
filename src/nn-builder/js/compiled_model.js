@@ -277,18 +277,18 @@ class CompiledModel {
 
     // Update learning rate
     this._SetLearningRate(config.learning_rate);
- 
-    // Register the total training time
+
+    // Training variables
     let total_time = 0.0;
+    let data_offset = this._TrainingDataOffset();
+    let labels_offset = this._TrainingLabelsOffset();
 
     // Train for each epoch
     for(let e=0; e < config.epochs; e++) {
-      // Epoch results
+      // Epoch variables
       let total_hits = 0;
       let average_cost = 0.0;
-      let train_time = 0.0;
-      let data_offset = this._TrainingDataOffset();
-      let labels_offset = this._TrainingLabelsOffset();
+      let epoch_time = new Date().getTime();
       for(let i=0; i < number_of_batches; i += batches_in_memory) {
         // Load new batches in memory and train
         let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
@@ -303,12 +303,10 @@ class CompiledModel {
         if(config.log_error) {
           average_cost += this._TrainingBatchesError();
         }
-        if(config.log_time) {
-          train_time += this._TrainingTime();
-        }
       }
-      // Update total time
-      total_time += train_time;
+      // Update time
+      epoch_time = new Date().getTime() - epoch_time;
+      total_time += epoch_time;
       // Log after end of epoch
       if(config.log_epoch_num) {
         console.log("Epoch",e+1);
@@ -320,7 +318,7 @@ class CompiledModel {
         console.log(">> Error:     ", average_cost / number_of_batches);
       }
       if(config.log_time) {
-        console.log(">> Epoch time:", train_time, "ms");
+        console.log(">> Epoch time:", epoch_time, "ms");
         console.log(">> Total time:", total_time, "ms");
       }
     }
@@ -356,9 +354,9 @@ class CompiledModel {
     // Testing results
     let total_hits = 0;
     let average_cost = 0.0;
-    let test_time = 0.0;
     let data_offset = this._TestingDataOffset();
     let labels_offset = this._TestingLabelsOffset();
+    let test_time = new Date().getTime();
     for(let i=0; i < number_of_batches; i += batches_in_memory) {
       // Load new batches in memory and test
       let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
@@ -373,10 +371,9 @@ class CompiledModel {
       if(config.log_error) {
         average_cost += this._TestingBatchesError();
       }
-      if(config.log_time) {
-        test_time += this._TestingTime();
-      }
     }
+    // Update time
+    test_time = new Date().getTime() - test_time;
     // Log testing results
     if(config.log_accuracy) {
       console.log(">> Test Accuracy:  ", total_hits / input.x_count);
@@ -449,36 +446,6 @@ class CompiledModel {
 
   _TestingLabelsOffset() {
     return this.Exports().testing_labels_offset();
-  }
-
-  _TrainingTime() {
-    let key = "training_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Training time function not found");
-    }
-    return 0;
-  }
-
-  _TestingTime() {
-    let key = "testing_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Testing time function not found");
-    }
-    return 0;
-  }
-
-  _PredictionTime() {
-    let key = "prediction_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Prediction time function not found");
-    }
-    return 0;
   }
 
   _TrainingBatchesAccuracy() {
@@ -621,8 +588,8 @@ class CompiledModel {
     config.log_result       = config.log_result       || false;
 
     // Prediction results
-    let pred_time = 0.0;
     let data_offset = this._PredictionDataOffset();
+    let pred_time = new Date().getTime();
     for(let i=0; i < number_of_batches; i++) {
       // Load new batches in memory and predict
       this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
@@ -631,13 +598,13 @@ class CompiledModel {
       this.Exports().predict_batch();
 
       // Log result
-      if(config.log_time) {
-        pred_time += this._PredictionTime();
-      }
       if(config.log_result) {
         this._LogPredictionResult();
       }
     }
+    // Update time
+    pred_time = new Date().getTime() - pred_time;
+
     // Log prediction details
     if(config.log_time) {
       console.log(">> Prediction time:", pred_time, "ms");
