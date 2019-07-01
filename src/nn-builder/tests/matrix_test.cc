@@ -339,7 +339,8 @@ void MatrixSnippetTest::MatrixVectorAddition_test_1() {
 void MatrixSnippetTest::MatrixAbsSum_test_1() {
   NN_TEST() {
     auto vi32_1 = locals[0];
-    auto result = locals[1];
+    auto v128_1 = locals[1];
+    auto result = locals[2];
 
     uint32_t rows = 5;
     uint32_t cols = 10;
@@ -357,20 +358,21 @@ void MatrixSnippetTest::MatrixAbsSum_test_1() {
       }
     }
 
-    f.Insert(matrix_snippet_.MatrixAbsSum(matrix, result, {vi32_1}));
+    f.Insert(matrix_snippet_.MatrixAbsSum(matrix, result, {vi32_1, v128_1}));
     f.Insert(MakeCall(test_builtins_->assert_f32_eq, {
       MakeF32Const(add),
       MakeLocalGet(result)
     }));
   };
-  ADD_NN_TEST(module_manager_, "MatrixAbsSum_1", Type::I32, Type::F32);
+  ADD_NN_TEST(module_manager_, "MatrixAbsSum_1", Type::I32, Type::V128, Type::F32);
 }
 
 void MatrixSnippetTest::MatrixSquareSum_test_1() {
   NN_TEST() {
     auto vi32_1 = locals[0];
     auto vf32_1 = locals[1];
-    auto result = locals[2];
+    auto v128_1 = locals[2];
+    auto result = locals[3];
 
     uint32_t rows = 5;
     uint32_t cols = 10;
@@ -388,13 +390,13 @@ void MatrixSnippetTest::MatrixSquareSum_test_1() {
       }
     }
 
-    f.Insert(matrix_snippet_.MatrixSquareSum(matrix, result, {vi32_1, vf32_1}));
+    f.Insert(matrix_snippet_.MatrixSquareSum(matrix, result, {vi32_1, vf32_1, v128_1}));
     f.Insert(MakeCall(test_builtins_->assert_f32_eq, {
         MakeF32Const(add),
         MakeLocalGet(result)
     }));
   };
-  ADD_NN_TEST(module_manager_, "MatrixSquareSum_1", Type::I32, Type::F32, Type::F32);
+  ADD_NN_TEST(module_manager_, "MatrixSquareSum_1", Type::I32, Type::F32, Type::V128, Type::F32);
 }
 
 void MatrixSnippetTest::MatrixAddRightScale_test_1() {
@@ -418,7 +420,7 @@ void MatrixSnippetTest::MatrixAddRightScale_test_1() {
       }
     }
 
-    f.Insert(matrix_snippet_.MatrixAddRightScale(lhs, rhs, dst, scale, locals));
+    f.Insert(matrix_snippet_.MatrixAddRightScale(lhs, rhs, dst, MakeF32Const(scale), locals));
     f.Insert(MakeCall(test_builtins_->assert_matrix_eq, {
         MakeI32Const(dst->Memory()->Begin()),
         MakeI32Const(expected->Memory()->Begin()),
@@ -426,7 +428,7 @@ void MatrixSnippetTest::MatrixAddRightScale_test_1() {
         MakeI32Const(dst->Shape()[1])
     }));
   };
-  ADD_NN_TEST(module_manager_, "MatrixAddRightScale_1", Type::I32, Type::I32);
+  ADD_NN_TEST(module_manager_, "MatrixAddRightScale_1", Type::I32, Type::I32, Type::F32);
 }
 
 void MatrixSnippetTest::MatrixAddRightSignScale_test_1() {
