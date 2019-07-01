@@ -48,6 +48,17 @@ wabt::ExprList* Model::GetLearningRate() {
   return MakeF32Load(MakeI32Const(learning_rate_->Begin()));
 }
 
+uint32_t Model::BatchSzie(uint8_t mode_index) const {
+  if(mode_index == Mode::Training) {
+    return TrainingBatchSize();
+  }
+  if(mode_index == Mode::Testing) {
+    return TestingBatchesInMemory();
+  }
+  assert(mode_index == Mode::Prediction);
+  return PredictionBatchSize();
+}
+
 void Model::SetLayers(std::vector<Layer *> layers) {
   ERROR_UNLESS(layers.size() >= 2, "At least an input and output layer should be defined");
   for(uint32_t index = 0; index < layers.size(); index++) {
@@ -68,25 +79,6 @@ void Model::SetLayers(std::vector<Layer *> layers) {
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     f.Insert(MakeI32Const((uint32_t)layers_.size()));
   });
-
-  // Overwrite some configuration as needed
-  if(layers.back()->Type() == FullyConnected) {
-    auto out_layer = static_cast<DenseOutputLayer*>(layers.back());
-    if(options_.bytecode_options.gen_training_confusion_matrix || options_.bytecode_options.gen_training_accuracy) {
-      out_layer->Hardmax(Training);
-    }
-    if(options_.bytecode_options.gen_testing_confusion_matrix || options_.bytecode_options.gen_testing_accuracy) {
-      out_layer->Hardmax(Testing);
-    }
-    if(options_.bytecode_options.gen_prediction_results_softmax) {
-      out_layer->Softmax(Prediction);
-    }
-    if(options_.bytecode_options.gen_prediction_results_hardmax) {
-      out_layer->Hardmax(Prediction);
-    }
-  } else {
-    assert(!"Not implemented!");
-  }
 }
 
 Model::Model(ModelOptions options) : options_(options), builtins_(options_.activation_options) {
@@ -100,19 +92,29 @@ Model::Model(ModelOptions options) : options_(options), builtins_(options_.activ
 }
 
 void Model::Build(uint32_t training_batch_size, uint32_t training_batches_in_memory, uint32_t testing_batch_size,
-                       uint32_t testing_batches_in_memory, uint32_t prediction_batch_size,
-                       nn::builtins::LossFunction loss) {
+                  uint32_t testing_batches_in_memory, uint32_t prediction_batch_size, nn::builtins::LossFunction loss,
+                  float l1_regularizer, float l2_regularizer) {
   ERROR_UNLESS(training_batch_size >= 1, "training batch size must be at least 1");
   ERROR_UNLESS(testing_batch_size >= 1, "testing batch size must be at least 1");
   ERROR_UNLESS(prediction_batch_size >= 1, "prediction batch size must be at least 1");
   ERROR_UNLESS(training_batches_in_memory >= 1, "training batches in memory must be at least 1");
   ERROR_UNLESS(testing_batches_in_memory >= 1, "testing batches in memory must be at least 1");
+  ERROR_UNLESS(l1_regularizer >= 0, "l1 regularizer cannot be negative");
+  ERROR_UNLESS(l2_regularizer >= 0, "l2 regularizer cannot be negative");
   training_batch_size_ = training_batch_size;
   training_batches_in_memory_ = training_batches_in_memory;
   testing_batch_size_ = testing_batch_size;
   testing_batches_in_memory_ = testing_batches_in_memory;
   prediction_batch_size_ = prediction_batch_size;
+  l1_regularizer_ = l1_regularizer;
+  l2_regularizer_ = l2_regularizer;
   loss_ = loss;
+
+  // Validate all layers now that
+  // all parameters has been set
+  for(auto &layer : layers_) {
+    layer->Validate();
+  }
 
   AllocateMemory();
   MakeLayersFunctions();
@@ -170,14 +172,11 @@ void Model::AllocateMemory() {
 }
 
 void Model::AllocateMembers() {
-  learning_rate_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-  training_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-  training_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-  training_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
-  testing_hits_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-  testing_error_ = module_manager_.Memory().Allocate(TypeSize(Type::F32));
-  testing_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
-  prediction_time_ = module_manager_.Memory().Allocate(TypeSize(Type::F64));
+  learning_rate_            = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  training_hits_            = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  training_error_           = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  testing_hits_             = module_manager_.Memory().Allocate(TypeSize(Type::F32));
+  testing_error_            = module_manager_.Memory().Allocate(TypeSize(Type::F32));
 #define ALLOCATE_TIME_MEMBERS(name) \
   dense_forward_logging_members_.name = module_manager_.Memory().Allocate(TypeSize(Type::F64));
   DENSE_FORWARD_TIME_MEMBERS(ALLOCATE_TIME_MEMBERS)
@@ -306,6 +305,51 @@ wabt::Var Model::CountCorrectPredictionsFunction(uint8_t mode_index) {
 
 }
 
+wabt::Var Model::ComputeCostFunction(uint8_t mode_index) {
+  std::vector<Type> locals = {Type::F32, Type::I32, Type::F32, Type::F32, V128_IF_SIMD(Type::I32)};
+  return module_manager_.MakeFunction(nullptr, {{Type::I32}, {Type::F32}}, locals,
+                                      [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
+    assert(locals.size() == 5);
+    auto cost = locals[0];
+    auto vi32_1 = locals[1];
+    auto vf32_1 = locals[2];
+    auto vf32_2 = locals[3];
+    auto v128_1 = locals[4];
+
+    assert(params.size() == 1);
+    auto target_begin = params[0];
+
+    for(auto &layer : layers_) {
+      if(layer->Type() == FullyConnected) {
+        if(layer->Position() != Input) {
+          auto fc_layer = static_cast<FullyConnectedLayer*>(layer);
+
+          // Compute cost
+          if(fc_layer->Position() == Output) {
+            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, static_cast<DenseOutputLayer*>(fc_layer)
+                ->ComputeCost(mode_index, target_begin)));
+          }
+
+          // Compute L1 cost
+          if(L1Regularizer() > 0) {
+            f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL1Cost(mode_index, {vi32_1, v128_1, vf32_1})));
+          }
+
+          // Compute L2 cost
+          if(L2Regularizer() > 0) {
+             f.Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, fc_layer->ComputeL2Cost(mode_index, {vi32_1, vf32_1, v128_1, vf32_2})));
+          }
+        }
+      } else {
+        assert(!"Not implemented!");
+      }
+    }
+
+    // Return final cost
+    f.Insert(MakeLocalGet(cost));
+  });
+}
+
 void Model::MakeData() {
   Var memory = module_manager_.MakeMemory(module_manager_.Memory().Pages());
   module_manager_.MakeMemoryExport("memory", memory);
@@ -325,6 +369,8 @@ void Model::MakeAlgorithmsFunctions() {
   forward_testing_func_             = ForwardAlgorithmFunction(Mode::Testing);
   forward_prediction_func_          = ForwardAlgorithmFunction(Mode::Prediction);
   backward_func_                    = BackwardAlgorithmFunction();
+  compute_cost_training_func_       = ComputeCostFunction(Mode::Training);
+  compute_cost_testing_func_        = ComputeCostFunction(Mode::Testing);
   if(options_.bytecode_options.gen_training_confusion_matrix) {
     confusion_matrix_training_func_ = ConfusionMatrixFunction(Mode::Training);
   }
@@ -396,22 +442,20 @@ void Model::MakeTrainingFunctions() {
   });
 
   // Create training function
-  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("train_batches_in_memory", {{Type::I32},{}}, locals_type,
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(params.size() == 1);
     auto batches_to_train_on = params[0];
 
-    assert(locals.size() == 9);
-    auto total_time = locals[0];
-    auto batch_time = locals[1];
-    auto cost = locals[2];
-    auto hits = locals[3];        // TODO Change to Type::I32
-    auto counter = locals[4];
-    auto train_addr = locals[5];
-    auto label_addr = locals[6];
-    auto vi32_1 = locals[7];
-    auto vi32_2 = locals[8];
+    assert(locals.size() == 7);
+    auto cost = locals[0];
+    auto hits = locals[1];        // TODO Change to Type::I32
+    auto counter = locals[2];
+    auto train_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
     // Set the training pointer to the address of the first training batch
     f.Insert(MakeLocalSet(train_addr, MakeI32Const(training_data_batches_->Begin())));
@@ -420,11 +464,6 @@ void Model::MakeTrainingFunctions() {
 
     // Loop on batches in memory
     f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_train_on, 1, {}, [&](BlockBody* b1){
-
-      // Start timer
-      if(options_.bytecode_options.gen_training_time) {
-        b1->Insert(MakeLocalSet(batch_time, MakeCall(builtins_.system.TimeF64(), {})));
-      }
 
       // Forward algorithm
       b1->Insert(MakeCall(forward_training_func_, {
@@ -437,13 +476,6 @@ void Model::MakeTrainingFunctions() {
         MakeLocalGet(label_addr)
       }));
 
-      // Update time
-      if(options_.bytecode_options.gen_training_time) {
-        b1->Insert(GenerateCompoundAssignment(total_time, Opcode::F64Add,
-                                              MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}),
-                                                         MakeLocalGet(batch_time))));
-      }
-
       // Count number of correct results
       if(options_.bytecode_options.gen_training_accuracy) {
         b1->Insert(GenerateCompoundAssignment(hits, Opcode::F32Add, MakeCall(count_correct_predictions_training_func_, {
@@ -453,13 +485,9 @@ void Model::MakeTrainingFunctions() {
 
       // Compute training error
       if(options_.bytecode_options.gen_training_error) {
-        assert(layers_.back()->Position() == Output);
-        if(layers_.back()->Type() == FullyConnected) {
-          auto compute_cost = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Training, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, compute_cost));
-        } else {
-          assert(!"Compute cost not implemented");
-        }
+        b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, MakeCall(compute_cost_training_func_, {
+          MakeLocalGet(label_addr)
+        })));
       }
 
       // Update confusion matrix
@@ -472,11 +500,6 @@ void Model::MakeTrainingFunctions() {
       // Move to the next label batch in memory
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
-
-    // Store time
-    if(options_.bytecode_options.gen_training_time) {
-      f.Insert(MakeF64Store(MakeI32Const(training_time_->Begin()), MakeLocalGet(total_time)));
-    }
 
     // Store total cost error in memory
     if(options_.bytecode_options.gen_training_error) {
@@ -505,14 +528,6 @@ void Model::MakeTrainingFunctions() {
     });
   }
 
-  // Create function to access training time
-  if(options_.bytecode_options.gen_training_error) {
-    module_manager_.MakeFunction("training_time", {{},{Type::F64}}, {},
-                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-      f.Insert(MakeF64Load(MakeI32Const(training_time_->Begin())));
-    });
-  }
-
   // Create function to access training batch size
   module_manager_.MakeFunction("training_batch_size", {{}, {Type::I32}}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
@@ -526,7 +541,7 @@ void Model::MakeTrainingFunctions() {
   });
 
   // Create forward log functions
-  if(options_.bytecode_options.gen_forward) {
+  if(options_.bytecode_options.gen_forward_profiling) {
 #define LOG_TIME_MEMBER(name)                                                                       \
     module_manager_.MakeFunction("log_forward_" #name, {{}, {Type::F64}}, {},                       \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
@@ -537,7 +552,7 @@ void Model::MakeTrainingFunctions() {
   }
 
   // Create backward log functions
-  if(options_.bytecode_options.gen_backward) {
+  if(options_.bytecode_options.gen_backward_profiling) {
 #define LOG_TIME_MEMBER(name)           \
     module_manager_.MakeFunction("log_backward_" #name, {{}, {Type::F64}}, {},                      \
                                  [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){ \
@@ -580,22 +595,20 @@ void Model::MakeTestingFunctions() {
   });
 
   // Create testing function
-  std::vector<Type> locals_type = {Type::F64, Type::F64, Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
+  std::vector<Type> locals_type = {Type::F32, Type::F32, Type::I32, Type::I32, Type::I32, Type::I32, Type::I32};
   module_manager_.MakeFunction("test_batches_in_memory", {{Type::I32},{}}, locals_type,
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
     assert(params.size() == 1);
     auto batches_to_test_on = params[0];
 
-    assert(locals.size() == 9);
-    auto total_time = locals[0];
-    auto batch_time = locals[1];
-    auto cost = locals[2];
-    auto hits = locals[3];
-    auto counter = locals[4];
-    auto test_addr = locals[5];
-    auto label_addr = locals[6];
-    auto vi32_1 = locals[7];
-    auto vi32_2 = locals[8];
+    assert(locals.size() == 7);
+    auto cost = locals[0];
+    auto hits = locals[1];
+    auto counter = locals[2];
+    auto test_addr = locals[3];
+    auto label_addr = locals[4];
+    auto vi32_1 = locals[5];
+    auto vi32_2 = locals[6];
 
     // Set the testing pointer to the address of the first testing batch
     f.Insert(MakeLocalSet(test_addr, MakeI32Const(testing_data_batches_->Begin())));
@@ -604,22 +617,10 @@ void Model::MakeTestingFunctions() {
     // Loop on batches in memory
     f.Insert(GenerateDoWhileLoop(f.Label(), counter, batches_to_test_on, 1, {}, [&](BlockBody* b1){
 
-      // Start timer
-      if(options_.bytecode_options.gen_testing_time) {
-        b1->Insert(MakeLocalSet(batch_time, MakeCall(builtins_.system.TimeF64(), {})));
-      }
-
       // Forward algorithm
       b1->Insert(MakeCall(forward_testing_func_, {
         MakeLocalGet(test_addr)
       }));
-
-      // Update time
-      if(options_.bytecode_options.gen_testing_time) {
-        b1->Insert(GenerateCompoundAssignment(total_time, Opcode::F64Add,
-                                              MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}),
-                                                         MakeLocalGet(batch_time))));
-      }
 
       // Count number of correct results
       if(options_.bytecode_options.gen_testing_accuracy) {
@@ -630,13 +631,9 @@ void Model::MakeTestingFunctions() {
 
       // Compute testing error
       if(options_.bytecode_options.gen_testing_error) {
-        assert(layers_.back()->Position() == Output);
-        if(layers_.back()->Type() == FullyConnected) {
-          auto cost_call = static_cast<DenseOutputLayer*>(layers_.back())->ComputeCost(Mode::Testing, label_addr);
-          b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, cost_call));
-        } else {
-          assert(!"Compute cost not implemented");
-        }
+        b1->Insert(GenerateCompoundAssignment(cost, Opcode::F32Add, MakeCall(compute_cost_testing_func_, {
+          MakeLocalGet(label_addr)
+        })));
       }
 
       // Update confusion matrix
@@ -650,11 +647,6 @@ void Model::MakeTestingFunctions() {
       b1->Insert(GenerateCompoundAssignment(label_addr, Opcode::I32Add, MakeI32Const(labels_batch_bytes)));
     }));
 
-     // Store time
-     if(options_.bytecode_options.gen_testing_time) {
-       f.Insert(MakeF64Store(MakeI32Const(testing_time_->Begin()), MakeLocalGet(total_time)));
-     }
-
     // Store total cost error in memory
     if(options_.bytecode_options.gen_testing_error) {
       f.Insert(MakeF32Store(MakeI32Const(testing_error_->Begin()), MakeLocalGet(cost)));
@@ -665,14 +657,6 @@ void Model::MakeTestingFunctions() {
       f.Insert(MakeF32Store(MakeI32Const(testing_hits_->Begin()), MakeLocalGet(hits)));
     }
   });
-
-  // Create function to access testing time
-  if(options_.bytecode_options.gen_testing_time) {
-    module_manager_.MakeFunction("testing_time", {{},{Type::F64}}, {},
-                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-      f.Insert(MakeF64Load(MakeI32Const(testing_time_->Begin())));
-    });
-  }
 
   // Create function to access testing batches hits
   if(options_.bytecode_options.gen_testing_accuracy) {
@@ -714,36 +698,15 @@ void Model::MakePredictionFunctions() {
   }
 
   // Create prediction function
-  module_manager_.MakeFunction("predict_batch", {}, {Type::F64},
+  module_manager_.MakeFunction("predict_batch", {}, {},
                                [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-
-    assert(locals.size() == 1);
-    auto time = locals[0];
-
-    // Start timer
-    if(options_.bytecode_options.gen_prediction_time) {
-      f.Insert(MakeLocalSet(time, MakeCall(builtins_.system.TimeF64(), {})));
-    }
+    assert(locals.empty());
 
     // Apply forward algorithm
     f.Insert(MakeCall(forward_prediction_func_, {
       MakeI32Const(input_addr)
     }));
-
-    // Store time
-    if(options_.bytecode_options.gen_prediction_time) {
-      f.Insert(MakeF64Store(MakeI32Const(prediction_time_->Begin()),
-                            MakeBinary(Opcode::F64Sub, MakeCall(builtins_.system.TimeF64(), {}), MakeLocalGet(time))));
-    }
   });
-
-  // Create function to access prediction time
-  if(options_.bytecode_options.gen_prediction_time) {
-    module_manager_.MakeFunction("prediction_time", {{},{Type::F64}}, {},
-                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals){
-      f.Insert(MakeF64Load(MakeI32Const(prediction_time_->Begin())));
-    });
-  }
 
   // Create a function to get prediction batch size
   module_manager_.MakeFunction("prediction_batch_size", {{}, {Type::I32}}, {},

@@ -42,7 +42,7 @@ l1.SetKeepProb(1.0);
 l1.SetWeightType("xavier_uniform");
 model.AddDenseHiddenLayer(l1);
 
-let l2 = new nnb.DenseOutputLayerDescriptor(10, "sigmoid");
+let l2 = new nnb.DenseOutputLayerDescriptor(10, "softmax");
 l2.SetWeightType("lecun_uniform");
 model.AddDenseOutputLayer(l2);</textarea>
       </div>
@@ -73,7 +73,8 @@ model.AddDenseOutputLayer(l2);</textarea>
             <label for="loss_func">Loss function</label>
             <select class="form-control" id="loss_func">
               <option value="mean-squared-error">Mean Squared Error</option>
-              <option value="cross-entropy" selected>Cross Entropy</option>
+              <option value="sigmoid-cross-entropy" selected>Sigmoid Cross Entropy</option>
+              <option value="softmax-cross-entropy" selected>Softmax Cross Entropy</option>
             </select>
           </div>
         </div>
@@ -103,6 +104,18 @@ model.AddDenseOutputLayer(l2);</textarea>
           <div class="col-xs-6">
             <label for="test_batch">Learning rate</label>
             <input class="form-control" id="learning_rate" type="number" value="0.02">
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="row">
+          <div class="col-xs-6">
+            <label for="l1_reg">L1 Regularizer</label>
+            <input class="form-control" id="l1_reg" type="number" value="0.0001">
+          </div>
+          <div class="col-xs-6">
+            <label for="test_batch">L2 Regularizer</label>
+            <input class="form-control" id="l2_reg" type="number" value="0.0001">
           </div>
         </div>
       </div>
@@ -250,14 +263,11 @@ model.AddDenseOutputLayer(l2);</textarea>
     bytecode_options.gen_training_error                = true;
     bytecode_options.gen_training_accuracy             = true;
     bytecode_options.gen_training_confusion_matrix     = true;
-    bytecode_options.gen_forward                       = true;
-    bytecode_options.gen_backward                      = true;
+    bytecode_options.gen_forward_profiling             = true;
+    bytecode_options.gen_backward_profiling            = true;
     bytecode_options.gen_testing_error                 = true;
     bytecode_options.gen_testing_accuracy              = true;
     bytecode_options.gen_testing_confusion_matrix      = true;
-    bytecode_options.gen_prediction_results            = true;
-    bytecode_options.gen_prediction_results_softmax    = true;
-    bytecode_options.gen_prediction_results_hardmax    = true;
     bytecode_options.use_simd                          = document.getElementById('use_simd').checked;
     let options = new nnb.ModelOptions();
     options.bytecode_options = bytecode_options;
@@ -269,20 +279,21 @@ model.AddDenseOutputLayer(l2);</textarea>
     let testing_batch_in_mem    = parseInt(document.getElementById('test_batch_in_mem').value);
     let prediction_batch        = parseInt(document.getElementById('pred_batch').value);
     let loss                    = document.getElementById('loss_func').value;
+    let l1_regularizer          = parseFloat(document.getElementById('l1_reg').value);
+    let l2_regularizer          = parseFloat(document.getElementById('l2_reg').value);
 
     // Create model
     window.model = new nnb.Model(options);
     eval(document.getElementById('layers').value);
     window.model.Build(training_batch, training_batch_in_mem,
       testing_batch, testing_batch_in_mem,
-      prediction_batch, loss);
+      prediction_batch, loss, l1_regularizer, l2_regularizer);
 
     if(window.model.Validate()) {
       let buffer = nnb.ToUint8Array(window.model.ToWasm());
-      window.compiled_model = new CompiledModel();
-      const lib = WebAssembly.instantiate(buffer, window.compiled_model.Imports());
+      const lib = WebAssembly.instantiate(buffer, CompiledModel.Imports());
       lib.then(wasm => {
-        window.compiled_model.SetWasm(wasm);
+        window.compiled_model = new CompiledModel(wasm);
         build_obj.innerText = "Build successful!";
         build_obj.className = "alert alert-success";
       });

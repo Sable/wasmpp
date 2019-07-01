@@ -8,10 +8,9 @@ process.on('unhandledRejection', error => {
 
 if(process.argv.length > 2) {
   const buf = fs.readFileSync(process.argv[2]);
-  const compiled_model = new CompiledModel();
-  const lib = WebAssembly.instantiate(new Uint8Array(buf), compiled_model.Imports());
+  const lib = WebAssembly.instantiate(new Uint8Array(buf), CompiledModel.Imports());
   lib.then( wasm => {
-    compiled_model.SetWasm(wasm);
+    const compiled_model = new CompiledModel(wasm);
     compiled_model.UnitTest();
   })
 } else {

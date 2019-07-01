@@ -15,10 +15,9 @@ process.on('unhandledRejection', error => {
 
 if(process.argv.length > 2) {
   const buf = fs.readFileSync(process.argv[2]);
-  const compiled_model = new CompiledModel();
-  const lib = WebAssembly.instantiate(new Uint8Array(buf), compiled_model.Imports());
+  const lib = WebAssembly.instantiate(new Uint8Array(buf), CompiledModel.Imports());
   lib.then( wasm => {
-    compiled_model.SetWasm(wasm);
+    const compiled_model = new CompiledModel(wasm);
 
     // Load mnist data
     let mnist_data = mnist.set(2240*2,2240);
@@ -32,15 +31,15 @@ if(process.argv.length > 2) {
     // Encode data
     let training = compiled_model.EncodeTrainingData(train_data, train_labels);
     let testing = compiled_model.EncodeTestingData(test_data, test_labels);
-    let prediction = compiled_model.EncodePredictionData(train_data);
+    let prediction = compiled_model.EncodePredictionData([train_data[0]]);
 
     console.log("Training ...");
     compiled_model.Train(training, {
       log_accuracy: true,
       log_error: true,
       log_time: true,
-      // log_forward: true,
-      // log_backward: true,
+      log_forward: true,
+      log_backward: true,
       log_conf_mat: true,
       epochs: 5,
       learning_rate: 0.02

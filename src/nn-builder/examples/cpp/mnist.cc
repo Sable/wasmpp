@@ -71,17 +71,14 @@ int main(int argc, char *argv[]) {
   options.bytecode_options.gen_testing_accuracy            = true;
   options.bytecode_options.gen_testing_error               = true;
   options.bytecode_options.gen_testing_confusion_matrix    = true;
-  options.bytecode_options.gen_prediction_results          = true;
-  options.bytecode_options.gen_prediction_results_softmax  = true;
-  options.bytecode_options.gen_prediction_results_hardmax  = true;
-  options.bytecode_options.gen_forward                     = true;
-  options.bytecode_options.gen_backward                    = true;
+  options.bytecode_options.gen_forward_profiling           = true;
+  options.bytecode_options.gen_backward_profiling          = true;
   options.bytecode_options.use_simd                        = true;
   Model model(options);
   model.SetLayers({
      NewLayer<DenseInputLayer>(784)->WeightType(XavierUniform)->KeepProb(1),
      NewLayer<DenseHiddenLayer>(64, model.Builtins().activation.Sigmoid())->WeightType(XavierUniform)->KeepProb(1),
-     NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Sigmoid())->WeightType(LeCunUniform)
+     NewLayer<DenseOutputLayer>(10, model.Builtins().activation.Softmax())->WeightType(LeCunUniform)
   });
 
   uint32_t training_batch_size = 1;
@@ -89,10 +86,13 @@ int main(int argc, char *argv[]) {
   uint32_t testing_batch_size = 1;
   uint32_t testing_batches_in_memory = 1;
   uint32_t prediction_batch_size = 1;
-  auto loss = model.Builtins().loss.CrossEntropy();
+  float l1_regularizer = 0.0001;
+  float l2_regularizer = 0.0001;
+  auto loss = model.Builtins().loss.SoftmaxCrossEntropy();
   model.Build(training_batch_size, training_batches_in_memory,
               testing_batch_size, testing_batches_in_memory,
-              prediction_batch_size, loss);
+              prediction_batch_size, loss,
+              l1_regularizer, l2_regularizer);
 
   assert(model.Validate());
   if(!output_file.empty()) {

@@ -76,6 +76,8 @@ private:
       return model_.Builtins().activation.ELU();
     } else if(act_func == "linear"){
       return model_.Builtins().activation.Linear();
+    } else if(act_func == "softmax") {
+      return model_.Builtins().activation.Softmax();
     }
     // Default "sigmoid"
     return model_.Builtins().activation.Sigmoid();
@@ -109,19 +111,22 @@ public:
   }
   void Build(uint32_t training_batch_size, uint32_t training_batches_in_memory,
              uint32_t testing_batch_size, uint32_t testing_batches_in_memory,
-             uint32_t prediction_batch_size, std::string loss) {
+             uint32_t prediction_batch_size, std::string loss,
+             float l1_regularizer, float l2_regularizer) {
     // Set layers
     model_.SetLayers(layers_);
 
     // Default "mean-squared-error"
     LossFunction loss_func = model_.Builtins().loss.MeanSquaredError();
-    if(loss == "cross-entropy") {
-      loss_func = model_.Builtins().loss.CrossEntropy();
+    if(loss == "sigmoid-cross-entropy") {
+      loss_func = model_.Builtins().loss.SigmoidCrossEntropy();
+    } else if( loss == "softmax-cross-entropy") {
+      loss_func = model_.Builtins().loss.SoftmaxCrossEntropy();
     }
 
     // Build model
     model_.Build(training_batch_size, training_batches_in_memory, testing_batch_size, testing_batches_in_memory,
-                 prediction_batch_size, loss_func);
+                 prediction_batch_size, loss_func, l1_regularizer, l2_regularizer);
   }
   void AddDenseInputLayer(DenseInputLayerDescriptor desc) {
     layers_.push_back(NewLayer<DenseInputLayer>(desc.GetNodes())
@@ -168,17 +173,11 @@ EMSCRIPTEN_BINDINGS(model_options) {
       MODEL_BYTECODE_OPTIONS(gen_training_accuracy)
       MODEL_BYTECODE_OPTIONS(gen_training_error)
       MODEL_BYTECODE_OPTIONS(gen_training_confusion_matrix)
-      MODEL_BYTECODE_OPTIONS(gen_training_time)
       MODEL_BYTECODE_OPTIONS(gen_testing_accuracy)
       MODEL_BYTECODE_OPTIONS(gen_testing_error)
       MODEL_BYTECODE_OPTIONS(gen_testing_confusion_matrix)
-      MODEL_BYTECODE_OPTIONS(gen_testing_time)
-      MODEL_BYTECODE_OPTIONS(gen_prediction_results)
-      MODEL_BYTECODE_OPTIONS(gen_prediction_results_softmax)
-      MODEL_BYTECODE_OPTIONS(gen_prediction_results_hardmax)
-      MODEL_BYTECODE_OPTIONS(gen_prediction_time)
-      MODEL_BYTECODE_OPTIONS(gen_forward)
-      MODEL_BYTECODE_OPTIONS(gen_backward)
+      MODEL_BYTECODE_OPTIONS(gen_forward_profiling)
+      MODEL_BYTECODE_OPTIONS(gen_backward_profiling)
       MODEL_BYTECODE_OPTIONS(use_simd);
 
 #define MODEL_OPTIONS(name) \

@@ -63,6 +63,8 @@ int main(int argc, char *argv[]) {
   nn::test::TestBuiltins test_builtins;
   test_builtins.assert_matrix_eq = module_manager.MakeFuncImport("Test", "assert_matrix_eq",
       {{wabt::Type ::I32, wabt::Type::I32, wabt::Type::I32, wabt::Type::I32},{}});
+  test_builtins.assert_f32_eq = module_manager.MakeFuncImport("Test", "assert_f32_eq",
+      {{wabt::Type ::F32, wabt::Type::F32},{}});
 
   // Allocate enough memory
   auto memory = module_manager.MakeMemory(500);
@@ -79,6 +81,12 @@ int main(int argc, char *argv[]) {
   matrix_snippet_test.MatrixDotRT_test_1();
   matrix_snippet_test.MatrixVectorAddition_test_1();
   matrix_snippet_test.MatrixHorizontalSum_test_1();
+  matrix_snippet_test.MatrixAbsSum_test_1();
+  matrix_snippet_test.MatrixSquareSum_test_1();
+  matrix_snippet_test.MatrixAddRightScale_test_1();
+  matrix_snippet_test.MatrixSubRightScale_test_1();
+  matrix_snippet_test.MatrixAddRightSignScale_test_1();
+  matrix_snippet_test.MatrixAddRightSignScaleAddRightScale_test_1();
 
   // Create matrix simd tests
   nn::test::MatrixSnippetSimdTest matrix_snippet_simd_test(&module_manager, &test_builtins);
@@ -93,6 +101,12 @@ int main(int argc, char *argv[]) {
   matrix_snippet_simd_test.MatrixDotRTSimd_test_2();
   matrix_snippet_simd_test.MatrixVectorAdditionSimd_test_1();
   matrix_snippet_simd_test.MatrixHorizontalSumSimd_test_1();
+  matrix_snippet_simd_test.MatrixAbsSumSimd_test_1();
+  matrix_snippet_simd_test.MatrixSquareSumSimd_test_1();
+  matrix_snippet_simd_test.MatrixAddRightScaleSimd_test_1();
+  matrix_snippet_simd_test.MatrixSubRightScaleSimd_test_1();
+  matrix_snippet_simd_test.MatrixAddRightSignScaleSimd_test_1();
+  matrix_snippet_simd_test.MatrixAddRightSignScaleAddRightScale_test_1();
 
   assert(module_manager.Validate());
   if(!output_file.empty()) {

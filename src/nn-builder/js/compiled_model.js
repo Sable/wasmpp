@@ -74,45 +74,50 @@ class ModelLogger {
     console.log("\n>> Backward algorithm steps time:");
   }
   log_backward_A(time) {
-    console.log("A) dA[L] = L(T, A[L]):", time);
+    console.log("A) dA[L] = dJ(T, A[L]):", time);
   }
-  log_backward_B_1(time) {
-    console.log("B) dZ[l] = dA[l] * g'[l](Z[l])");
-    console.log("    1) dZ[l] = g'[l](Z[l]):", time);
-  }
-  log_backward_B_2(time) {
-    console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
+  log_backward_B(time) {
+    console.log("B) [Softmax] dZ[L] = dJ(T, A[L]):", time);
   }
   log_backward_C_1(time) {
-    console.log("C) dW[l] = (1/m) dZ[l] . A[l-1]^T");
-    console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
+    console.log("C) dZ[l] = dA[l] * g'[l](Z[l])");
+    console.log("    1) dZ[l] = g'[l](Z[l]):", time);
   }
   log_backward_C_2(time) {
-    console.log("    2) dW[l] = (1/m) dW[l]:", time);
+    console.log("    2) dZ[l] = dA[l] * dZ[l]:", time);
   }
   log_backward_D_1(time) {
-    console.log("D) db[l] = (1/m) dZ[l]");
+    console.log("D) dW[l] = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))");
+    console.log("    1) dW[l] = dZ[l] . A[l-1]^T:", time);
+  }
+  log_backward_D_2_1(time) {
+    console.log("    2) 1) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]:", time);
+  }
+  log_backward_D_2_2_1(time) {
+    console.log("       2) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]");
+    console.log("          1) dW[l] = dW[l] + l1_decay W[l]:", time);
+  }
+  log_backward_D_2_2_2(time) {
+    console.log("          2) dW[l] = dW[l] + l2_decay W[l]:", time);
+  }
+  log_backward_D_3(time) {
+    console.log("    3) dW[l] = (1/m) dW[l]:", time);
+  }
+  log_backward_E_1(time) {
+    console.log("E) db[l] = (1/m) dZ[l]");
     console.log("    1) db[l] = SUM(dZ[l], row wise):", time);
   }
-  log_backward_D_2(time) {
+  log_backward_E_2(time) {
     console.log("    2) db[l] = (1/m) db[l]:", time);
   }
-  log_backward_E(time) {
-    console.log("E) dA[l-1] = W[l]^T . dZ[l]:", time);
+  log_backward_F(time) {
+    console.log("F) dA[l-1] = W[l]^T . dZ[l]:", time);
   }
-  log_backward_F_1(time) {
-    console.log("F) W[l] = W[l] - alpha * dW[l]");
-    console.log("    1) dW[l] = alpha * dW[l]:", time);
+  log_backward_G(time) {
+    console.log("G) W[l] = W[l] - alpha * dW[l]:", time);
   }
-  log_backward_F_2(time) {
-    console.log("    2) W[l] = W[l] - dW[l]:", time);
-  }
-  log_backward_G_1(time) {
-    console.log("G) b[l] = b[l] - alpha * db[l]");
-    console.log("    1) db[l] = alpha * db[l]:", time);
-  }
-  log_backward_G_2(time) {
-    console.log("    2) b[l] = b[l] - db[l]:", time);
+  log_backward_H(time) {
+    console.log("H) b[l] = b[l] - alpha * db[l]:", time);
   }
 }
 
@@ -137,14 +142,11 @@ class CompiledModel {
   _wasm = null;
   _imports = {};
   _logger = new ModelLogger();
+  static _memory;
 
-  constructor() {
-    this._imports = this._InitImports();
-  }
-
-  // Set the wasm instance
-  SetWasm(wasm) {
+  constructor(wasm) {
     this._wasm = wasm;
+    CompiledModel._memory = this.Exports().memory;
   }
 
   // Get exports from Wasm to JS
@@ -156,13 +158,16 @@ class CompiledModel {
     return this._wasm.instance.exports;
   }
 
-  // Get imports from JS to Wasm
-  Imports() {
-    return this._imports;
+  _CallExport(key, ...args) {
+    if(key in this.Exports()) {
+      return this.Exports()[key].apply(null, args);
+    }
+    this._WarnNotFound("Function '"+key+"' not found")
+    return null;
   }
 
-  Memory() {
-    return this.Exports().memory;
+  static Memory() {
+    return CompiledModel._memory;
   }
 
   _EncodeArray(data, entry_size, batch_size) {
@@ -278,18 +283,18 @@ class CompiledModel {
 
     // Update learning rate
     this._SetLearningRate(config.learning_rate);
- 
-    // Register the total training time
+
+    // Training variables
     let total_time = 0.0;
+    let data_offset = this._TrainingDataOffset();
+    let labels_offset = this._TrainingLabelsOffset();
 
     // Train for each epoch
     for(let e=0; e < config.epochs; e++) {
-      // Epoch results
+      // Epoch variables
       let total_hits = 0;
       let average_cost = 0.0;
-      let train_time = 0.0;
-      let data_offset = this._TrainingDataOffset();
-      let labels_offset = this._TrainingLabelsOffset();
+      let epoch_time = new Date().getTime();
       for(let i=0; i < number_of_batches; i += batches_in_memory) {
         // Load new batches in memory and train
         let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
@@ -304,12 +309,10 @@ class CompiledModel {
         if(config.log_error) {
           average_cost += this._TrainingBatchesError();
         }
-        if(config.log_time) {
-          train_time += this._TrainingTime();
-        }
       }
-      // Update total time
-      total_time += train_time;
+      // Update time
+      epoch_time = new Date().getTime() - epoch_time;
+      total_time += epoch_time;
       // Log after end of epoch
       if(config.log_epoch_num) {
         console.log("Epoch",e+1);
@@ -321,7 +324,7 @@ class CompiledModel {
         console.log(">> Error:     ", average_cost / number_of_batches);
       }
       if(config.log_time) {
-        console.log(">> Epoch time:", train_time, "ms");
+        console.log(">> Epoch time:", epoch_time, "ms");
         console.log(">> Total time:", total_time, "ms");
       }
     }
@@ -357,9 +360,9 @@ class CompiledModel {
     // Testing results
     let total_hits = 0;
     let average_cost = 0.0;
-    let test_time = 0.0;
     let data_offset = this._TestingDataOffset();
     let labels_offset = this._TestingLabelsOffset();
+    let test_time = new Date().getTime();
     for(let i=0; i < number_of_batches; i += batches_in_memory) {
       // Load new batches in memory and test
       let batches_inserted = this._CopyBatchesToMemory(input, data_offset, labels_offset, i,
@@ -374,10 +377,9 @@ class CompiledModel {
       if(config.log_error) {
         average_cost += this._TestingBatchesError();
       }
-      if(config.log_time) {
-        test_time += this._TestingTime();
-      }
     }
+    // Update time
+    test_time = new Date().getTime() - test_time;
     // Log testing results
     if(config.log_accuracy) {
       console.log(">> Test Accuracy:  ", total_hits / input.x_count);
@@ -417,7 +419,7 @@ class CompiledModel {
 
     // Copy data
     let data_array = new Float32Array(input.X.buffer, x_begin* Float32Array.BYTES_PER_ELEMENT, x_length);
-    let data_memory = new Float32Array(this.Memory().buffer, x_offset, x_length);
+    let data_memory = new Float32Array(CompiledModel.Memory().buffer, x_offset, x_length);
     data_memory.set(data_array);
 
     if(y_offset !== null) {
@@ -428,7 +430,7 @@ class CompiledModel {
 
       // Copy labels
       let labels_array = new Float32Array(input.Y.buffer, y_begin* Float32Array.BYTES_PER_ELEMENT, y_length);
-      let labels_memory = new Float32Array(this.Memory().buffer, y_offset, y_length);
+      let labels_memory = new Float32Array(CompiledModel.Memory().buffer, y_offset, y_length);
       labels_memory.set(labels_array);
     }
 
@@ -450,36 +452,6 @@ class CompiledModel {
 
   _TestingLabelsOffset() {
     return this.Exports().testing_labels_offset();
-  }
-
-  _TrainingTime() {
-    let key = "training_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Training time function not found");
-    }
-    return 0;
-  }
-
-  _TestingTime() {
-    let key = "testing_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Testing time function not found");
-    }
-    return 0;
-  }
-
-  _PredictionTime() {
-    let key = "prediction_time";
-    if(key in this.Exports()) {
-      return this.Exports()[key]();
-    } else {
-      this._WarnNotFound("Prediction time function not found");
-    }
-    return 0;
   }
 
   _TrainingBatchesAccuracy() {
@@ -543,7 +515,7 @@ class CompiledModel {
     let found = false;
     Object.keys(this.Exports()).forEach((func) => {
       if(func.startsWith("log_forward_")) {
-        this._logger[func](this.Exports()[func]());
+        this._logger[func](this._CallExport(func));
         found = true;
       }
     });
@@ -570,7 +542,7 @@ class CompiledModel {
     let matrix_offset_key = "training_confusion_matrix_offset";
     let matrix_side = this._LayerSize(this._TotalLayers() - 1);
     if(matrix_offset_key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+      console.table(CompiledModel._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Training confusion matrix function not found");
     }
@@ -580,35 +552,17 @@ class CompiledModel {
     let matrix_offset_key = "testing_confusion_matrix_offset";
     let matrix_side = this._LayerSize(this._TotalLayers() - 1);
     if(matrix_offset_key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
+      console.table(CompiledModel._MakeF32Matrix(this.Exports()[matrix_offset_key](), matrix_side, matrix_side));
     } else {
       this._WarnNotFound("Testing confusion matrix function not found");
     }
   }
 
-  _LogPredictionResultTemplate(key, msg) {
-    let batch_size = this._PredictionBatchSize();
-    let output_size = this._LayerSize(this._TotalLayers() - 1);
-    if(key in this.Exports()) {
-      console.table(this._MakeF32Matrix(this.Exports()[key](), output_size, batch_size));
-    } else {
-      this._WarnNotFound(msg);
-    }
-  }
-
   _LogPredictionResult() {
-    this._LogPredictionResultTemplate("prediction_result_offset", 
-      "Prediction result function not found");
-  }
-
-  _LogPredictionSoftmaxResult() {
-    this._LogPredictionResultTemplate("prediction_softmax_result_offset", 
-      "Prediction softmax result function not found");
-  }
-
-  _LogPredictionHardmaxResult() {
-    this._LogPredictionResultTemplate("prediction_hardmax_result_offset", 
-      "Prediction hardmax result function not found");
+    let offset = this._CallExport("prediction_result_offset");
+    if(offset != null) {
+      console.table(CompiledModel._MakeF32Matrix(offset, this._LayerSize(this._TotalLayers() - 1), this._PredictionBatchSize()));
+    }
   }
 
   // Run unit test Wasm function
@@ -638,11 +592,10 @@ class CompiledModel {
     config                  = config                  || {};
     config.log_time         = config.log_time         || false;
     config.log_result       = config.log_result       || false;
-    config.result_mode      = config.result_mode      || "default";
 
     // Prediction results
-    let pred_time = 0.0;
     let data_offset = this._PredictionDataOffset();
+    let pred_time = new Date().getTime();
     for(let i=0; i < number_of_batches; i++) {
       // Load new batches in memory and predict
       this._CopyBatchesToMemory(input, data_offset, null, i, batch_size, 1);
@@ -651,19 +604,13 @@ class CompiledModel {
       this.Exports().predict_batch();
 
       // Log result
-      if(config.log_time) {
-        pred_time += this._PredictionTime();
-      }
       if(config.log_result) {
-        if(config.result_mode === "softmax") {
-          this._LogPredictionSoftmaxResult();
-        } else if(config.result_mode === "hardmax") {
-          this._LogPredictionHardmaxResult();
-        } else {
-          this._LogPredictionResult();
-        }
+        this._LogPredictionResult();
       }
     }
+    // Update time
+    pred_time = new Date().getTime() - pred_time;
+
     // Log prediction details
     if(config.log_time) {
       console.log(">> Prediction time:", pred_time, "ms");
@@ -677,8 +624,8 @@ class CompiledModel {
       let bias_info = this._BiasInfo(l);
       if (weight_info != null && bias_info != null) {
         let layer_weight = new LayerWeights(l);
-        layer_weight.ImportWeightsFromBuffer(this.Memory().buffer, weight_info.offset, weight_info.byte_size);
-        layer_weight.ImportBiasFromBuffer(this.Memory().buffer, bias_info.offset, bias_info.byte_size);
+        layer_weight.ImportWeightsFromBuffer(CompiledModel.Memory().buffer, weight_info.offset, weight_info.byte_size);
+        layer_weight.ImportBiasFromBuffer(CompiledModel.Memory().buffer, bias_info.offset, bias_info.byte_size);
         weights.push(layer_weight.ToJson());
       }
     }
@@ -697,9 +644,9 @@ class CompiledModel {
       if (weights_info != null && bias_info != null) {
         // Wrap Wasm model weight in a LayerWeight object
         let model_layer_weights = new LayerWeights(weights_array[i].layer);
-        model_layer_weights.ImportWeightsFromBuffer(this.Memory().buffer,
+        model_layer_weights.ImportWeightsFromBuffer(CompiledModel.Memory().buffer,
           weights_info.offset, weights_info.byte_size);
-        model_layer_weights.ImportBiasFromBuffer(this.Memory().buffer,
+        model_layer_weights.ImportBiasFromBuffer(CompiledModel.Memory().buffer,
           bias_info.offset, bias_info.byte_size);
         // Set weights
         if (!model_layer_weights.CopyWeights(imported_layer_weights)) {
@@ -756,8 +703,8 @@ class CompiledModel {
     console.log(pre_msg +". Make sure you compiled the model with the correct options.");
   }
 
-  _MakeF32Matrix(index, rows, cols) {
-    let view = new Float32Array(this.Memory().buffer, index);
+  static _MakeF32Matrix(index, rows, cols) {
+    let view = new Float32Array(CompiledModel.Memory().buffer, index);
     let table = [];
     for (let r = 0; r < rows; ++r) {
       table.push([]);
@@ -769,7 +716,7 @@ class CompiledModel {
   }
 
   // Initialize imports
-  _InitImports() {
+  static Imports() {
     let math_imports = {
       exp: Math.exp,
       log: Math.log,
@@ -782,14 +729,19 @@ class CompiledModel {
         return new Date().getTime();
       },
       print_table_f32: (index, rows, cols) => {
-        console.table(this._MakeF32Matrix(index, rows, cols));
+        console.table(CompiledModel._MakeF32Matrix(index, rows, cols));
       }
     };
 
     let test_imports = {
+      assert_f32_eq: (val1, val2) => {
+        if(val1 !== val2) {
+          console.error("F32 equality failed!", val1, "!=", val2);
+        }
+      },
       assert_matrix_eq: (mat1_index, mat2_index, rows, cols) => {
-        let mat1 = new Float32Array(this.Memory().buffer, mat1_index, rows * cols);
-        let mat2 = new Float32Array(this.Memory().buffer, mat2_index, rows * cols);
+        let mat1 = new Float32Array(CompiledModel.Memory().buffer, mat1_index, rows * cols);
+        let mat2 = new Float32Array(CompiledModel.Memory().buffer, mat2_index, rows * cols);
         for (let i = 0; i < rows * cols; i++) {
           if (mat1[i] !== mat2[i]) {
             console.error("Matrix equality failed!");

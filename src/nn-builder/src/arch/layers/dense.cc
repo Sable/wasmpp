@@ -1,5 +1,6 @@
 #include <src/nn-builder/src/arch/layers/dense.h>
 #include <src/nn-builder/src/arch/model.h>
+#include <src/wasmpp/wasm-instructions-gen.h>
 #include <sstream>
 
 namespace nn {
@@ -21,19 +22,19 @@ FullyConnectedLayer* FullyConnectedLayer::WeightType(nn::arch::WeightDistributio
   return this;
 }
 
-#define START_TIME() \
-  if(NetworkModel()->Options().bytecode_options.gen_forward) {                                                        \
+#define START_TIME()                                                                                                  \
+  if(mode_index == Model::Mode::Training && NetworkModel()->Options().bytecode_options.gen_forward_profiling) {       \
     Merge(e, NetworkModel()->DenseForwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {})));  \
   }
 
-#define END_TIME(name)                                                                                \
-  if(NetworkModel()->Options().bytecode_options.gen_forward) {                                        \
-    Merge(e, NetworkModel()->DenseForwardTime()                                                       \
-    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
-                       NetworkModel()->DenseForwardTime().GetTime())));                               \
-    Merge(e, NetworkModel()->DenseForwardTime()                                                       \
-    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseForwardTime().GetTime(),               \
-                       NetworkModel()->DenseForwardTime().Get##name())));                             \
+#define END_TIME(name)                                                                                          \
+  if(mode_index == Model::Mode::Training && NetworkModel()->Options().bytecode_options.gen_forward_profiling) { \
+    Merge(e, NetworkModel()->DenseForwardTime()                                                                 \
+    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),              \
+                       NetworkModel()->DenseForwardTime().GetTime())));                                         \
+    Merge(e, NetworkModel()->DenseForwardTime()                                                                 \
+    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseForwardTime().GetTime(),                         \
+                       NetworkModel()->DenseForwardTime().Get##name())));                                       \
   }
 
 
@@ -81,8 +82,18 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
 
       // B) A[l] = g(Z[l])
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
-                                                                   {vi32_1, vi32_2}, false));
+      // Special case for softmax
+      if(activation_func_ == NetworkModel()->Builtins().activation.Softmax()) {
+        Merge(e, MakeCall(activation_func_.function, {
+          MakeI32Const(Z_[mode_index]->Begin()),
+          MakeI32Const(A_[mode_index]->Begin()),
+          MakeI32Const(Z_[mode_index]->Shape()[0]),
+          MakeI32Const(Z_[mode_index]->Shape()[1])
+        }));
+      } else {
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[mode_index]), activation_func_, A_[mode_index],
+                                                                     {vi32_1, vi32_2}, false));
+      }
       END_TIME(B)
     } else {
       assert(!"Not implemented!");
@@ -119,7 +130,7 @@ wabt::ExprList* FullyConnectedLayer::Forward(uint8_t mode_index, Var input_begin
 
 wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var target_begin) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
-  return MakeCall(NetworkModel()->Loss().cost, {
+  return MakeCall(NetworkModel()->Loss().J, {
       MakeLocalGet(target_begin),
       MakeI32Const(A_[mode_index]->Begin()),
       MakeI32Const(A_[mode_index]->Shape()[0]),
@@ -127,22 +138,63 @@ wabt::ExprList* DenseOutputLayer::ComputeCost(uint8_t mode_index, wabt::Var targ
   });
 }
 
+wabt::ExprList* FullyConnectedLayer::ComputeL1Cost(uint8_t mode_index, std::vector<Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+
+  assert(locals.size() == 3);
+  auto vi32_1 = locals[0];
+  auto v128_1 = locals[1];
+  auto result = locals[2];
+
+  // Compute l1_loss
+  // (l1_decay/2m) SUM(ABS(W[l]))
+  // 1) local = SUM(ABS(W[l]))
+  // 2) local = (l1_decay/2m) local
+  ExprList* e = new ExprList();
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixAbsSum(W_, result, {vi32_1, v128_1}));
+  Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L1Regularizer() /
+                                                                           (2 * NetworkModel()->BatchSzie(mode_index)))));
+  Merge(e, MakeLocalGet(result));
+  return e;
+}
+
+wabt::ExprList* FullyConnectedLayer::ComputeL2Cost(uint8_t mode_index, std::vector<Var> locals) {
+  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+
+  assert(locals.size() == 4);
+  auto vi32_1 = locals[0];
+  auto vf32_1 = locals[1];
+  auto v128_1 = locals[2];
+  auto result = locals[3];
+
+  // Compute l2 loss
+  // (l2_decay/2m) SUM(W[l] * W[l])
+  // 1) local = SUM(W[l] * W[l])
+  // 2) local = (l2_decay/2m) local
+  ExprList* e = new ExprList();
+  Merge(e, NetworkModel()->Snippets().matrix->MatrixSquareSum(W_, result, {vi32_1, vf32_1, v128_1}));
+  Merge(e, GenerateCompoundAssignment(result, Opcode::F32Mul, MakeF32Const(NetworkModel()->L2Regularizer() /
+                                                                           (2 * NetworkModel()->BatchSzie(mode_index)))));
+  Merge(e, MakeLocalGet(result));
+  return e;
+}
+
 #undef START_TIME
 #undef END_TIME
 
 #define START_TIME() \
-  if(NetworkModel()->Options().bytecode_options.gen_backward) {                                                                        \
+  if(NetworkModel()->Options().bytecode_options.gen_backward_profiling) {                                             \
     Merge(e, NetworkModel()->DenseBackwardTime().SetTime(MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}))); \
   }
 
-#define END_TIME(name)                                                                                \
-  if(NetworkModel()->Options().bytecode_options.gen_backward) {                                       \
-    Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
-    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),    \
-                       NetworkModel()->DenseBackwardTime().GetTime())));                              \
-    Merge(e, NetworkModel()->DenseBackwardTime()                                                      \
-    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseBackwardTime().GetTime(),              \
-                       NetworkModel()->DenseBackwardTime().Get##name())));                            \
+#define END_TIME(name)                                                                              \
+  if(NetworkModel()->Options().bytecode_options.gen_backward_profiling) {                           \
+    Merge(e, NetworkModel()->DenseBackwardTime()                                                    \
+    .SetTime(MakeBinary(Opcode::F64Sub, MakeCall(NetworkModel()->Builtins().system.TimeF64(), {}),  \
+                       NetworkModel()->DenseBackwardTime().GetTime())));                            \
+    Merge(e, NetworkModel()->DenseBackwardTime()                                                    \
+    .Set##name(MakeBinary(Opcode::F64Add, NetworkModel()->DenseBackwardTime().GetTime(),            \
+                       NetworkModel()->DenseBackwardTime().Get##name())));                          \
   }
 
 wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var target_begin,
@@ -160,10 +212,12 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
   if(Position() != Input) {
     assert(LayerIndex() > 0);
 
-    if(Position() == Output) {
+    if(Position() == Output && NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
+      // A) dA[L] = dJ(T, A[L])
+      // Note: For softmax, we should skip this step because
+      // we can directly store the result in dZ[L]
       START_TIME()
-      // A) dA[L] = L(T, A[L])
-      Merge(e, MakeCall(NetworkModel()->Loss().loss, {
+      Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
           MakeLocalGet(target_begin),
           MakeI32Const(A_[Model::Mode::Training]->Begin()),
           MakeI32Const(dA_->Begin()),
@@ -176,20 +230,39 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
     auto prev_layer = NetworkModel()->Layers()[LayerIndex()-1];
     if(prev_layer->Type() == FullyConnected) {
       auto prev_fc_layer = static_cast<FullyConnectedLayer*>(prev_layer);
-      // B) dZ[l] = dA[l] * g'(Z[l])
-      //    1) dZ[l] = g'(Z[l])
-      //    2) dZ[l] = dA[l] * dZ[l]
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
-                                                                   activation_func_, dZ_, {vi32_1, vi32_2}, true));
-      END_TIME(B_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
-      END_TIME(B_2)
 
-      // C) dW[l] = (1/m) dZ[l] . A[l-1]^T
+      // Special case for softmax
+      if(Position() == Output && NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy()) {
+        // B) dZ[L] = dJ(T, A[L])
+        START_TIME()
+        Merge(e, MakeCall(NetworkModel()->Loss().dJ, {
+            MakeLocalGet(target_begin),
+            MakeI32Const(A_[Model::Mode::Training]->Begin()),
+            MakeI32Const(dZ_->Begin()),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[0]),
+            MakeI32Const(A_[Model::Mode::Training]->Shape()[1])
+        }));
+        END_TIME(B)
+      } else {
+        // C) dZ[l] = dA[l] * g'(Z[l])
+        //    1) dZ[l] = g'(Z[l])
+        //    2) dZ[l] = dA[l] * dZ[l]
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixActivation(snippet::RelocMat(Z_[Model::Mode::Training]),
+                                                                     activation_func_, dZ_, {vi32_1, vi32_2}, true));
+        END_TIME(C_1)
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixMultiplication(dA_, dZ_, dZ_, {vi32_1, vi32_2}));
+        END_TIME(C_2)
+      }
+
+      // D) dW[l] = (1/m) dZ[l] . A[l-1]^T + (l2_decay/m) W[l] + (l1_decay/m) sign(W[l])
+      //          = (1/m) (dZ[l] . A[l-1]^T + l2_decay W[l]) + l1_decay sign(W[l]))
       //    1) dW[l] = dZ[l] . A[l-1]^T
-      //    2) dW[l] = (1/m) dW[l]
+      //    2) 1) dW[l] = dW[l] + l1_decay sign(W[l]) + l2_decay W[l]
+      //       2) 1) dW[l] = dW[l] + l1_decay sign(W[l])
+      //          2) dW[l] = dW[l] + l2_decay W[l]
+      //    3) dW[l] = (1/m) dW[l]
       START_TIME()
 #ifdef WABT_EXPERIMENTAL
       Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_rt, {
@@ -207,30 +280,50 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
                                                                    snippet::RelocMat(prev_fc_layer->A_[Model::Mode::Training]), dW_,
                                                               {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
-      END_TIME(C_1)
-      START_TIME()
+      END_TIME(D_1)
+      if(NetworkModel()->L1Regularizer() > 0 && NetworkModel()->L2Regularizer() > 0) {
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix
+            ->MatrixAddRightSignScaleAddRightScale(dW_, W_, dW_, NetworkModel()->L1Regularizer(),
+                                                   NetworkModel()->L2Regularizer(), {vi32_1, vi32_2, vf32_1, v128_1}));
+        END_TIME(D_2_1)
+      }
+      if(NetworkModel()->L1Regularizer() > 0 && NetworkModel()->L2Regularizer() == 0) {
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightSignScale(dW_, W_, dW_, NetworkModel()->L1Regularizer(),
+                                                                        {vi32_1, vi32_2}));
+        END_TIME(D_2_2_1)
+      }
+      if(NetworkModel()->L2Regularizer() > 0 && NetworkModel()->L1Regularizer() == 0) {
+        START_TIME()
+        Merge(e, NetworkModel()->Snippets().matrix->MatrixAddRightScale(dW_, W_, dW_,
+                                                                        MakeF32Const(NetworkModel()->L2Regularizer()),
+                                                                        {vi32_1, vi32_2, vf32_1}));
+        END_TIME(D_2_2_2)
+      }
       if(NetworkModel()->TrainingBatchSize() > 1) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, MakeF32Const(1.0f / NetworkModel()->TrainingBatchSize()),
                                                                  dW_, {vi32_1, vi32_2, vf32_1}));
+        END_TIME(D_3)
       }
-      END_TIME(C_2)
 
-      // D) db[l] = (1/m) dZ[l]
+      // E) db[l] = (1/m) dZ[l]
       //    1) db[l] = SUM(dZ[l], row wise)
       //    2) db[l] = (1/m) db[l]
       START_TIME()
       Merge(e, NetworkModel()->Snippets().matrix->MatrixHorizontalSum(dZ_, db_,
                                                                       {vi32_1, vi32_2, vi32_3, vf32_1, v128_1}));
-      END_TIME(D_1)
-      START_TIME()
+      END_TIME(E_1)
       if(NetworkModel()->TrainingBatchSize() > 1) {
+        START_TIME()
         Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, MakeF32Const(1.0f/NetworkModel()->TrainingBatchSize()),
                                                                  db_, {vi32_1, vi32_2, vf32_1}));
+        END_TIME(E_2)
       }
-      END_TIME(D_2)
 
       if(LayerIndex() > 1) {
-        // E) dA[l-1] = W[l]^T . dZ[l]
+        // F) dA[l-1] = W[l]^T . dZ[l]
         START_TIME()
 #ifdef WABT_EXPERIMENTAL
         Merge(e, MakeNativeCall(NetworkModel()->Natives().dot_product_lt, {
@@ -245,30 +338,20 @@ wabt::ExprList* FullyConnectedLayer::Backward(wabt::Var input_begin, wabt::Var t
         Merge(e, NetworkModel()->Snippets().matrix->MatrixDotLT(W_, dZ_, prev_fc_layer->dA_,
                                                                 {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 #endif
-        END_TIME(E)
+        END_TIME(F)
       }
 
-      // F) W[l] = W[l] - alpha * dW[l]
-      //    1) dW[l] = alpha * dW[l]
-      //    2) W[l] = W[l] - dW[l]
+      // G) W[l] = W[l] - alpha * dW[l]
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(dW_, NetworkModel()->GetLearningRate(), dW_,
-                                                               {vi32_1, vi32_2, vf32_1}));
-      END_TIME(F_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(W_, dW_, W_, {vi32_1, vi32_2}));
-      END_TIME(F_2)
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(W_, dW_, W_, NetworkModel()->GetLearningRate(),
+                                                                      {vi32_1, vi32_2, vf32_1}));
+      END_TIME(G)
 
-      // G) b[l] = b[l] - alpha * db[l]
-      //    1) db[l] = alpha * db[l]
-      //    2) b[l] = b[l] - db[l]
+      // H) b[l] = b[l] - alpha * db[l]
       START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixScalar(db_, NetworkModel()->GetLearningRate(), db_,
+      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubRightScale(b_, db_, b_, NetworkModel()->GetLearningRate(),
                                                                {vi32_1, vi32_2, vf32_1}));
-      END_TIME(G_1)
-      START_TIME()
-      Merge(e, NetworkModel()->Snippets().matrix->MatrixSubtraction(b_, db_, b_, {vi32_1, vi32_2}));
-      END_TIME(G_2)
+      END_TIME(H)
     } else {
       assert(!"Not implemented!");
     }
@@ -445,18 +528,6 @@ FullyConnectedLayer * DenseOutputLayer::KeepProb(float keep_prob) {
   return this;
 }
 
-DenseOutputLayer* DenseOutputLayer::Softmax(uint8_t mode_index) {
-  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  softmax_[mode_index] = true;
-  return this;
-}
-
-DenseOutputLayer* DenseOutputLayer::Hardmax(uint8_t mode_index) {
-  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  hardmax_[mode_index] = true;
-  return this;
-}
-
 wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) {
   // Not need to assert the mode_index because it is done
   // when calling the parent function
@@ -474,19 +545,32 @@ wabt::ExprList* DenseOutputLayer::Forward(uint8_t mode_index, wabt::Var input_be
   ExprList* e = new ExprList();
   Merge(e, FullyConnectedLayer::Forward(mode_index, input_begin, {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vf32_1, v128_1}));
 
-  // Apply softmax
-  if(softmax_[mode_index]) {
-    Merge(e, NetworkModel()->Snippets().matrix->MatrixColumnSoftmax(Predictions(mode_index),
-                                                                    PredictionsSoftmax(mode_index),
-                                                                    {vi32_1, vi32_2, vi32_3, vf32_1, vf32_2}));
-  }
   // Apply hardmax
-  if(hardmax_[mode_index]) {
+  if(ShouldHardmax(mode_index)) {
     Merge(e, NetworkModel()->Snippets().matrix->MatrixColumnHardmax(Predictions(mode_index),
-                                                                    PredictionsHardmax(mode_index),
+                                                                    hardmax_[mode_index],
                                                                     {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5}));
   }
   return e;
+}
+
+void DenseHiddenLayer::Validate() {
+  ERROR_UNLESS(activation_func_ != NetworkModel()->Builtins().activation.Softmax(),
+               "Hidden layer cannot have softmax activation function");
+}
+
+void DenseOutputLayer::Validate() {
+  ERROR_UNLESS(activation_func_ == NetworkModel()->Builtins().activation.Softmax()
+               || activation_func_ == NetworkModel()->Builtins().activation.Sigmoid() ,
+               "Output layer must sigmoid or softmax as activation function");
+  if(activation_func_ == NetworkModel()->Builtins().activation.Softmax()) {
+    ERROR_UNLESS(NetworkModel()->Loss() == NetworkModel()->Builtins().loss.SoftmaxCrossEntropy(),
+                 "Loss function not compatible with softmax activation function");
+  }
+  if(activation_func_ == NetworkModel()->Builtins().activation.Sigmoid()) {
+    ERROR_UNLESS(NetworkModel()->Loss() != NetworkModel()->Builtins().loss.SoftmaxCrossEntropy(),
+                 "Loss function not compatible with sigmoid activation function");
+  }
 }
 
 void DenseOutputLayer::MakeFunctions() {
@@ -510,32 +594,15 @@ void DenseOutputLayer::MakeFunctions() {
   }
 
   // Create function to get the prediction result offset
-  if(NetworkModel()->Options().bytecode_options.gen_prediction_results) {
-    NetworkModel()->ModuleManager().MakeFunction("prediction_result_offset", {{},{Type::I32}},{},
-                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-      f.Insert(MakeI32Const(Predictions(Model::Mode::Prediction)->Begin()));
-    });
-  }
-
-  // Create function to get the prediction hardmax result offset
-  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_hardmax) {
-    NetworkModel()->ModuleManager().MakeFunction("prediction_hardmax_result_offset", {{},{Type::I32}},{},
-                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-      f.Insert(MakeI32Const(PredictionsHardmax(Model::Mode::Prediction)->Begin()));
-    });
-  }
-
-  // Create function to get the prediction softmax result offset
-  if(NetworkModel()->Options().bytecode_options.gen_prediction_results_softmax) {
-    NetworkModel()->ModuleManager().MakeFunction("prediction_softmax_result_offset", {{},{Type::I32}},{},
-                                                 [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
-      f.Insert(MakeI32Const(PredictionsSoftmax(Model::Mode::Prediction)->Begin()));
-    });
-  }
+  NetworkModel()->ModuleManager().MakeFunction("prediction_result_offset", {{},{Type::I32}},{},
+                                               [&](FuncBody f, std::vector<Var> params, std::vector<Var> locals) {
+    f.Insert(MakeI32Const(Predictions(Model::Mode::Prediction)->Begin()));
+  });
 }
 
 wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+  assert(hardmax_[mode_index] != nullptr);
   assert(locals.size() == 6);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -545,19 +612,18 @@ wabt::ExprList* DenseOutputLayer::UpdateConfusionMatrix(uint8_t mode_index, wabt
   auto vi32_6 = locals[5];
 
   wabt::ExprList *e = new ExprList();
-  assert(hardmax_[mode_index]);
   // Second update confusion matrix
-  Merge(e, NetworkModel()->Snippets().analysis->ConfusionMatrixUpdate(ConfusionMatrix(mode_index),
-                                                                      PredictionsHardmax(mode_index),
-                                                                      snippet::RelocMat(Predictions(mode_index), target_begin),
-                                                                      {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5,
-                                                                       vi32_6}));
+  Merge(e, NetworkModel()->Snippets().analysis
+      ->ConfusionMatrixUpdate(confusion_matrix_[mode_index], hardmax_[mode_index],
+                              snippet::RelocMat(Predictions(mode_index), target_begin),
+                              {vi32_1, vi32_2, vi32_3, vi32_4, vi32_5, vi32_6}));
   return e;
 }
 
 wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(uint8_t mode_index, Var target_begin, Var result,
                                                           std::vector<Var> locals) {
   assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
+  assert(hardmax_[mode_index] != nullptr);
   assert(locals.size() == 5);
   auto vi32_1 = locals[0];
   auto vi32_2 = locals[1];
@@ -566,45 +632,46 @@ wabt::ExprList* DenseOutputLayer::CountCorrectPredictions(uint8_t mode_index, Va
   auto vi32_5 = locals[4];
 
   wabt::ExprList* e = new ExprList();
-  assert(hardmax_[mode_index]);
   // Second count correct predictions
-  Merge(e, NetworkModel()->Snippets().analysis->CorrectPredictions(PredictionsHardmax(mode_index),
-                                                                   snippet::RelocMat(Predictions(mode_index),
-                                                                                     target_begin), result,
-                                                                   {vi32_1, vi32_2, vi32_3}));
+  Merge(e, NetworkModel()->Snippets().analysis
+      ->CorrectPredictions(hardmax_[mode_index],
+                           snippet::RelocMat(Predictions(mode_index), target_begin),
+                           result, {vi32_1, vi32_2, vi32_3}));
   return e;
+}
+
+bool DenseOutputLayer::ShouldHardmax(uint8_t mode_index) const {
+  if(mode_index == Model::Mode::Training) {
+    return NetworkModel()->Options().bytecode_options.gen_training_confusion_matrix
+           || NetworkModel()->Options().bytecode_options.gen_training_accuracy;
+  }
+
+  if(mode_index == Model::Mode::Testing) {
+    return NetworkModel()->Options().bytecode_options.gen_testing_confusion_matrix
+           || NetworkModel()->Options().bytecode_options.gen_testing_accuracy;
+  }
+  return false;
 }
 
 void DenseOutputLayer::AllocateMemory() {
   FullyConnectedLayer::AllocateMemory();
-  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
-  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
-  ALLOCATE_MEMORY(A_hardmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
-  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
-  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
-  ALLOCATE_MEMORY(A_softmax_[Model::Mode::Prediction], Nodes(), NetworkModel()->PredictionBatchSize());
-  ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Training], Nodes(), Nodes());
-  ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Testing], Nodes(), Nodes());
+  if(ShouldHardmax(Model::Mode::Training)) {
+    ALLOCATE_MEMORY(hardmax_[Model::Mode::Training], Nodes(), NetworkModel()->TrainingBatchSize());
+  }
+  if(ShouldHardmax(Model::Mode::Testing)) {
+    ALLOCATE_MEMORY(hardmax_[Model::Mode::Testing], Nodes(), NetworkModel()->TestingBatchSize());
+  }
+  if(NetworkModel()->Options().bytecode_options.gen_training_confusion_matrix) {
+    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Training], Nodes(), Nodes());
+  }
+  if(NetworkModel()->Options().bytecode_options.gen_testing_confusion_matrix) {
+    ALLOCATE_MEMORY(confusion_matrix_[Model::Mode::Testing], Nodes(), Nodes());
+  }
 }
 
 ds::NDArray* DenseOutputLayer::Predictions(uint8_t mode_index) const {
   assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
   return A_[mode_index];
-}
-
-ds::NDArray* DenseOutputLayer::PredictionsHardmax(uint8_t mode_index) const {
-  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  return A_hardmax_[mode_index];
-}
-
-ds::NDArray* DenseOutputLayer::PredictionsSoftmax(uint8_t mode_index) const {
-  assert(mode_index >= Model::Mode::FIRST_MODE && mode_index <= Model::Mode::LAST_MODE);
-  return A_softmax_[mode_index];
-}
-
-ds::NDArray* DenseOutputLayer::ConfusionMatrix(uint8_t mode_index) const {
-  assert(mode_index == Model::Mode::Training || mode_index == Model::Mode::Testing);
-  return confusion_matrix_[mode_index];
 }
 
 ds::NDArray* DenseInputLayer::InputArray(uint8_t mode_index) const {

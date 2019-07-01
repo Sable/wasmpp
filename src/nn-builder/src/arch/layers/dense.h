@@ -45,50 +45,13 @@ public:
   // Create functions
   void MakeFunctions() override;
 
+  // Compute cost
+  wabt::ExprList* ComputeL1Cost(uint8_t mode_index, std::vector<wabt::Var>locals);
+  wabt::ExprList* ComputeL2Cost(uint8_t mode_index, std::vector<wabt::Var>locals);
+
   // Layer configuration
   virtual FullyConnectedLayer* KeepProb(float keep_prob);
   FullyConnectedLayer* WeightType(WeightDistributionType type);
-};
-
-class DenseHiddenLayer : public FullyConnectedLayer {
-public:
-  DenseHiddenLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
-      FullyConnectedLayer(Hidden, nodes, act_func) {}
-};
-
-class DenseOutputLayer : public FullyConnectedLayer {
-public:
-  DenseOutputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
-      FullyConnectedLayer(Output, nodes, act_func) {}
-  // Allocate memory
-  void AllocateMemory() override ;
-  // Get arrays
-  ds::NDArray* Predictions(uint8_t mode_index) const;
-  ds::NDArray* PredictionsHardmax(uint8_t mode_index) const;
-  ds::NDArray* PredictionsSoftmax(uint8_t mode_index) const;
-  ds::NDArray* ConfusionMatrix(uint8_t mode_index) const;
-  // Error out on keep probability on the output layer
-  FullyConnectedLayer* KeepProb(float keep_prob) override ;
-  // Apply softmax to predictions
-  DenseOutputLayer* Softmax(uint8_t mode_index);
-  // Apply hardmax to predictions
-  DenseOutputLayer* Hardmax(uint8_t mode_index);
-  // Augment forward algorithm
-  wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
-  void MakeFunctions() override ;
-
-  // Compute cost value
-  wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);
-  // Update confusion matrix
-  wabt::ExprList* UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals);
-  // Count number of correct predictions
-  wabt::ExprList* CountCorrectPredictions(uint8_t mode_index, wabt::Var target_begin, wabt::Var result, std::vector<wabt::Var> locals);
-private:
-  bool softmax_[3] = {false, false, false}; // Training, Testing, Prediction
-  bool hardmax_[3] = {false, false, false}; // Training, Testing, Prediction
-  ds::NDArray* A_hardmax_[3]; // Training, Testing, Prediction
-  ds::NDArray* A_softmax_[3]; // Training, Testing, Prediction
-  ds::NDArray* confusion_matrix_[2]; // Training, Testing
 };
 
 class DenseInputLayer : public FullyConnectedLayer {
@@ -99,6 +62,41 @@ public:
   DenseInputLayer(uint32_t nodes) : FullyConnectedLayer(Input, nodes, builtins::ActivationFunction()) {}
   ds::NDArray* InputArray(uint8_t mode_index) const;
   void MakeFunctions() override ;
+};
+
+class DenseHiddenLayer : public FullyConnectedLayer {
+public:
+  DenseHiddenLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
+      FullyConnectedLayer(Hidden, nodes, act_func) {}
+  void Validate() override ;
+};
+
+class DenseOutputLayer : public FullyConnectedLayer {
+public:
+  DenseOutputLayer(uint32_t nodes, builtins::ActivationFunction act_func) :
+      FullyConnectedLayer(Output, nodes, act_func) {}
+  // Allocate memory
+  void AllocateMemory() override ;
+  // Get arrays
+  ds::NDArray* Predictions(uint8_t mode_index) const;
+  // Error out on keep probability on the output layer
+  FullyConnectedLayer* KeepProb(float keep_prob) override ;
+  // Augment forward algorithm
+  wabt::ExprList* Forward(uint8_t mode_index, wabt::Var input_begin, std::vector<wabt::Var> locals) final;
+  void MakeFunctions() override ;
+  void Validate() override ;
+
+  // Compute cost value
+  wabt::ExprList* ComputeCost(uint8_t mode_index, wabt::Var target_begin);
+  // Update confusion matrix
+  wabt::ExprList* UpdateConfusionMatrix(uint8_t mode_index, wabt::Var target_begin, std::vector<wabt::Var> locals);
+  // Count number of correct predictions
+  wabt::ExprList* CountCorrectPredictions(uint8_t mode_index, wabt::Var target_begin, wabt::Var result, std::vector<wabt::Var> locals);
+private:
+  // Check if hardmax is required
+  bool ShouldHardmax(uint8_t mode_index) const;
+  ds::NDArray* hardmax_[2]          = {nullptr, nullptr}; // Training, Testing
+  ds::NDArray* confusion_matrix_[2] = {nullptr, nullptr}; // Training, Testing
 };
 
 } // namespace layer

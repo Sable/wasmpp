@@ -7,8 +7,19 @@ namespace nn {
 namespace builtins {
 
 struct ActivationFunction {
+  enum Type {
+    SIGMOID,
+    RELU,
+    LEAKY_RELU,
+    ELU,
+    TANH,
+    LINEAR,
+    SOFTMAX
+  } type;
   wabt::Var function;
   wabt::Var derivative;
+  bool operator==(const ActivationFunction& func) const;
+  bool operator!=(const ActivationFunction& func) const;
 };
 struct ActivationOptions {
   float linear_slope = 1;
@@ -25,6 +36,7 @@ private:
   ActivationFunction elu_;
   ActivationFunction tanh_;
   ActivationFunction linear_;
+  ActivationFunction softmax_;
 public:
   Activation(ActivationOptions options) : options_(options) {}
   void InitImports(arch::Model* model, wasmpp::ModuleManager* module_manager, std::string module_name) override ;
@@ -36,6 +48,7 @@ public:
   const ActivationFunction& Tanh() const { return tanh_; }
   const ActivationFunction& Linear() const { return linear_; }
   const ActivationFunction& ELU() const { return elu_; }
+  const ActivationFunction& Softmax() const { return softmax_; }
 };
 
 } // namespace builtins
