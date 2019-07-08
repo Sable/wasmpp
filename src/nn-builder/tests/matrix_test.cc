@@ -1280,9 +1280,9 @@ void MatrixSnippetSimdTest::MatrixAddRightSignScaleSimd_test_1() {
       float s_val = val * (index % 2 == 0 ? 1 : -1);
       signed int ge = (s_val >= 0 ? -1 : 0);
       float cnvt = (float) ge;
-      float mul = cnvt * (2*scale);
-      float add = scale + mul;
-      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + add)));
+      float mul = cnvt * (-2*scale);
+      float sub = mul - scale;
+      f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + sub)));
       index++;
       val++;
     }
@@ -1339,10 +1339,10 @@ void MatrixSnippetSimdTest::MatrixAddRightSignScaleAddRightScale_test_1() {
       float s_val = val * (index % 2 == 0 ? 1 : -1);
       signed int ge = (s_val >= 0 ? -1 : 0);
       float cnvt = (float) ge;
-      float mul = cnvt * (2*scale1);
-      float add = scale1 + mul;
+      float mul = cnvt * (-2*scale1);
+      float sub = mul - scale1;
       float rhs_scale2 = s_val * scale2;
-      float rhs_val = add + rhs_scale2;
+      float rhs_val = sub + rhs_scale2;
       f.Insert(MakeF32Store(MakeI32Const(expected->Begin() + i * 4), MakeF32Const(s_val + rhs_val)));
       index++;
       val++;
