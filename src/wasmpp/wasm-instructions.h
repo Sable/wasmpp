@@ -119,6 +119,9 @@ wabt::ExprList* MakeNop();
 
 #ifdef WABT_EXPERIMENTAL
 wabt::ExprList* MakeNativeCall(wabt::Var var, std::vector<wabt::ExprList*> args);
+wabt::ExprList* MakeOffset32(wabt::ExprList* base, wabt::ExprList* offset, wabt::ExprList* size);
+wabt::ExprList* MakeDup(wabt::ExprList* expr);
+wabt::ExprList* MakeSwap(wabt::ExprList* expr1, wabt::ExprList* expr2);
 #endif
 
 }

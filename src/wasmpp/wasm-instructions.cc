@@ -213,6 +213,30 @@ wabt::ExprList* MakeNativeCall(wabt::Var var, std::vector<wabt::ExprList*> args)
   e->push_back(wabt::MakeUnique<wabt::CallNativeExpr>(var));
   return e;
 }
+
+wabt::ExprList* MakeOffset32(wabt::ExprList* base, wabt::ExprList* offset, wabt::ExprList* size) {
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, base);
+  Merge(e, offset);
+  Merge(e, size);
+  e->push_back(wabt::MakeUnique<wabt::Offset32Expr>());
+  return e;
+}
+
+wabt::ExprList* MakeDup(wabt::ExprList* expr) {
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, expr);
+  e->push_back(wabt::MakeUnique<wabt::DuplicateExpr>());
+  return e;
+}
+
+wabt::ExprList* MakeSwap(wabt::ExprList* expr1, wabt::ExprList* expr2) {
+  wabt::ExprList* e = new wabt::ExprList();
+  Merge(e, expr1);
+  Merge(e, expr2);
+  e->push_back(wabt::MakeUnique<wabt::SwapExpr>());
+  return e;
+}
 #endif // WABT_EXPERIMENTAL
 
 } // namespace wasmpp
