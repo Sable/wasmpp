@@ -1,0 +1,7 @@
+<map id="nn::arch::layer::DenseInputLayer" name="nn::arch::layer::DenseInputLayer">
+<area shape="rect" id="node2" href="$classnn_1_1arch_1_1layer_1_1FullyConnectedLayer.html" title="nn::arch::layer::FullyConnected\lLayer" alt="" coords="537,71,741,112"/>
+<area shape="rect" id="node3" href="$classnn_1_1arch_1_1layer_1_1TypedLayer.html" title="nn::arch::layer::TypedLayer\l\&lt; FullyConnected \&gt;" alt="" coords="200,5,381,47"/>
+<area shape="rect" id="node4" href="$classnn_1_1arch_1_1layer_1_1Layer.html" title="nn::arch::layer::Layer" alt="" coords="5,13,151,39"/>
+<area shape="rect" id="node5" href="$structnn_1_1builtins_1_1ActivationFunction.html" title="nn::builtins::Activation\lFunction" alt="" coords="215,71,366,112"/>
+<area shape="rect" id="node6" href="$classnn_1_1ds_1_1NDArray.html" title="nn::ds::NDArray" alt="" coords="232,241,349,267"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="nn::arch::BuiltinFunctions" name="nn::arch::BuiltinFunctions">
+<area shape="rect" id="node2" href="$classnn_1_1builtins_1_1Math.html" title="nn::builtins::Math" alt="" coords="5,81,128,108"/>
+<area shape="rect" id="node3" href="$classnn_1_1builtins_1_1Builtin.html" title="nn::builtins::Builtin" alt="" coords="203,5,333,32"/>
+<area shape="rect" id="node4" href="$classnn_1_1builtins_1_1System.html" title="nn::builtins::System" alt="" coords="152,81,291,108"/>
+<area shape="rect" id="node5" href="$classnn_1_1builtins_1_1Loss.html" title="nn::builtins::Loss" alt="" coords="315,81,437,108"/>
+<area shape="rect" id="node6" href="$classnn_1_1builtins_1_1Activation.html" title="nn::builtins::Activation" alt="" coords="461,81,611,108"/>
+</map>

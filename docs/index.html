@@ -5,19 +5,38 @@
 </head>
 <body>
 <h1>Documentation</h1>
-<table border="0" cellpadding="4">
+<table border="0" cellpadding="10">
   <tr>
-    <td>Demo</td>
-    <td><a href="demo/nnb.html">Neural Network Builder</a></td>
-  </tr>
-  <tr>
-    <td>Wasm++</td>
+    <th>Wasm++</th>
     <td><a href="wasmpp_html/">Documentation</a></td>
+    <td><a href="wasmpp_api/">API</a> (Doxygen)</td>
+    <td></td>
   </tr>
   <tr>
-    <td>WasmDNN</td>
+    <th>WasmDNN</th>
     <td><a href="wasmdnn_html/">Documentation</a></td>
+    <td><a href="wasmdnn_api/">API</a> (Doxygen)</td>
+    <td><a href="demo/nnb.html">Online demo</a></td>
   </tr>
 </table>
+<hr/>
+
+<h2>Update Demo</h2>
+<pre>
+cd scripts/
+./build_demo.sh
+</pre>
+
+<h2>Update Documentation</h2>
+<pre>
+cd scripts/
+./build_docs.sh
+</pre>
+
+<h2>Update API (Doxygen)</h2>
+<pre>
+cd scripts/
+./build_doxygen.sh
+</pre>
 </body>
 </html>

@@ -62,3 +62,22 @@ target_link_libraries(${NN_TEST} ${NN_BUILDER})
 # Create mnist example
 add_executable(${MNIST} src/nn-builder/examples/cpp/mnist.cc)
 target_link_libraries(${MNIST} ${NN_BUILDER})
+
+# Doxygen
+find_package(Doxygen)
+
+if(${DOXYGEN_FOUND})
+    # Doxygen for Wasm++
+    set(DOXYGEN_GENERATE_HTML YES)
+    set(DOXYGEN_PROJECT_NAME "Wasm++")
+    set(DOXYGEN_OUTPUT_DIRECTORY "wasmpp_api")
+    file(GLOB_RECURSE WASMPP_DOCS_FILES src/wasmpp/*.h)
+    doxygen_add_docs(doxygen_wasmpp ${WASMPP_DOCS_FILES})
+
+    # Doxygen for WasmDNN
+    set(DOXYGEN_GENERATE_HTML YES)
+    set(DOXYGEN_PROJECT_NAME "WasmDNN")
+    set(DOXYGEN_OUTPUT_DIRECTORY "wasmdnn_api")
+    file(GLOB_RECURSE NN_BUILDER_DOCS_FILES src/nn-builder/src/*/*.h)
+    doxygen_add_docs(doxygen_wasmdnn ${NN_BUILDER_DOCS_FILES})
+endif()

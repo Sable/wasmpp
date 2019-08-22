@@ -1,0 +1,5 @@
+<map id="nn::arch::layer::DenseHiddenLayer" name="nn::arch::layer::DenseHiddenLayer">
+<area shape="rect" id="node2" href="$classnn_1_1arch_1_1layer_1_1FullyConnectedLayer.html" title="nn::arch::layer::FullyConnected\lLayer" alt="" coords="5,169,209,211"/>
+<area shape="rect" id="node3" href="$classnn_1_1arch_1_1layer_1_1TypedLayer.html" title="nn::arch::layer::TypedLayer\l\&lt; FullyConnected \&gt;" alt="" coords="17,80,198,121"/>
+<area shape="rect" id="node4" href="$classnn_1_1arch_1_1layer_1_1Layer.html" title="nn::arch::layer::Layer" alt="" coords="35,5,180,32"/>
+</map>

@@ -1,0 +1,9 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="node1" href="$classnn_1_1arch_1_1layer_1_1Layer.html" title="nn::arch::layer::Layer" alt="" coords="5,46,151,73"/>
+<area shape="rect" id="node2" href="$classnn_1_1arch_1_1layer_1_1TypedLayer.html" title="nn::arch::layer::TypedLayer\l\&lt; type \&gt;" alt="" coords="199,5,380,47"/>
+<area shape="rect" id="node3" href="$classnn_1_1arch_1_1layer_1_1TypedLayer.html" title="nn::arch::layer::TypedLayer\l\&lt; FullyConnected \&gt;" alt="" coords="199,71,380,112"/>
+<area shape="rect" id="node4" href="$classnn_1_1arch_1_1layer_1_1FullyConnectedLayer.html" title="nn::arch::layer::FullyConnected\lLayer" alt="" coords="428,71,632,112"/>
+<area shape="rect" id="node5" href="$classnn_1_1arch_1_1layer_1_1DenseHiddenLayer.html" title="nn::arch::layer::DenseHidden\lLayer" alt="" coords="680,5,872,47"/>
+<area shape="rect" id="node6" href="$classnn_1_1arch_1_1layer_1_1DenseInputLayer.html" title="nn::arch::layer::DenseInput\lLayer" alt="" coords="686,71,866,112"/>
+<area shape="rect" id="node7" href="$classnn_1_1arch_1_1layer_1_1DenseOutputLayer.html" title="nn::arch::layer::DenseOutput\lLayer" alt="" coords="681,136,871,177"/>
+</map>

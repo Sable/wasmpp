@@ -1,0 +1,5 @@
+<map id="nn::arch::ModelOptions" name="nn::arch::ModelOptions">
+<area shape="rect" id="node2" href="$structnn_1_1arch_1_1ModelBytecodeOptions.html" title="nn::arch::ModelBytecodeOptions" alt="" coords="5,5,217,32"/>
+<area shape="rect" id="node3" href="$structnn_1_1arch_1_1WeightDistributionOptions.html" title="nn::arch::WeightDistribution\lOptions" alt="" coords="19,57,203,98"/>
+<area shape="rect" id="node4" href="$structnn_1_1builtins_1_1ActivationOptions.html" title="nn::builtins::Activation\lOptions" alt="" coords="36,122,187,163"/>
+</map>
