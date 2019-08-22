@@ -1,6 +1,6 @@
 site_name: Wasm++
 theme: material
-pages:
+nav:
   - 'Home': 'index.md'
   - 'Makers & Generators': 'maker_generator.md'
   - 'Managers': 'managers.md'
