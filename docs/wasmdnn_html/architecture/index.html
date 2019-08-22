@@ -31,18 +31,18 @@
       
         <meta name="lang:search.tokenizer" content="[\s\-]+">
       
-      <link rel="shortcut icon" href="assets/images/favicon.png">
+      <link rel="shortcut icon" href="../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.0.4, mkdocs-material-3.1.0">
     
     
       
-        <title>WasmDNN</title>
+        <title>Architecture - WasmDNN</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/application.11e41852.css">
+      <link rel="stylesheet" href="../assets/stylesheets/application.11e41852.css">
       
-        <link rel="stylesheet" href="assets/stylesheets/application-palette.22915126.css">
+        <link rel="stylesheet" href="../assets/stylesheets/application-palette.22915126.css">
       
       
         
@@ -51,7 +51,7 @@
       
     
     
-      <script src="assets/javascripts/modernizr.20ef595d.js"></script>
+      <script src="../assets/javascripts/modernizr.20ef595d.js"></script>
     
     
       
@@ -60,7 +60,7 @@
         <style>body,input{font-family:"Roboto","Helvetica Neue",Helvetica,Arial,sans-serif}code,kbd,pre{font-family:"Roboto Mono","Courier New",Courier,monospace}</style>
       
     
-    <link rel="stylesheet" href="assets/fonts/material-icons.css">
+    <link rel="stylesheet" href="../assets/fonts/material-icons.css">
     
     
     
@@ -89,7 +89,7 @@
   <nav class="md-header-nav md-grid">
     <div class="md-flex">
       <div class="md-flex__cell md-flex__cell--shrink">
-        <a href="." title="WasmDNN" class="md-header-nav__button md-logo">
+        <a href=".." title="WasmDNN" class="md-header-nav__button md-logo">
           
             <i class="md-icon"></i>
           
@@ -106,7 +106,7 @@
                 WasmDNN
               </span>
               <span class="md-header-nav__topic">
-                Home
+                Architecture
               </span>
             
           
@@ -161,7 +161,7 @@
                   <div class="md-sidebar__inner">
                     <nav class="md-nav md-nav--primary" data-md-level="0">
   <label class="md-nav__title md-nav__title--site" for="__drawer">
-    <a href="." title="WasmDNN" class="md-nav__button md-logo">
+    <a href=".." title="WasmDNN" class="md-nav__button md-logo">
       
         <i class="md-icon"></i>
       
@@ -170,6 +170,18 @@
   </label>
   
   <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+      
+
+
+  <li class="md-nav__item">
+    <a href=".." title="Home" class="md-nav__link">
+      Home
+    </a>
+  </li>
+
     
       
       
@@ -186,11 +198,11 @@
     
     
       <label class="md-nav__link md-nav__link--active" for="__toc">
-        Home
+        Architecture
       </label>
     
-    <a href="." title="Home" class="md-nav__link md-nav__link--active">
-      Home
+    <a href="./" title="Architecture" class="md-nav__link md-nav__link--active">
+      Architecture
     </a>
     
       
@@ -204,16 +216,22 @@
     <ul class="md-nav__list" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#getting-started" title="Getting Started" class="md-nav__link">
-    Getting Started
+  <a href="#architecture" title="Architecture" class="md-nav__link">
+    Architecture
+  </a>
+  
+    <nav class="md-nav">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline" title="Pipeline" class="md-nav__link">
+    Pipeline
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#demo" title="Demo" class="md-nav__link">
-    Demo
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -234,19 +252,7 @@
 
 
   <li class="md-nav__item">
-    <a href="architecture/" title="Architecture" class="md-nav__link">
-      Architecture
-    </a>
-  </li>
-
-    
-      
-      
-      
-
-
-  <li class="md-nav__item">
-    <a href="features/" title="Features" class="md-nav__link">
+    <a href="../features/" title="Features" class="md-nav__link">
       Features
     </a>
   </li>
@@ -273,16 +279,22 @@
     <ul class="md-nav__list" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#getting-started" title="Getting Started" class="md-nav__link">
-    Getting Started
+  <a href="#architecture" title="Architecture" class="md-nav__link">
+    Architecture
+  </a>
+  
+    <nav class="md-nav">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pipeline" title="Pipeline" class="md-nav__link">
+    Pipeline
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#demo" title="Demo" class="md-nav__link">
-    Demo
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -307,15 +319,16 @@
 <p>WasmDNN is a deep neural network library for generating machine learning models in WebAssembly. The library is
 written in C++, but an alternative JavaScript/WebAssembly version is also available by compiling the project
 using Emscripten.</p>
-<h2 id="getting-started">Getting Started</h2>
-<ul>
-<li><a href="architecture/">Architecture</a></li>
-<li><a href="features/">Features</a></li>
-</ul>
-<h2 id="demo">Demo</h2>
-<ul>
-<li><a href="../demo/nnb.html">Online version</a></li>
-</ul>
+<h2 id="architecture">Architecture</h2>
+<h3 id="pipeline">Pipeline</h3>
+<p><img alt="Pipeline" src="../img/pipeline.png" /></p>
+<p>Above is an overview diagram of the WasmDNN library pipeline using an example model
+designed to operate on the MNIST dataset.  To configure this model, one can either do this in C++ or in
+WebAssembly using JavaScript bindings. In the C++ option, the model configuration is done using the WasmDNN
+library. In the JavaScript bindings, the model configuration is done using the WebAssembly version
+of the library compiled, together with Wasm++ and WABT, using Emscripten. Both model
+configuration options are equivalent and should be capable of generating identical machine
+learning Wasm model to train, test and predict on the MNIST dataset.</p>
                 
                   
                 
@@ -336,14 +349,28 @@ using Emscripten.</p>
     <div class="md-footer-nav">
       <nav class="md-footer-nav__inner md-grid">
         
+          <a href=".." title="Home" class="md-flex md-footer-nav__link md-footer-nav__link--prev" rel="prev">
+            <div class="md-flex__cell md-flex__cell--shrink">
+              <i class="md-icon md-icon--arrow-back md-footer-nav__button"></i>
+            </div>
+            <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+              <span class="md-flex__ellipsis">
+                <span class="md-footer-nav__direction">
+                  Previous
+                </span>
+                Home
+              </span>
+            </div>
+          </a>
         
-          <a href="architecture/" title="Architecture" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
+        
+          <a href="../features/" title="Features" class="md-flex md-footer-nav__link md-footer-nav__link--next" rel="next">
             <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
               <span class="md-flex__ellipsis">
                 <span class="md-footer-nav__direction">
                   Next
                 </span>
-                Architecture
+                Features
               </span>
             </div>
             <div class="md-flex__cell md-flex__cell--shrink">
@@ -373,9 +400,9 @@ using Emscripten.</p>
       
     </div>
     
-      <script src="assets/javascripts/application.9e1f3b71.js"></script>
+      <script src="../assets/javascripts/application.9e1f3b71.js"></script>
       
-      <script>app.initialize({version:"1.0.4",url:{base:"."}})</script>
+      <script>app.initialize({version:"1.0.4",url:{base:".."}})</script>
       
     
     

@@ -1,2 +1,10 @@
 site_name: WasmDNN
-theme: material
+nav:
+  - 'Home': 'index.md'
+  - 'Architecture': 'architecture.md'
+  - 'Features': 'features.md'
+theme:
+  name: 'material'
+  palette:
+    primary: 'light green'
+    accent: 'light green'

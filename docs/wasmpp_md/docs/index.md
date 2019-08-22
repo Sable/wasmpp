@@ -8,4 +8,4 @@ building [WABT](https://github.com/WebAssembly/wabt) IR objects.
 - [Managers](managers.md)
 
 ## Example of Usage
-- [WasmDNN](..//wasmdnn_html/)
+- [WasmDNN](../wasmdnn_html/)
