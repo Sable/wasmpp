@@ -7,3 +7,6 @@
 [submodule "third_party/node"]
 	path = third_party/node
 	url = https://github.com/amirbawab/node
+[submodule "third_party/mkdocs"]
+	path = third_party/mkdocs
+	url = https://github.com/mkdocs/mkdocs
