@@ -269,8 +269,11 @@ model.AddDenseOutputLayer(l2);</textarea>
     bytecode_options.gen_testing_accuracy              = true;
     bytecode_options.gen_testing_confusion_matrix      = true;
     bytecode_options.use_simd                          = document.getElementById('use_simd').checked;
+    let weights_options = new nnb.WeightDistributionOptions()
+    weights_options.seed = new Date().getTime() >>> 0;
     let options = new nnb.ModelOptions();
     options.bytecode_options = bytecode_options;
+    options.weights_options = weights_options;
 
     // Load data
     let training_batch          = parseInt(document.getElementById('train_batch').value);

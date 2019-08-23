@@ -149,12 +149,13 @@ EMSCRIPTEN_BINDINGS(model_options) {
   .property(#name, &WeightDistributionOptions::name)
 
     class_<WeightDistributionOptions>("WeightDistributionOptions")
-    WEIGHT_DISTRIBUTION_OPTIONS(gaussian_mean)
-    WEIGHT_DISTRIBUTION_OPTIONS(gaussian_std_dev)
-    WEIGHT_DISTRIBUTION_OPTIONS(uniform_low)
-    WEIGHT_DISTRIBUTION_OPTIONS(uniform_high)
-    WEIGHT_DISTRIBUTION_OPTIONS(constant_value)
-    WEIGHT_DISTRIBUTION_OPTIONS(seed);
+        .constructor<>()
+        WEIGHT_DISTRIBUTION_OPTIONS(gaussian_mean)
+        WEIGHT_DISTRIBUTION_OPTIONS(gaussian_std_dev)
+        WEIGHT_DISTRIBUTION_OPTIONS(uniform_low)
+        WEIGHT_DISTRIBUTION_OPTIONS(uniform_high)
+        WEIGHT_DISTRIBUTION_OPTIONS(constant_value)
+        WEIGHT_DISTRIBUTION_OPTIONS(seed);
 
 #define ACTIVATION_OPTIONS(name) \
   .property(#name, &ActivationOptions::name)

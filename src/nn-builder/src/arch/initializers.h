@@ -39,13 +39,13 @@ struct WeightDistributionOptions {
   float uniform_low = -1;
   float uniform_high = 1;
   float constant_value = 0.1;
-  uint64_t seed = 0;
+  uint32_t seed = 0;
 };
 
-std::vector<wasmpp::DataEntry> XavierDistribution(uint32_t size, uint32_t n_in, uint32_t n_out, bool uniform, uint64_t seed);
-std::vector<wasmpp::DataEntry> LeCunDistribution(uint32_t size, uint32_t n_in, bool uniform, uint64_t seed);
-std::vector<wasmpp::DataEntry> GaussianDistribution(uint32_t size, float mean, float std_dev, uint64_t seed);
-std::vector<wasmpp::DataEntry> UniformDistribution(uint32_t size, float low, float high, uint64_t seed);
+std::vector<wasmpp::DataEntry> XavierDistribution(uint32_t size, uint32_t n_in, uint32_t n_out, bool uniform, uint32_t seed);
+std::vector<wasmpp::DataEntry> LeCunDistribution(uint32_t size, uint32_t n_in, bool uniform, uint32_t seed);
+std::vector<wasmpp::DataEntry> GaussianDistribution(uint32_t size, float mean, float std_dev, uint32_t seed);
+std::vector<wasmpp::DataEntry> UniformDistribution(uint32_t size, float low, float high, uint32_t seed);
 std::vector<wasmpp::DataEntry> ConstantDistribution(uint32_t size, float value);
 
 } // namespace arch
