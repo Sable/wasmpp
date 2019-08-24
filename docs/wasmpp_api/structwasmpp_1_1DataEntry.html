@@ -72,10 +72,15 @@ $(function() {
 <div class="title">wasmpp::DataEntry Struct Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>A data entry or unit in the linear memory.  
+ <a href="structwasmpp_1_1DataEntry.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:acf4c110ea685062a6451e4a003cab47e"><td class="memItemLeft" align="right" valign="top"><a id="acf4c110ea685062a6451e4a003cab47e"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>Kind</b> { <br />
+<tr class="memitem:acf4c110ea685062a6451e4a003cab47e"><td class="memItemLeft" align="right" valign="top"><a id="acf4c110ea685062a6451e4a003cab47e"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#acf4c110ea685062a6451e4a003cab47e">Kind</a> { <br />
 &#160;&#160;<b>Byte</b>, 
 <b>I32</b>, 
 <b>I64</b>, 
@@ -83,32 +88,27 @@ Public Types</h2></td></tr>
 <br />
 &#160;&#160;<b>F64</b>
 <br />
- }</td></tr>
+ }<tr class="memdesc:acf4c110ea685062a6451e4a003cab47e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Entry kind. <br /></td></tr>
+</td></tr>
 <tr class="separator:acf4c110ea685062a6451e4a003cab47e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a29a63ac9091df5e17c2ebe2f04361273"><td class="memItemLeft" align="right" valign="top"><a id="a29a63ac9091df5e17c2ebe2f04361273"></a>
-uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>Size</b> () const</td></tr>
+<tr class="memitem:a29a63ac9091df5e17c2ebe2f04361273"><td class="memItemLeft" align="right" valign="top">uint32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#a29a63ac9091df5e17c2ebe2f04361273">Size</a> () const</td></tr>
 <tr class="separator:a29a63ac9091df5e17c2ebe2f04361273"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
-<tr class="memitem:a4aeed8ca489c3e84a61989968ad2c3fd"><td class="memItemLeft" align="right" valign="top"><a id="a4aeed8ca489c3e84a61989968ad2c3fd"></a>
-static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><b>MakeI32</b> (uint32_t val)</td></tr>
-<tr class="separator:a4aeed8ca489c3e84a61989968ad2c3fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad4a5288fab21e52c603e1ccefa51452a"><td class="memItemLeft" align="right" valign="top"><a id="ad4a5288fab21e52c603e1ccefa51452a"></a>
-static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><b>MakeI64</b> (uint64_t val)</td></tr>
-<tr class="separator:ad4a5288fab21e52c603e1ccefa51452a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae193cd8f3862da1614b85076498e2f38"><td class="memItemLeft" align="right" valign="top"><a id="ae193cd8f3862da1614b85076498e2f38"></a>
-static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><b>MakeF32</b> (float val)</td></tr>
-<tr class="separator:ae193cd8f3862da1614b85076498e2f38"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9f8d35386863d3e729181dcda12022be"><td class="memItemLeft" align="right" valign="top"><a id="a9f8d35386863d3e729181dcda12022be"></a>
-static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><b>MakeF64</b> (double val)</td></tr>
-<tr class="separator:a9f8d35386863d3e729181dcda12022be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a80657973d011e94f224ba658c5b7946f"><td class="memItemLeft" align="right" valign="top"><a id="a80657973d011e94f224ba658c5b7946f"></a>
-static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><b>MakeByte</b> (uint8_t val)</td></tr>
-<tr class="separator:a80657973d011e94f224ba658c5b7946f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8b57974ed6245fa16e0007c14be0e5b8"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#a8b57974ed6245fa16e0007c14be0e5b8">MakeI32</a> (uint32_t val)</td></tr>
+<tr class="separator:a8b57974ed6245fa16e0007c14be0e5b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a25c515604478c2db5f0d6cacb85661cf"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#a25c515604478c2db5f0d6cacb85661cf">MakeI64</a> (uint64_t val)</td></tr>
+<tr class="separator:a25c515604478c2db5f0d6cacb85661cf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adca3c2dec0f907e35a47e494ea789515"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#adca3c2dec0f907e35a47e494ea789515">MakeF32</a> (float val)</td></tr>
+<tr class="separator:adca3c2dec0f907e35a47e494ea789515"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a06c5d8af9731f898d6829208f8f807e5"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#a06c5d8af9731f898d6829208f8f807e5">MakeF64</a> (double val)</td></tr>
+<tr class="separator:a06c5d8af9731f898d6829208f8f807e5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7c76a15843999961807961e3e5700865"><td class="memItemLeft" align="right" valign="top">static <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structwasmpp_1_1DataEntry.html#a7c76a15843999961807961e3e5700865">MakeByte</a> (uint8_t val)</td></tr>
+<tr class="separator:a7c76a15843999961807961e3e5700865"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
@@ -132,11 +132,206 @@ union {</td></tr>
 <tr class="memitem:ab19a1848c51d0afa7c5fe0cc2b7c1058"><td class="memItemLeft" valign="top">}&#160;</td><td class="memItemRight" valign="bottom"><b>val</b></td></tr>
 <tr class="separator:ab19a1848c51d0afa7c5fe0cc2b7c1058"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1a1c3ddd4a90ec67824bd8562483e7fb"><td class="memItemLeft" align="right" valign="top"><a id="a1a1c3ddd4a90ec67824bd8562483e7fb"></a>
-enum wasmpp::DataEntry::Kind&#160;</td><td class="memItemRight" valign="bottom"><b>kind</b></td></tr>
+enum <a class="el" href="structwasmpp_1_1DataEntry.html#acf4c110ea685062a6451e4a003cab47e">wasmpp::DataEntry::Kind</a>&#160;</td><td class="memItemRight" valign="bottom"><b>kind</b></td></tr>
 <tr class="separator:a1a1c3ddd4a90ec67824bd8562483e7fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this struct was generated from the following file:<ul>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>A data entry or unit in the linear memory. </p>
+</div><h2 class="groupheader">Member Function Documentation</h2>
+<a id="a7c76a15843999961807961e3e5700865"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7c76a15843999961807961e3e5700865">&#9670;&nbsp;</a></span>MakeByte()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> wasmpp::DataEntry::MakeByte </td>
+          <td>(</td>
+          <td class="paramtype">uint8_t&#160;</td>
+          <td class="paramname"><em>val</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Make a byte data entry </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">val</td><td>Value </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Data entry </dd></dl>
+
+</div>
+</div>
+<a id="adca3c2dec0f907e35a47e494ea789515"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adca3c2dec0f907e35a47e494ea789515">&#9670;&nbsp;</a></span>MakeF32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> wasmpp::DataEntry::MakeF32 </td>
+          <td>(</td>
+          <td class="paramtype">float&#160;</td>
+          <td class="paramname"><em>val</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Make an f32 data entry </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">val</td><td>Value </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Data entry </dd></dl>
+
+</div>
+</div>
+<a id="a06c5d8af9731f898d6829208f8f807e5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a06c5d8af9731f898d6829208f8f807e5">&#9670;&nbsp;</a></span>MakeF64()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> wasmpp::DataEntry::MakeF64 </td>
+          <td>(</td>
+          <td class="paramtype">double&#160;</td>
+          <td class="paramname"><em>val</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Make an f64 data entry </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">val</td><td>Value </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Data entry </dd></dl>
+
+</div>
+</div>
+<a id="a8b57974ed6245fa16e0007c14be0e5b8"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8b57974ed6245fa16e0007c14be0e5b8">&#9670;&nbsp;</a></span>MakeI32()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> wasmpp::DataEntry::MakeI32 </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>val</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Make an i32 data entry </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">val</td><td>Value </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Data entry </dd></dl>
+
+</div>
+</div>
+<a id="a25c515604478c2db5f0d6cacb85661cf"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a25c515604478c2db5f0d6cacb85661cf">&#9670;&nbsp;</a></span>MakeI64()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> wasmpp::DataEntry::MakeI64 </td>
+          <td>(</td>
+          <td class="paramtype">uint64_t&#160;</td>
+          <td class="paramname"><em>val</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Make an i64 data entry </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">val</td><td>Value </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Data entry </dd></dl>
+
+</div>
+</div>
+<a id="a29a63ac9091df5e17c2ebe2f04361273"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a29a63ac9091df5e17c2ebe2f04361273">&#9670;&nbsp;</a></span>Size()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t wasmpp::DataEntry::Size </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Entry size </p><dl class="section return"><dt>Returns</dt><dd>Number of bytes </dd></dl>
+
+</div>
+</div>
+<hr/>The documentation for this struct was generated from the following files:<ul>
 <li>src/wasmpp/<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a></li>
+<li>src/wasmpp/wasm-manager.cc</li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

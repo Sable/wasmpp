@@ -1,3 +1,7 @@
+/*!
+ * @file wasm-instructions.h
+ */
+
 #ifndef WASM_WASM_INSTRUCTIONS_H_
 #define WASM_WASM_INSTRUCTIONS_H_
 
@@ -10,27 +14,98 @@ class LabelManager;
 class ContentManager;
 typedef ContentManager BlockBody;
 
-// Helpers
+/*!
+ * Convert an expression into an expression list
+ * with one element
+ * @param expr Expression
+ * @return Expression list
+ */
 wabt::ExprList* ExprToExprList(std::unique_ptr<wabt::Expr> expr);
+
+/*!
+ * Merge second expression list into first expression list
+ * @note Expression lists will be modified
+ * @param e1 Merge into list
+ * @param e2 Merge from list
+ */
 void Merge(wabt::ExprList* e1, wabt::ExprList* e2);
 
-// Make block expressions
+/*!
+ * Make a Wasm loop
+ * @param label_manager Label manager
+ * @param sig Loop signature
+ * @param content Loop body
+ * @return Expression list
+ */
 wabt::ExprList* MakeLoop(LabelManager* label_manager, wabt::FuncSignature sig,
                          std::function<void(BlockBody, wabt::Var)> content);
+
+/*!
+ * Make a Wasm block
+ * @param label_manager Label manager
+ * @param sig Block signature
+ * @param content Block body
+ * @return Expression list
+ */
 wabt::ExprList* MakeBlock(LabelManager* label_manager, wabt::FuncSignature sig,
                           std::function<void(BlockBody, wabt::Var)> content);
+
+/*!
+ * Make a Wasm if statement
+ * @param label_manager Label manager
+ * @param cond If condition
+ * @param sig Statement signature
+ * @param true_content True case block body
+ * @param false_content False case block body
+ * @return Expression list
+ */
 wabt::ExprList* MakeIf(LabelManager* label_manager, wabt::ExprList* cond, wabt::FuncSignature sig,
                        std::function<void(BlockBody, wabt::Var)> true_content,
                        std::function<void(BlockBody)> false_content = {});
 
-// Make arithmetic expression
+/*!
+ * Make a Wasm unary operation
+ * @param opcode Operation
+ * @param op Operand
+ * @return Expression list
+ */
 wabt::ExprList* MakeUnary(wabt::Opcode opcode, wabt::ExprList* op);
+
+/*!
+ * Make a Wasm binary operation
+ * @param opcode Operation
+ * @param op1 Left operand
+ * @param op2 Right operand
+ * @return Expression list
+ */
 wabt::ExprList* MakeBinary(wabt::Opcode opcode, wabt::ExprList* op1, wabt::ExprList* op2);
 
-// Make constants
+/*!
+ * Make a Wasm i32 constant
+ * @param val Value
+ * @return Expression list
+ */
 wabt::ExprList* MakeI32Const(uint32_t val);
+
+/*!
+ * Make a Wasm i64 constant
+ * @param val Value
+ * @return Expression list
+ */
 wabt::ExprList* MakeI64Const(uint64_t val);
+
+/*!
+ * Make a Wasm f32 constant
+ * @param val Value
+ * @return Expression list
+ */
 wabt::ExprList* MakeF32Const(float val);
+
+/*!
+ * Make a Wasm f64 constant
+ * @param val Value
+ * @return Expression list
+ */
 wabt::ExprList* MakeF64Const(double val);
 
 // Make SIMD extract lane
@@ -101,20 +176,59 @@ EXTRACT_LANE_LIST(DECLARE_EXTRACT)
   STORE_INSTRUCTIONS_LIST(DECLARE_STORE)
 #undef DECLARE_STORE
 
-// Make branch
+/*!
+ * Make a branch instruction
+ * @param label Reference variable of a loop
+ * @return Expression list
+ */
 wabt::ExprList* MakeBr(wabt::Var label);
+
+/*!
+ * Make a branch-if instruction
+ * @param label Reference variable of a loop
+ * @return Expression list
+ */
 wabt::ExprList* MakeBrIf(wabt::Var label, wabt::ExprList* cond);
 
-// Make locals
+/*!
+ * Make Wasm local get instruction
+ * @param var Local reference variable
+ * @return Expression list
+ */
 wabt::ExprList* MakeLocalGet(wabt::Var var);
+
+/*!
+ * Make Wasm local set instruction
+ * @param var Local reference variable
+ * @return Expression list
+ */
 wabt::ExprList* MakeLocalSet(wabt::Var var, wabt::ExprList* val);
+
+/*!
+ * Make Wasm local tee instruction
+ * @param var Local reference variable
+ * @return Expression list
+ */
 wabt::ExprList* MakeLocalTree(wabt::Var var, wabt::ExprList* val);
 
-// Make calls
+/*!
+ * Make a function call
+ * @param var Function reference variable
+ * @param args List of arguments
+ * @return Expression list
+ */
 wabt::ExprList* MakeCall(wabt::Var var, std::vector<wabt::ExprList*> args);
 
-// Misc
+/*!
+ * Make a Wasm drop instruction
+ * @return Expression list
+ */
 wabt::ExprList* MakeDrop();
+
+/*!
+ * Make a Wasm nop instruction
+ * @return Expression list
+ */
 wabt::ExprList* MakeNop();
 
 #ifdef WABT_EXPERIMENTAL

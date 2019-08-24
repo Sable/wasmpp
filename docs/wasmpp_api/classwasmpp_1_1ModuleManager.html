@@ -69,45 +69,403 @@ $(function() {
 <div class="title">wasmpp::ModuleManager Class Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>WebAssembly module manager.  
+ <a href="classwasmpp_1_1ModuleManager.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:af1ea9cb7a0aeb2fddcd94ab94fb346fb"><td class="memItemLeft" align="right" valign="top"><a id="af1ea9cb7a0aeb2fddcd94ab94fb346fb"></a>
-const wabt::Module &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>GetModule</b> () const</td></tr>
-<tr class="separator:af1ea9cb7a0aeb2fddcd94ab94fb346fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae57152e18a685dde654ef8aedc530a12"><td class="memItemLeft" align="right" valign="top"><a id="ae57152e18a685dde654ef8aedc530a12"></a>
-<a class="el" href="classwasmpp_1_1MemoryManager.html">MemoryManager</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>Memory</b> ()</td></tr>
+<tr class="memitem:a169dcc35ace64740e4bb788863f9dfb1"><td class="memItemLeft" align="right" valign="top">const wabt::Module &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a169dcc35ace64740e4bb788863f9dfb1">GetModule</a> () const</td></tr>
+<tr class="separator:a169dcc35ace64740e4bb788863f9dfb1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae57152e18a685dde654ef8aedc530a12"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classwasmpp_1_1MemoryManager.html">MemoryManager</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#ae57152e18a685dde654ef8aedc530a12">Memory</a> ()</td></tr>
 <tr class="separator:ae57152e18a685dde654ef8aedc530a12"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9e9112ae986af1abbbd6ea267aa84bd"><td class="memItemLeft" align="right" valign="top"><a id="af9e9112ae986af1abbbd6ea267aa84bd"></a>
-<a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>Label</b> ()</td></tr>
+<tr class="memitem:af9e9112ae986af1abbbd6ea267aa84bd"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#af9e9112ae986af1abbbd6ea267aa84bd">Label</a> ()</td></tr>
 <tr class="separator:af9e9112ae986af1abbbd6ea267aa84bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae1b9daf59ce4402336c525b27d414913"><td class="memItemLeft" align="right" valign="top"><a id="ae1b9daf59ce4402336c525b27d414913"></a>
-bool&#160;</td><td class="memItemRight" valign="bottom"><b>Validate</b> ()</td></tr>
+<tr class="memitem:ae1b9daf59ce4402336c525b27d414913"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#ae1b9daf59ce4402336c525b27d414913">Validate</a> ()</td></tr>
 <tr class="separator:ae1b9daf59ce4402336c525b27d414913"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17fa8b2d4388befcf316ca1f135ab6d2"><td class="memItemLeft" align="right" valign="top"><a id="a17fa8b2d4388befcf316ca1f135ab6d2"></a>
-std::string&#160;</td><td class="memItemRight" valign="bottom"><b>ToWat</b> (bool folded, bool inline_import_export) const</td></tr>
+<tr class="memitem:a17fa8b2d4388befcf316ca1f135ab6d2"><td class="memItemLeft" align="right" valign="top">std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a17fa8b2d4388befcf316ca1f135ab6d2">ToWat</a> (bool folded, bool inline_import_export) const</td></tr>
 <tr class="separator:a17fa8b2d4388befcf316ca1f135ab6d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaeb5ac61460c5de8c27726c41a9c15f6"><td class="memItemLeft" align="right" valign="top"><a id="aaeb5ac61460c5de8c27726c41a9c15f6"></a>
-wabt::OutputBuffer&#160;</td><td class="memItemRight" valign="bottom"><b>ToWasm</b> () const</td></tr>
+<tr class="memitem:aaeb5ac61460c5de8c27726c41a9c15f6"><td class="memItemLeft" align="right" valign="top">wabt::OutputBuffer&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#aaeb5ac61460c5de8c27726c41a9c15f6">ToWasm</a> () const</td></tr>
 <tr class="separator:aaeb5ac61460c5de8c27726c41a9c15f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4c87b8c7ef8c16cde3662a263fba0f60"><td class="memItemLeft" align="right" valign="top"><a id="a4c87b8c7ef8c16cde3662a263fba0f60"></a>
-wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><b>MakeFunction</b> (const char *name, wabt::FuncSignature sig, wabt::TypeVector locals, std::function&lt; void(<a class="el" href="classwasmpp_1_1ContentManager.html">FuncBody</a>, std::vector&lt; wabt::Var &gt;, std::vector&lt; wabt::Var &gt;)&gt; content)</td></tr>
+<tr class="memitem:a4c87b8c7ef8c16cde3662a263fba0f60"><td class="memItemLeft" align="right" valign="top">wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a4c87b8c7ef8c16cde3662a263fba0f60">MakeFunction</a> (const char *name, wabt::FuncSignature sig, wabt::TypeVector locals, std::function&lt; void(<a class="el" href="wasm-manager_8h.html#aa0bcce79cd2db618ca840898fcfb84de">FuncBody</a>, std::vector&lt; wabt::Var &gt;, std::vector&lt; wabt::Var &gt;)&gt; content)</td></tr>
 <tr class="separator:a4c87b8c7ef8c16cde3662a263fba0f60"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9753732fcb72eb28bf78a408d5d1e7f1"><td class="memItemLeft" align="right" valign="top"><a id="a9753732fcb72eb28bf78a408d5d1e7f1"></a>
-wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><b>MakeFuncImport</b> (std::string module, std::string function, wabt::FuncSignature sig)</td></tr>
+<tr class="memitem:a9753732fcb72eb28bf78a408d5d1e7f1"><td class="memItemLeft" align="right" valign="top">wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a9753732fcb72eb28bf78a408d5d1e7f1">MakeFuncImport</a> (std::string module, std::string function, wabt::FuncSignature sig)</td></tr>
 <tr class="separator:a9753732fcb72eb28bf78a408d5d1e7f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1aa852eabe999dd21e62b02c69af462f"><td class="memItemLeft" align="right" valign="top"><a id="a1aa852eabe999dd21e62b02c69af462f"></a>
-wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><b>MakeMemory</b> (uint32_t init_page, uint32_t max=0, bool shared=false)</td></tr>
+<tr class="memitem:a1aa852eabe999dd21e62b02c69af462f"><td class="memItemLeft" align="right" valign="top">wabt::Var&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a1aa852eabe999dd21e62b02c69af462f">MakeMemory</a> (uint32_t init_page, uint32_t max=0, bool shared=false)</td></tr>
 <tr class="separator:a1aa852eabe999dd21e62b02c69af462f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae132782db71844f922336c6c54799614"><td class="memItemLeft" align="right" valign="top"><a id="ae132782db71844f922336c6c54799614"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MakeData</b> (wabt::Var var, uint32_t index, std::vector&lt; <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> &gt; entries)</td></tr>
+<tr class="memitem:ae132782db71844f922336c6c54799614"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#ae132782db71844f922336c6c54799614">MakeData</a> (wabt::Var var, uint32_t index, std::vector&lt; <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> &gt; entries)</td></tr>
 <tr class="separator:ae132782db71844f922336c6c54799614"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a28d041bfbbf3cdfe7cb1bdea61ec9aef"><td class="memItemLeft" align="right" valign="top"><a id="a28d041bfbbf3cdfe7cb1bdea61ec9aef"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>MakeMemoryExport</b> (std::string name, wabt::Var var)</td></tr>
+<tr class="memitem:a28d041bfbbf3cdfe7cb1bdea61ec9aef"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ModuleManager.html#a28d041bfbbf3cdfe7cb1bdea61ec9aef">MakeMemoryExport</a> (std::string name, wabt::Var var)</td></tr>
 <tr class="separator:a28d041bfbbf3cdfe7cb1bdea61ec9aef"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this class was generated from the following file:<ul>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>WebAssembly module manager. </p>
+</div><h2 class="groupheader">Member Function Documentation</h2>
+<a id="a169dcc35ace64740e4bb788863f9dfb1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a169dcc35ace64740e4bb788863f9dfb1">&#9670;&nbsp;</a></span>GetModule()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const wabt::Module &amp; wasmpp::ModuleManager::GetModule </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Get WABT module object </p><dl class="section return"><dt>Returns</dt><dd>Module </dd></dl>
+
+</div>
+</div>
+<a id="af9e9112ae986af1abbbd6ea267aa84bd"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af9e9112ae986af1abbbd6ea267aa84bd">&#9670;&nbsp;</a></span>Label()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a>&amp; wasmpp::ModuleManager::Label </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Get label manager </p><dl class="section return"><dt>Returns</dt><dd>Label manager </dd></dl>
+
+</div>
+</div>
+<a id="ae132782db71844f922336c6c54799614"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae132782db71844f922336c6c54799614">&#9670;&nbsp;</a></span>MakeData()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void wasmpp::ModuleManager::MakeData </td>
+          <td>(</td>
+          <td class="paramtype">wabt::Var&#160;</td>
+          <td class="paramname"><em>var</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>index</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::vector&lt; <a class="el" href="structwasmpp_1_1DataEntry.html">DataEntry</a> &gt;&#160;</td>
+          <td class="paramname"><em>entries</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Make a data section. <br />
+ Insert data in little-endian format </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">var</td><td>Linear memory reference variable </td></tr>
+    <tr><td class="paramname">index</td><td>Index where data is inserted </td></tr>
+    <tr><td class="paramname">entries</td><td>List of data entries </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a9753732fcb72eb28bf78a408d5d1e7f1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9753732fcb72eb28bf78a408d5d1e7f1">&#9670;&nbsp;</a></span>MakeFuncImport()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">wabt::Var wasmpp::ModuleManager::MakeFuncImport </td>
+          <td>(</td>
+          <td class="paramtype">std::string&#160;</td>
+          <td class="paramname"><em>module</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::string&#160;</td>
+          <td class="paramname"><em>function</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">wabt::FuncSignature&#160;</td>
+          <td class="paramname"><em>sig</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Make a Wasm import function <br />
+ e.g. <code>("module" "function" (func $var (param i32) (result i32)))</code> </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">module</td><td>Module name </td></tr>
+    <tr><td class="paramname">function</td><td>Function name </td></tr>
+    <tr><td class="paramname">sig</td><td>Function signature </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Function variable used to call it e.g. <code>call $var</code> </dd></dl>
+
+</div>
+</div>
+<a id="a4c87b8c7ef8c16cde3662a263fba0f60"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a4c87b8c7ef8c16cde3662a263fba0f60">&#9670;&nbsp;</a></span>MakeFunction()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">wabt::Var wasmpp::ModuleManager::MakeFunction </td>
+          <td>(</td>
+          <td class="paramtype">const char *&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">wabt::FuncSignature&#160;</td>
+          <td class="paramname"><em>sig</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">wabt::TypeVector&#160;</td>
+          <td class="paramname"><em>locals</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::function&lt; void(<a class="el" href="wasm-manager_8h.html#aa0bcce79cd2db618ca840898fcfb84de">FuncBody</a>, std::vector&lt; wabt::Var &gt;, std::vector&lt; wabt::Var &gt;)&gt;&#160;</td>
+          <td class="paramname"><em>content</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Make a Wasm function </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">name</td><td>Export name </td></tr>
+    <tr><td class="paramname">sig</td><td>Function signature </td></tr>
+    <tr><td class="paramname">locals</td><td>Function locals </td></tr>
+    <tr><td class="paramname">content</td><td>Function body </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Function variable used to call it e.g. <code>call $var</code> </dd></dl>
+
+</div>
+</div>
+<a id="a1aa852eabe999dd21e62b02c69af462f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1aa852eabe999dd21e62b02c69af462f">&#9670;&nbsp;</a></span>MakeMemory()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">wabt::Var wasmpp::ModuleManager::MakeMemory </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>init_page</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>max</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>shared</em> = <code>false</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Make a Wasm linear memory in the module </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">init_page</td><td>Number of pages </td></tr>
+    <tr><td class="paramname">max</td><td>Maximum number of pages </td></tr>
+    <tr><td class="paramname">shared</td><td>Mark shared linear memory </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Create memory reference variable </dd></dl>
+
+</div>
+</div>
+<a id="a28d041bfbbf3cdfe7cb1bdea61ec9aef"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a28d041bfbbf3cdfe7cb1bdea61ec9aef">&#9670;&nbsp;</a></span>MakeMemoryExport()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void wasmpp::ModuleManager::MakeMemoryExport </td>
+          <td>(</td>
+          <td class="paramtype">std::string&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">wabt::Var&#160;</td>
+          <td class="paramname"><em>var</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Export linear memory </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">name</td><td>Export name </td></tr>
+    <tr><td class="paramname">var</td><td>Linear memory reference variable </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ae57152e18a685dde654ef8aedc530a12"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae57152e18a685dde654ef8aedc530a12">&#9670;&nbsp;</a></span>Memory()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classwasmpp_1_1MemoryManager.html">MemoryManager</a>&amp; wasmpp::ModuleManager::Memory </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Get memory manager </p><dl class="section return"><dt>Returns</dt><dd><a class="el" href="classwasmpp_1_1Memory.html" title="Block of bytes in the linear memory. ">Memory</a> manager </dd></dl>
+
+</div>
+</div>
+<a id="aaeb5ac61460c5de8c27726c41a9c15f6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aaeb5ac61460c5de8c27726c41a9c15f6">&#9670;&nbsp;</a></span>ToWasm()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">wabt::OutputBuffer wasmpp::ModuleManager::ToWasm </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Module to Wasm format </p><dl class="section note"><dt>Note</dt><dd>Uses WABT Wasm generator </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>Wasm binary in a buffer </dd></dl>
+
+</div>
+</div>
+<a id="a17fa8b2d4388befcf316ca1f135ab6d2"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a17fa8b2d4388befcf316ca1f135ab6d2">&#9670;&nbsp;</a></span>ToWat()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::string wasmpp::ModuleManager::ToWat </td>
+          <td>(</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>folded</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>inline_import_export</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Module to Wat format </p><dl class="section note"><dt>Note</dt><dd>Uses WABT Wat generator </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">folded</td><td>Tree structure </td></tr>
+    <tr><td class="paramname">inline_import_export</td><td>Inline import/export </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Wat code as string </dd></dl>
+
+</div>
+</div>
+<a id="ae1b9daf59ce4402336c525b27d414913"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae1b9daf59ce4402336c525b27d414913">&#9670;&nbsp;</a></span>Validate()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool wasmpp::ModuleManager::Validate </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Validate created Wasm module </p><dl class="section note"><dt>Note</dt><dd>Uses WABT validation </dd></dl>
+<dl class="section return"><dt>Returns</dt><dd>true if Wasm module is valid </dd></dl>
+
+</div>
+</div>
+<hr/>The documentation for this class was generated from the following files:<ul>
 <li>src/wasmpp/<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a></li>
+<li>src/wasmpp/wasm-manager.cc</li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

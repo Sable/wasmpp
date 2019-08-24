@@ -1,6 +1,0 @@
-<map id="nn::snippet::Snippet" name="nn::snippet::Snippet">
-<area shape="rect" id="node2" href="$classnn_1_1snippet_1_1AnalysisSnippet.html" title="nn::snippet::AnalysisSnippet" alt="" coords="35,80,223,107"/>
-<area shape="rect" id="node4" href="$classnn_1_1snippet_1_1MatrixSnippet.html" title="nn::snippet::MatrixSnippet" alt="" coords="255,80,430,107"/>
-<area shape="rect" id="node3" href="$classnn_1_1snippet_1_1AnalysisSnippetSimd.html" title="nn::snippet::AnalysisSnippetSimd" alt="" coords="5,155,224,181"/>
-<area shape="rect" id="node5" href="$classnn_1_1snippet_1_1MatrixSnippetSimd.html" title="nn::snippet::MatrixSnippetSimd" alt="" coords="249,155,453,181"/>
-</map>

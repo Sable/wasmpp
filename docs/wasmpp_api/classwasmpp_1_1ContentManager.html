@@ -69,21 +69,123 @@ $(function() {
 <div class="title">wasmpp::ContentManager Class Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>Manage the content of a Wasm instruction block e.g. <code>block</code>, <code>loop</code>, <code>if</code>, etc ...  
+ <a href="classwasmpp_1_1ContentManager.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a9cd0cb437fc371457278755c52336645"><td class="memItemLeft" align="right" valign="top"><a id="a9cd0cb437fc371457278755c52336645"></a>
-void&#160;</td><td class="memItemRight" valign="bottom"><b>Insert</b> (wabt::ExprList *e)</td></tr>
+<tr class="memitem:a9cd0cb437fc371457278755c52336645"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ContentManager.html#a9cd0cb437fc371457278755c52336645">Insert</a> (wabt::ExprList *e)</td></tr>
+<tr class="memdesc:a9cd0cb437fc371457278755c52336645"><td class="mdescLeft">&#160;</td><td class="mdescRight">Insert expression list.  <a href="#a9cd0cb437fc371457278755c52336645">More...</a><br /></td></tr>
 <tr class="separator:a9cd0cb437fc371457278755c52336645"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a67cd3898bfc4038886b621f201e9f6ea"><td class="memItemLeft" align="right" valign="top"><a id="a67cd3898bfc4038886b621f201e9f6ea"></a>
-&#160;</td><td class="memItemRight" valign="bottom"><b>ContentManager</b> (<a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> *label_manager, wabt::ExprList *expr_list)</td></tr>
+<tr class="memitem:a67cd3898bfc4038886b621f201e9f6ea"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ContentManager.html#a67cd3898bfc4038886b621f201e9f6ea">ContentManager</a> (<a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> *label_manager, wabt::ExprList *expr_list)</td></tr>
+<tr class="memdesc:a67cd3898bfc4038886b621f201e9f6ea"><td class="mdescLeft">&#160;</td><td class="mdescRight">Create a new content manager.  <a href="#a67cd3898bfc4038886b621f201e9f6ea">More...</a><br /></td></tr>
 <tr class="separator:a67cd3898bfc4038886b621f201e9f6ea"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a91097d5d37fc8397dc063d903891d427"><td class="memItemLeft" align="right" valign="top"><a id="a91097d5d37fc8397dc063d903891d427"></a>
-<a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>Label</b> () const</td></tr>
+<tr class="memitem:a91097d5d37fc8397dc063d903891d427"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1ContentManager.html#a91097d5d37fc8397dc063d903891d427">Label</a> () const</td></tr>
+<tr class="memdesc:a91097d5d37fc8397dc063d903891d427"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get label manager.  <a href="#a91097d5d37fc8397dc063d903891d427">More...</a><br /></td></tr>
 <tr class="separator:a91097d5d37fc8397dc063d903891d427"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this class was generated from the following file:<ul>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Manage the content of a Wasm instruction block e.g. <code>block</code>, <code>loop</code>, <code>if</code>, etc ... </p>
+</div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
+<a id="a67cd3898bfc4038886b621f201e9f6ea"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a67cd3898bfc4038886b621f201e9f6ea">&#9670;&nbsp;</a></span>ContentManager()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">wasmpp::ContentManager::ContentManager </td>
+          <td>(</td>
+          <td class="paramtype"><a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a> *&#160;</td>
+          <td class="paramname"><em>label_manager</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">wabt::ExprList *&#160;</td>
+          <td class="paramname"><em>expr_list</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Create a new content manager. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">label_manager</td><td>Label manager </td></tr>
+    <tr><td class="paramname">expr_list</td><td>Expression list </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<h2 class="groupheader">Member Function Documentation</h2>
+<a id="a9cd0cb437fc371457278755c52336645"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a9cd0cb437fc371457278755c52336645">&#9670;&nbsp;</a></span>Insert()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void wasmpp::ContentManager::Insert </td>
+          <td>(</td>
+          <td class="paramtype">wabt::ExprList *&#160;</td>
+          <td class="paramname"><em>e</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Insert expression list. </p>
+<dl class="section warning"><dt>Warning</dt><dd>Do not re-use the input list as it will become empty after calling this method </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">e</td><td>Expression list </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a91097d5d37fc8397dc063d903891d427"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a91097d5d37fc8397dc063d903891d427">&#9670;&nbsp;</a></span>Label()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="classwasmpp_1_1LabelManager.html">LabelManager</a>* wasmpp::ContentManager::Label </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Get label manager. </p>
+<dl class="section return"><dt>Returns</dt><dd>Label manager </dd></dl>
+
+</div>
+</div>
+<hr/>The documentation for this class was generated from the following files:<ul>
 <li>src/wasmpp/<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a></li>
+<li>src/wasmpp/wasm-manager.cc</li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

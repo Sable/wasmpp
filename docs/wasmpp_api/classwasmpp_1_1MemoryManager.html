@@ -70,26 +70,28 @@ $(function() {
 <div class="title">wasmpp::MemoryManager Class Reference<span class="mlabels"><span class="mlabel">abstract</span></span></div>  </div>
 </div><!--header-->
 <div class="contents">
+
+<p>Linear memory manager.  
+ <a href="classwasmpp_1_1MemoryManager.html#details">More...</a></p>
+
+<p><code>#include &lt;<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a>&gt;</code></p>
 <div class="dynheader">
 Inheritance diagram for wasmpp::MemoryManager:</div>
 <div class="dyncontent">
 <div class="center"><img src="classwasmpp_1_1MemoryManager__inherit__graph.png" border="0" usemap="#wasmpp_1_1MemoryManager_inherit__map" alt="Inheritance graph"/></div>
 <map name="wasmpp_1_1MemoryManager_inherit__map" id="wasmpp_1_1MemoryManager_inherit__map">
-<area shape="rect" id="node2" href="classwasmpp_1_1FirstFit.html" title="wasmpp::FirstFit" alt="" coords="33,80,153,107"/>
+<area shape="rect" id="node2" href="classwasmpp_1_1FirstFit.html" title="First fit memory manager. " alt="" coords="33,80,153,107"/>
 </map>
 <center><span class="legend">[<a href="graph_legend.html">legend</a>]</span></center></div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a15006dde7a07b7bf24159ff615fa59a9"><td class="memItemLeft" align="right" valign="top"><a id="a15006dde7a07b7bf24159ff615fa59a9"></a>
-virtual <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>Allocate</b> (uint32_t k)=0</td></tr>
+<tr class="memitem:a15006dde7a07b7bf24159ff615fa59a9"><td class="memItemLeft" align="right" valign="top">virtual <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1MemoryManager.html#a15006dde7a07b7bf24159ff615fa59a9">Allocate</a> (uint32_t k)=0</td></tr>
 <tr class="separator:a15006dde7a07b7bf24159ff615fa59a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a939fc4bc1201142ba9fd2e80b2362919"><td class="memItemLeft" align="right" valign="top"><a id="a939fc4bc1201142ba9fd2e80b2362919"></a>
-virtual bool&#160;</td><td class="memItemRight" valign="bottom"><b>Free</b> (const <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> *m)</td></tr>
-<tr class="separator:a939fc4bc1201142ba9fd2e80b2362919"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a17404143292bc6cac1ae028f92d13345"><td class="memItemLeft" align="right" valign="top"><a id="a17404143292bc6cac1ae028f92d13345"></a>
-virtual uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>Pages</b> ()</td></tr>
-<tr class="separator:a17404143292bc6cac1ae028f92d13345"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa1222ccb576543da62c7f7c77509c67f"><td class="memItemLeft" align="right" valign="top">virtual bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1MemoryManager.html#aa1222ccb576543da62c7f7c77509c67f">Free</a> (const <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> *m)</td></tr>
+<tr class="separator:aa1222ccb576543da62c7f7c77509c67f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a353d38741a049570848a22ae382efae1"><td class="memItemLeft" align="right" valign="top">virtual uint32_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classwasmpp_1_1MemoryManager.html#a353d38741a049570848a22ae382efae1">Pages</a> ()</td></tr>
+<tr class="separator:a353d38741a049570848a22ae382efae1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pro-attribs"></a>
 Protected Attributes</h2></td></tr>
@@ -97,8 +99,104 @@ Protected Attributes</h2></td></tr>
 std::vector&lt; <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> * &gt;&#160;</td><td class="memItemRight" valign="bottom"><b>memories_</b></td></tr>
 <tr class="separator:a8e3878a684129fcfa3f4f64e404beaef"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
-<hr/>The documentation for this class was generated from the following file:<ul>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Linear memory manager. </p>
+</div><h2 class="groupheader">Member Function Documentation</h2>
+<a id="a15006dde7a07b7bf24159ff615fa59a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a15006dde7a07b7bf24159ff615fa59a9">&#9670;&nbsp;</a></span>Allocate()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">virtual <a class="el" href="classwasmpp_1_1Memory.html">Memory</a>* wasmpp::MemoryManager::Allocate </td>
+          <td>(</td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>k</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">pure virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Allocate block in the linear memory </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">k</td><td>Number of bytes </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Pointer to the allocated block of memory </dd></dl>
+
+</div>
+</div>
+<a id="aa1222ccb576543da62c7f7c77509c67f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa1222ccb576543da62c7f7c77509c67f">&#9670;&nbsp;</a></span>Free()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool wasmpp::MemoryManager::Free </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="classwasmpp_1_1Memory.html">Memory</a> *&#160;</td>
+          <td class="paramname"><em>m</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Free block </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">m</td><td>Pointer to the allocated block of memory </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true if successful </dd></dl>
+
+</div>
+</div>
+<a id="a353d38741a049570848a22ae382efae1"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a353d38741a049570848a22ae382efae1">&#9670;&nbsp;</a></span>Pages()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">uint32_t wasmpp::MemoryManager::Pages </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">virtual</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Get number of Wasm pages </p><dl class="section return"><dt>Returns</dt><dd>Number of Wasm pages </dd></dl>
+
+</div>
+</div>
+<hr/>The documentation for this class was generated from the following files:<ul>
 <li>src/wasmpp/<a class="el" href="wasm-manager_8h_source.html">wasm-manager.h</a></li>
+<li>src/wasmpp/wasm-manager.cc</li>
 </ul>
 </div><!-- contents -->
 <!-- start footer part -->

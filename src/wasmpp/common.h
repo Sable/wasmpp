@@ -1,3 +1,6 @@
+/*!
+ * @file common.h
+ */
 #ifndef WASMPP_COMMON_H_
 #define WASMPP_COMMON_H_
 
@@ -29,10 +32,27 @@ const uint32_t WASMPP_F64_SIZE = 8;
 const uint32_t WASMPP_V128_SIZE = 16;
 
 // Size of types
+/*!
+ * Get Wasm type size
+ * @param type Wasm type
+ * @return size in bytes
+ */
 uint32_t TypeSize(wabt::Type type);
+
+/*!
+ * Shift left value for a Wasm type <br/>
+ * e.g. <code>sizeof(i32) = 4</code> -> <code>(1 << 2)</code>. <br/>
+ * Therefore <code>TypeShiftLeft(i32)</code> is 2
+ * @param type
+ * @return
+ */
 uint32_t TypeShiftLeft(wabt::Type type);
 
-// Opcode conversion to SIMD opcode
+/*!
+ * Get the SIMD version of a Wasm instruction
+ * @param op Opcode of the non-SIMD instruction
+ * @return Opcode of the SIMD instruction
+ */
 wabt::Opcode OpcodeToSimdOpcode(wabt::Opcode op);
 
 } // namespace wasmpp
