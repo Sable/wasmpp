@@ -1,3 +1,9 @@
+/*! \mainpage Wasm++
+ *
+ * This library allows creating <a href="https://github.com/WebAssembly/wabt">WABT</a>
+ * IR objects with a simplified API.
+ */
+
 #ifndef WASM_WASM_MANAGER_H_
 #define WASM_WASM_MANAGER_H_
 
@@ -39,17 +45,42 @@ private:
   wabt::ExprList* expr_list_ = nullptr;
   LabelManager* label_manager_ = nullptr;
 public:
-  // Extract the elements from input list
-  // into structure list. Do not re-use the
-  // input list as it will become empty after
-  // calling this method
+
+  /*!
+   * \brief Insert expression list
+   * \warning Do not re-use the input list as it will
+   * become empty after calling this method
+   * \param e Expression list
+   */
   void Insert(wabt::ExprList* e);
+
+  /*!
+   * \brief Manage the content of a Wasm instruction block
+   * e.g. <code>block</code>, <code>loop</code>, <code>if</code>, etc ...
+   * \param label_manager Label manager
+   * \param expr_list Expression list
+   */
   ContentManager(LabelManager* label_manager, wabt::ExprList* expr_list);
+
+  /*!
+   * \brief Get label manager
+   * \return Label manager
+   */
   LabelManager* Label() const { return label_manager_; };
 };
+
+/*!
+ * \brief Function body block
+ */
 typedef ContentManager FuncBody;
 
+/*!
+ * \brief A data entry or unit in the linear memory
+ */
 struct DataEntry {
+  /*!
+   * Entry value
+   */
   union {
     uint8_t byte;
     uint32_t i32;
@@ -57,6 +88,10 @@ struct DataEntry {
     float f32;
     double f64;
   } val;
+
+  /*!
+   * Entry kind
+   */
   enum Kind {
     Byte,
     I32,
@@ -64,6 +99,11 @@ struct DataEntry {
     F32,
     F64
   } kind;
+
+  /*!
+   * Entry size
+   * \return Number of bytes
+   */
   uint32_t Size() const {
     if(kind == I32) return WASMPP_I32_SIZE;
     if(kind == I64) return WASMPP_I64_SIZE;
@@ -71,10 +111,36 @@ struct DataEntry {
     if(kind == F64) return WASMPP_F64_SIZE;
     assert(kind == Byte); return 1;
   }
+
+  /*!
+   * Make an i32 data entry
+   * @param val Value
+   * @return Data entry
+   */
   static DataEntry MakeI32(uint32_t val);
+  /*!
+   * Make an i64 data entry
+   * @param val Value
+   * @return Data entry
+   */
   static DataEntry MakeI64(uint64_t val);
+  /*!
+   * Make an f32 data entry
+   * @param val Value
+   * @return Data entry
+   */
   static DataEntry MakeF32(float val);
+  /*!
+   * Make an f64 data entry
+   * @param val Value
+   * @return Data entry
+   */
   static DataEntry MakeF64(double val);
+  /*!
+   * Make a byte data entry
+   * @param val Value
+   * @return Data entry
+   */
   static DataEntry MakeByte(uint8_t val);
 };
 
