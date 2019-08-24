@@ -6,6 +6,12 @@ WASMPP_DOXYGEN="$DOCS_DST/wasmpp_api"
 WASMDDNN_DOXYGEN="$DOCS_DST/wasmdnn_api"
 DOXYGEN_DST="$PWD/build/doxygen"
 
+# Remove old build
+echo ">> Removing old docs and build (if any)"
+rm -rf "$DOXYGEN_DST"
+rm -rf "$WASMPP_DOXYGEN"
+rm -rf "$WASMDDNN_DOXYGEN"
+
 # Build doxygen
 echo ">> Building doxygen files ..."
 mkdir -p $DOXYGEN_DST
